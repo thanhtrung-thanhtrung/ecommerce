@@ -1,0 +1,603 @@
+{
+  "info": {
+    "name": "Shoes Shop API",
+    "description": "API Collection cho Shop Giày",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Các API xác thực",
+      "item": [
+        {
+          "name": "Đăng ký",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "email": "user@example.com",
+                "matKhau": "123456",
+                "hoTen": "Nguyễn Văn A",
+                "soDienThoai": "0987654321",
+                "diaChi": "123 Đường ABC, Quận XYZ, TP.HCM"
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "email": "user@example.com",
+                "matKhau": "123456"
+              }
+            }
+          }
+        },
+        {
+          "name": "Quên mật khẩu",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/forgot-password",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "forgot-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "email": "user@example.com"
+              }
+            }
+          }
+        },
+        {
+          "name": "Đặt lại mật khẩu",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/reset-password/:token",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "reset-password", ":token"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "reset_token_here"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "matKhau": "new_password",
+                "xacNhanMatKhau": "new_password"
+              }
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh-token",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh-token"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "refreshToken": "refresh_token_here"
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng xuất",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "refreshToken": "refresh_token_here"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "description": "Các API quản lý người dùng",
+      "item": [
+        {
+          "name": "Xem thông tin cá nhân",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/profile",
+              "host": ["{{base_url}}"],
+              "path": ["users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Cập nhật thông tin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/profile",
+              "host": ["{{base_url}}"],
+              "path": ["users", "profile"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "hoTen": "Nguyễn Văn A",
+                "soDienThoai": "0987654321",
+                "diaChi": "123 Đường ABC, Quận XYZ, TP.HCM"
+              }
+            }
+          }
+        },
+        {
+          "name": "Đổi mật khẩu",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/change-password",
+              "host": ["{{base_url}}"],
+              "path": ["users", "change-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "matKhauCu": "old_password",
+                "matKhauMoi": "new_password",
+                "xacNhanMatKhau": "new_password"
+              }
+            }
+          }
+        },
+        {
+          "name": "Xem wishlist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/wishlist",
+              "host": ["{{base_url}}"],
+              "path": ["users", "wishlist"]
+            }
+          }
+        },
+        {
+          "name": "Thêm vào wishlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/wishlist",
+              "host": ["{{base_url}}"],
+              "path": ["users", "wishlist"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "id_SanPham": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "description": "Các API quản lý sản phẩm",
+      "item": [
+        {
+          "name": "Danh sách sản phẩm",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tìm kiếm sản phẩm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/search",
+              "host": ["{{base_url}}"],
+              "path": ["products", "search"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "tuKhoa": "giày nike",
+                "id_DanhMuc": 1,
+                "id_ThuongHieu": 1,
+                "giaMin": 100000,
+                "giaMax": 1000000
+              }
+            }
+          }
+        },
+        {
+          "name": "Chi tiết sản phẩm",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products/:id",
+              "host": ["{{base_url}}"],
+              "path": ["products", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Đánh giá sản phẩm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/:id/review",
+              "host": ["{{base_url}}"],
+              "path": ["products", ":id", "review"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "noiDung": "Sản phẩm rất tốt",
+                "diem": 5
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "description": "Các API quản lý giỏ hàng",
+      "item": [
+        {
+          "name": "Xem giỏ hàng",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/cart",
+              "host": ["{{base_url}}"],
+              "path": ["cart"]
+            }
+          }
+        },
+        {
+          "name": "Thêm vào giỏ hàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cart",
+              "host": ["{{base_url}}"],
+              "path": ["cart"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "id_ChiTietSanPham": 1,
+                "soLuong": 1
+              }
+            }
+          }
+        },
+        {
+          "name": "Cập nhật giỏ hàng",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cart/:id",
+              "host": ["{{base_url}}"],
+              "path": ["cart", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "soLuong": 2
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Order",
+      "description": "Các API quản lý đơn hàng",
+      "item": [
+        {
+          "name": "Tạo đơn hàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "diaChiGiao": "123 Đường ABC, Quận XYZ, TP.HCM",
+                "soDienThoai": "0987654321",
+                "id_ThanhToan": 1,
+                "id_VanChuyen": 1,
+                "MaGiamGia": "SALE10",
+                "ghiChu": "Giao giờ hành chính"
+              }
+            }
+          }
+        },
+        {
+          "name": "Chi tiết đơn hàng",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/:id",
+              "host": ["{{base_url}}"],
+              "path": ["orders", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hủy đơn hàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/:id/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["orders", ":id", "cancel"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "lyDo": "Đổi ý không mua nữa"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "description": "Các API thanh toán",
+      "item": [
+        {
+          "name": "Tạo thanh toán",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/payments/create",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "create"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "id": 1,
+                "id_ThanhToan": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "access_token",
+      "value": "your_access_token_here"
+    }
+  ]
+}

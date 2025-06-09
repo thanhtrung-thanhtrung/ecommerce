@@ -1,0 +1,719 @@
+
+xây dựng dự án nghiệp vụ bán giày cho người việt sử dụng chỉ cần src/ frontend đễ mở rộng với reatjs vite .jsx .js taiwind với các thư viện như {{
+  "name": "kinhdoanh",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview" 
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "bcryptjs": "^2.4.3",
+    "firebase": "^11.4.0",
+    "formik": "^2.4.6",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-redux": "^9.1.2",
+    "react-router-dom": "^6.28.0",
+    "react-toastify": "^10.0.6",
+    "sass": "^1.81.0",
+    "yup": "^1.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.13.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "globals": "^15.11.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "vite": "^5.4.11"
+  }
+}
+}  
+
+
+với các quy trình 2.3.1.2.	Quy trình đăng ký
+Người dùng truy cập vào trang đăng ký, nhập họ tên, email và mật khẩu. Hệ thống kiểm tra định dạng email, độ dài mật khẩu và kiểm tra email đã tồn tại trong bảng 'nguoidung' hay chưa. Nếu hợp lệ, hệ thống lưu thông tin vào bảng 'nguoidung' với trạng thái chưa kích hoạt và gửi email xác thực. Khi người dùng nhấp vào liên kết xác nhận, trạng thái trong bảng 'nguoidung' được cập nhật thành đã kích hoạt.
+2.3.1.3.	Quy trình đăng nhập – đăng xuất
+Người dùng nhập email và mật khẩu trên trang đăng nhập. Hệ thống kiểm tra thông tin trong bảng 'nguoidung', nếu đúng sẽ tạo access token lưu vào session hoặc gửi về frontend. Khi đăng xuất, token bị xóa và phiên làm việc kết thúc.
+2.3.1.4.	Quy trình quản lý tài khoản người dùng
+Người dùng sau khi đăng nhập có thể truy cập trang quản lý tài khoản để cập nhật tên, địa chỉ, số điện thoại hoặc đổi mật khẩu. Thông tin được cập nhật vào bảng 'nguoidung'. Nếu chọn xóa tài khoản, hệ thống chuyển trạng thái tài khoản thành vô hiệu hóa.
+2.3.1.5.	Quy trình xem chi tiết sản phẩm
+Người dùng chọn một sản phẩm từ trang danh sách. Hệ thống truy vấn bảng 'sanpham' kết hợp với bảng 'thuonghieu', 'danhmuc', và 'hinhanh' để hiển thị thông tin chi tiết như tên sản phẩm, mô tả, giá, tồn kho, và hình ảnh tương ứng.
+2.3.1.6.	Quy trình lọc sản phẩm theo danh mục
+Người dùng chọn danh mục từ giao diện. Hệ thống truy vấn bảng 'sanpham' kết hợp bảng 'danhmuc' để lọc và hiển thị các sản phẩm thuộc danh mục đã chọn.
+2.3.1.7.	Quy trình tìm kiếm sản phẩm
+Người dùng nhập từ khóa vào ô tìm kiếm. Hệ thống tìm các sản phẩm có tên hoặc mô tả trong bảng 'sanpham' khớp với từ khóa và hiển thị kết quả.
+2.3.1.8.	Quy trình đánh giá sản phẩm
+Sau khi mua hàng, người dùng có thể đánh giá sản phẩm bằng cách để lại sao và bình luận. Hệ thống lưu vào bảng 'danhgia' có liên kết với 'nguoidung' và 'sanpham'. Admin duyệt trước khi hiển thị công khai.
+2.3.1.9.	Quy trình quản lý giỏ hàng
+Khi người dùng nhấn vào nút 'Thêm vào giỏ hàng' tại trang chi tiết sản phẩm, hệ thống kiểm tra số lượng tồn trong bảng 'sanpham_chitiet'. Nếu còn hàng, sản phẩm sẽ được thêm vào bảng 'giohang' hoặc cập nhật số lượng nếu đã tồn tại. Mỗi người dùng có một giỏ hàng riêng liên kết với ID người dùng.
+2.3.1.10.	Quy trình cập nhật giỏ hàng
+Người dùng vào trang giỏ hàng có thể thay đổi số lượng sản phẩm. Hệ thống kiểm tra số lượng tồn kho rồi cập nhật vào bảng 'giohang' tương ứng. Nếu vượt quá tồn kho, hiển thị thông báo lỗi.
+2.3.1.11.	Quy trình xóa sản phẩm khỏi giỏ hàng
+Người dùng có thể xóa từng sản phẩm khỏi giỏ hàng bằng cách nhấn vào nút xóa. Hệ thống thực hiện xóa dòng tương ứng trong bảng 'giohang' dựa trên ID người dùng và ID sản phẩm.
+2.3.1.12.	Quy trình quản lý thanh toán
+Sau khi người dùng xác nhận giỏ hàng, hệ thống chuyển đến trang thanh toán, nơi người dùng chọn phương thức thanh toán được lưu trong bảng 'pt_thanhtoan'. Nếu chọn trực tuyến, hệ thống tích hợp API để xử lý thanh toán online và lưu kết quả vào bảng 'hoadon'.
+2.3.1.13.	Quy trình áp dụng mã giảm giá khi thanh toán
+Người dùng có thể nhập mã giảm giá trong bước thanh toán. Hệ thống kiểm tra mã trong bảng 'magiamgia' xem còn hiệu lực và số lượt sử dụng. Nếu hợp lệ, hệ thống tính giảm giá và cập nhật vào hóa đơn.
+2.3.1.14.	Quy trình theo dõi đơn hàng và vận chuyển
+Người dùng vào trang 'Đơn hàng của tôi' để theo dõi trạng thái đơn hàng. Hệ thống truy vấn bảng 'donhang' và 'trangthai_vanchuyen' để hiển thị thông tin chi tiết về đơn hàng và tình trạng giao hàng.
+2.3.1.15.	Quy trình đặt hàng
+Sau khi xác nhận thông tin người nhận, phương thức thanh toán và vận chuyển, hệ thống tạo mới bản ghi trong bảng 'donhang', chi tiết vào 'chitiet_donhang', giảm tồn kho trong bảng 'sanpham_chitiet' tương ứng.
+2.3.1.16.	Quy trình hủy đơn hàng
+Người dùng có thể hủy đơn hàng nếu đơn chưa giao. Hệ thống kiểm tra trạng thái đơn hàng trong bảng 'donhang'. Nếu hợp lệ, cập nhật trạng thái đơn thành 'Đã hủy' và hoàn lại tồn kho.
+
+
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+
+# Database Configuration
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=shoes_shop
+DB_PORT=3306
+
+# JWT Configuration
+JWT_SECRET=shoes_shop_jwt_secret_key_2024
+JWT_REFRESH_SECRET=shoes_shop_refresh_secret_key_2024
+JWT_EXPIRES_IN=1h
+JWT_REFRESH_EXPIRES_IN=7d
+
+
+    SESSION_SECRET=a_very_long_and_random_string_for_your_session_secret_12345
+# Cloudinary Configuration
+CLOUDINARY_API_KEY=467159227754399
+CLOUDINARY_SECRET_KEY=EIZNUZwPNvEWaOclAVoDfAvX7lI
+CLOUDINARY_NAME=db7jn3ooa
+
+VITE_API_URL=http://localhost:5000/api/client
+VITE_API_TIMEOUT=5000
+
+
+trước tiên đọc thật kĩ @backend-shop  và @shoes_shop (18).sql  và @nghiepvu.txt    xem đã đủ để làm được các chức năng Chức năng khách hàng: 
+- Xác thực khách hàng: Đăng ký, đăng nhập, đăng xuất, quên mật khẩu. 
+- Tương tác sản phẩm: Tìm kiếm, lọc, đánh giá, xem chi tiết 
+- Quản lý tài khoản : Cập nhật thông tin tài khoản, đổi mật khẩu, xóa tài khoản.
+- Giỏ hàng: Thêm sản phẩm vào giỏ hàng, xóa sản phẩm khỏi giỏ hàng, cập nhật giỏ hàng, không cần đăng nhập vẫn mua được hàng
+- Mua hàng: Đặt hàng, thanh toán trực tuyến, theo dõi đơn hàng 
+- Wishlist: Thêm sản phẩm vào wishlist, xóa sản phẩm khỏi wishlist.
+
+
+
+{
+  "info": {
+    "name": "Shoes Shop API",
+    "description": "API Collection cho Shop Giày",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Các API xác thực",
+      "item": [
+        {
+          "name": "Đăng ký",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "email": "user@example.com",
+                "matKhau": "123456",
+                "hoTen": "Nguyễn Văn A",
+                "soDienThoai": "0987654321",
+                "diaChi": "123 Đường ABC, Quận XYZ, TP.HCM"
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng nhập",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "email": "user@example.com",
+                "matKhau": "123456"
+              }
+            }
+          }
+        },
+        {
+          "name": "Quên mật khẩu",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/forgot-password",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "forgot-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "email": "user@example.com"
+              }
+            }
+          }
+        },
+        {
+          "name": "Đặt lại mật khẩu",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/reset-password/:token",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "reset-password", ":token"],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "reset_token_here"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "matKhau": "new_password",
+                "xacNhanMatKhau": "new_password"
+              }
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh-token",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh-token"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "refreshToken": "refresh_token_here"
+              }
+            }
+          }
+        },
+        {
+          "name": "Đăng xuất",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "refreshToken": "refresh_token_here"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "description": "Các API quản lý người dùng",
+      "item": [
+        {
+          "name": "Xem thông tin cá nhân",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/profile",
+              "host": ["{{base_url}}"],
+              "path": ["users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Cập nhật thông tin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/profile",
+              "host": ["{{base_url}}"],
+              "path": ["users", "profile"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "hoTen": "Nguyễn Văn A",
+                "soDienThoai": "0987654321",
+                "diaChi": "123 Đường ABC, Quận XYZ, TP.HCM"
+              }
+            }
+          }
+        },
+        {
+          "name": "Đổi mật khẩu",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/change-password",
+              "host": ["{{base_url}}"],
+              "path": ["users", "change-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "matKhauCu": "old_password",
+                "matKhauMoi": "new_password",
+                "xacNhanMatKhau": "new_password"
+              }
+            }
+          }
+        },
+        {
+          "name": "Xem wishlist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/wishlist",
+              "host": ["{{base_url}}"],
+              "path": ["users", "wishlist"]
+            }
+          }
+        },
+        {
+          "name": "Thêm vào wishlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/wishlist",
+              "host": ["{{base_url}}"],
+              "path": ["users", "wishlist"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "id_SanPham": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "description": "Các API quản lý sản phẩm",
+      "item": [
+        {
+          "name": "Danh sách sản phẩm",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tìm kiếm sản phẩm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/search",
+              "host": ["{{base_url}}"],
+              "path": ["products", "search"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "tuKhoa": "giày nike",
+                "id_DanhMuc": 1,
+                "id_ThuongHieu": 1,
+                "giaMin": 100000,
+                "giaMax": 1000000
+              }
+            }
+          }
+        },
+        {
+          "name": "Chi tiết sản phẩm",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/products/:id",
+              "host": ["{{base_url}}"],
+              "path": ["products", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Đánh giá sản phẩm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/:id/review",
+              "host": ["{{base_url}}"],
+              "path": ["products", ":id", "review"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "noiDung": "Sản phẩm rất tốt",
+                "diem": 5
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "description": "Các API quản lý giỏ hàng",
+      "item": [
+        {
+          "name": "Xem giỏ hàng",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/cart",
+              "host": ["{{base_url}}"],
+              "path": ["cart"]
+            }
+          }
+        },
+        {
+          "name": "Thêm vào giỏ hàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cart",
+              "host": ["{{base_url}}"],
+              "path": ["cart"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "id_ChiTietSanPham": 1,
+                "soLuong": 1
+              }
+            }
+          }
+        },
+        {
+          "name": "Cập nhật giỏ hàng",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cart/:id",
+              "host": ["{{base_url}}"],
+              "path": ["cart", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "soLuong": 2
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Order",
+      "description": "Các API quản lý đơn hàng",
+      "item": [
+        {
+          "name": "Tạo đơn hàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "diaChiGiao": "123 Đường ABC, Quận XYZ, TP.HCM",
+                "soDienThoai": "0987654321",
+                "id_ThanhToan": 1,
+                "id_VanChuyen": 1,
+                "MaGiamGia": "SALE10",
+                "ghiChu": "Giao giờ hành chính"
+              }
+            }
+          }
+        },
+        {
+          "name": "Chi tiết đơn hàng",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/:id",
+              "host": ["{{base_url}}"],
+              "path": ["orders", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hủy đơn hàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/:id/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["orders", ":id", "cancel"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "lyDo": "Đổi ý không mua nữa"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "description": "Các API thanh toán",
+      "item": [
+        {
+          "name": "Tạo thanh toán",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/payments/create",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "create"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": {
+                "id": 1,
+                "id_ThanhToan": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "access_token",
+      "value": "your_access_token_here"
+    }
+  ]
+}
