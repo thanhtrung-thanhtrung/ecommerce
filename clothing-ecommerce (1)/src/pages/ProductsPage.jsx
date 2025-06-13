@@ -125,7 +125,7 @@ const ProductsPage = () => {
         return dispatch(
           searchProducts({
             searchData,
-            
+
             limit: ITEMS_PER_PAGE,
           })
         );

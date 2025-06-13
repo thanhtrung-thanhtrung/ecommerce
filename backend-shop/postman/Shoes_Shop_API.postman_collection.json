@@ -1,0 +1,304 @@
+{
+  "info": {
+    "name": "Shoes Shop API",
+    "description": "API cho hệ thống quản lý cửa hàng giày",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Sản Phẩm",
+      "description": "Quản lý sản phẩm",
+      "item": [
+        {
+          "name": "Lấy danh sách sản phẩm",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tìm kiếm sản phẩm",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/search?tuKhoa=giay&id_DanhMuc=1&id_ThuongHieu=1&giaMin=100000&giaMax=1000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "search"],
+              "query": [
+                {
+                  "key": "tuKhoa",
+                  "value": "giay"
+                },
+                {
+                  "key": "id_DanhMuc",
+                  "value": "1"
+                },
+                {
+                  "key": "id_ThuongHieu",
+                  "value": "1"
+                },
+                {
+                  "key": "giaMin",
+                  "value": "100000"
+                },
+                {
+                  "key": "giaMax",
+                  "value": "1000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Xem chi tiết sản phẩm",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "1"]
+            }
+          }
+        },
+        {
+          "name": "Kiểm tra tồn kho",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"soLuong\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/1/check-stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "1", "check-stock"]
+            }
+          }
+        },
+        {
+          "name": "Đánh giá sản phẩm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"noiDung\": \"Sản phẩm tốt\",\n    \"diemDanhGia\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/1/review",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "1", "review"]
+            }
+          }
+        },
+        {
+          "name": "Admin - Danh sách sản phẩm",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/admin/list?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "admin", "list"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin - Tạo sản phẩm mới",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "tenSanPham",
+                  "value": "Giày thể thao mới",
+                  "type": "text"
+                },
+                {
+                  "key": "moTa",
+                  "value": "Mô tả sản phẩm",
+                  "type": "text"
+                },
+                {
+                  "key": "thongSoKyThuat",
+                  "value": "Thông số kỹ thuật",
+                  "type": "text"
+                },
+                {
+                  "key": "gia",
+                  "value": "1000000",
+                  "type": "text"
+                },
+                {
+                  "key": "hinhAnh",
+                  "type": "file",
+                  "src": "/path/to/image.jpg"
+                },
+                {
+                  "key": "hinhAnhChiTiet",
+                  "type": "file",
+                  "src": "/path/to/detail.jpg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/admin/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "admin", "create"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Kho",
+      "description": "Quản lý kho và nhập hàng",
+      "item": [
+        {
+          "name": "Kiểm tra tồn kho",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"chiTietSanPhamId\": 1,\n    \"soLuong\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inventory/check-stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", "check-stock"]
+            }
+          }
+        },
+        {
+          "name": "Admin - Tạo phiếu nhập",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"ngayNhap\": \"2024-03-20\",\n    \"ghiChu\": \"Nhập hàng mới\",\n    \"chiTietNhap\": [\n        {\n            \"chiTietSanPhamId\": 1,\n            \"soLuong\": 10,\n            \"giaNhap\": 500000\n        }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inventory/admin/phieu-nhap/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", "admin", "phieu-nhap", "create"]
+            }
+          }
+        },
+        {
+          "name": "Admin - Danh sách phiếu nhập",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/admin/phieu-nhap/list?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", "admin", "phieu-nhap", "list"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thống kê tồn kho",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/thong-ke/ton-kho",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", "thong-ke", "ton-kho"]
+            }
+          }
+        },
+        {
+          "name": "Thống kê nhập kho",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/thong-ke/nhap-kho?tuNgay=2024-01-01&denNgay=2024-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", "thong-ke", "nhap-kho"],
+              "query": [
+                {
+                  "key": "tuNgay",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "denNgay",
+                  "value": "2024-12-31"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    }
+  ]
+}
