@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
+import axios from "axios";
 import { clearCart } from "../store/slices/cartSlice";
 import CheckoutSummary from "../components/Checkout/CheckoutSummary";
 import PaymentMethods from "../components/Checkout/PaymentMethods";
 import ShippingMethods from "../components/Checkout/ShippingMethods";
 import { formatCurrency } from "../utils/helpers";
-import axios from "axios";
+import orderAPI from "../services/orderAPI";
+import cartAPI from "../services/cartAPI";
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -42,9 +44,10 @@ const CheckoutPage = () => {
   useEffect(() => {
     const fetchCheckoutData = async () => {
       try {
+        // Sử dụng orderAPI service thay vì axios trực tiếp
         const [paymentResponse, shippingResponse] = await Promise.all([
-          axios.get("/api/payment-methods"),
-          axios.get("/api/shipping-methods"),
+          orderAPI.getPaymentMethods(),
+          orderAPI.getShippingMethods(),
         ]);
 
         // Ensure paymentMethods is always an array
@@ -62,7 +65,7 @@ const CheckoutPage = () => {
 
         if (Array.isArray(shippingData) && shippingData.length > 0) {
           setSelectedShippingMethod(shippingData[0].id);
-          setShippingFee(shippingData[0].PhiVanChuyen || 0);
+          setShippingFee(parseFloat(shippingData[0].PhiVanChuyen) || 0);
         }
       } catch (error) {
         console.error("Error fetching checkout data:", error);
@@ -92,17 +95,17 @@ const CheckoutPage = () => {
   }, []);
 
   const validationSchema = Yup.object({
-    TenNguoiNhan: Yup.string()
+    hoTen: Yup.string()
       .min(2, "Họ tên phải có ít nhất 2 ký tự")
       .max(50, "Họ tên không được quá 50 ký tự")
       .required("Vui lòng nhập họ tên"),
-    SDTNguoiNhan: Yup.string()
+    soDienThoai: Yup.string()
       .matches(/^(0[3|5|7|8|9])+([0-9]{8})$/, "Số điện thoại không hợp lệ")
       .required("Vui lòng nhập số điện thoại"),
-    Email: Yup.string()
+    email: Yup.string()
       .email("Email không hợp lệ")
       .required("Vui lòng nhập email"),
-    DiaChi: Yup.string()
+    diaChiGiao: Yup.string()
       .min(10, "Địa chỉ phải có ít nhất 10 ký tự")
       .required("Vui lòng nhập địa chỉ chi tiết"),
     thanhPho: Yup.string().required("Vui lòng chọn thành phố"),
@@ -140,39 +143,50 @@ const CheckoutPage = () => {
       }
 
       // Construct full address
-      const fullAddress = `${values.DiaChi}, ${selectedWard?.name || ""}, ${
+      const fullAddress = `${values.diaChiGiao}, ${selectedWard?.name || ""}, ${
         selectedDistrict?.name || ""
       }, ${selectedProvince?.name || ""}`;
 
-      // Prepare order data according to backend expectations
+      // Prepare order data theo định dạng backend mong muốn
       const orderData = {
-        DiaChiNhan: fullAddress,
-        SDTNguoiNhan: values.SDTNguoiNhan,
-        TenNguoiNhan: values.TenNguoiNhan,
-        Email: values.Email,
+        hoTen: values.hoTen,
+        email: values.email,
+        diaChiGiao: fullAddress,
+        soDienThoai: values.soDienThoai,
         id_ThanhToan: selectedPaymentMethod,
         id_VanChuyen: selectedShippingMethod,
         MaGiamGia: appliedVoucher ? voucherCode : null,
-        GhiChu: values.GhiChu || "",
+        ghiChu: values.ghiChu || "",
       };
 
       console.log("Order data:", orderData);
 
-      // Send request to create order with session ID for guests
-      const sessionId = !isAuthenticated
-        ? localStorage.getItem("guest_session_id")
-        : null;
-      let apiUrl = "/api/orders";
-      if (sessionId) {
-        apiUrl += `?sessionId=${sessionId}`;
-      }
+      let response;
 
-      // Call API to create order
-      const response = await axios.post(apiUrl, orderData);
+      if (isAuthenticated) {
+        // User đã đăng nhập
+        response = await orderAPI.createOrder(orderData);
+      } else {
+        // Khách vãng lai - gửi sessionId qua query parameter
+        const sessionId = localStorage.getItem("guestSessionId");
+        if (!sessionId) {
+          alert(
+            "Không tìm thấy session. Vui lòng thêm sản phẩm vào giỏ hàng trước"
+          );
+          navigate("/cart");
+          return;
+        }
+        response = await orderAPI.createGuestOrder(orderData, sessionId);
+      }
 
       if (response.data) {
         // Clear cart after successful order
         dispatch(clearCart());
+
+        // Clear guest session if exists
+        if (!isAuthenticated) {
+          localStorage.removeItem("guestSessionId");
+        }
 
         // Handle payment gateway redirect if needed
         if (response.data.paymentUrl) {
@@ -180,7 +194,10 @@ const CheckoutPage = () => {
         } else {
           // Redirect to success page
           navigate(`/order-success/${response.data.id}`, {
-            state: { orderSuccess: true },
+            state: {
+              orderSuccess: true,
+              orderData: response.data,
+            },
           });
         }
       }
@@ -189,9 +206,20 @@ const CheckoutPage = () => {
 
       if (error.response?.data?.errors) {
         // Handle validation errors from backend
-        Object.keys(error.response.data.errors).forEach((field) => {
-          setFieldError(field, error.response.data.errors[field]);
-        });
+        const errors = error.response.data.errors;
+        if (Array.isArray(errors)) {
+          // If errors is an array of validation errors
+          errors.forEach((err) => {
+            if (err.path) {
+              setFieldError(err.path, err.msg);
+            }
+          });
+        } else if (typeof errors === "object") {
+          // If errors is an object with field names as keys
+          Object.keys(errors).forEach((field) => {
+            setFieldError(field, errors[field]);
+          });
+        }
       } else {
         alert(error.response?.data?.message || "Có lỗi xảy ra khi đặt hàng");
       }
@@ -268,7 +296,7 @@ const CheckoutPage = () => {
         (method) => method.id === methodId
       );
       if (selectedMethod) {
-        setShippingFee(selectedMethod.PhiVanChuyen || 0);
+        setShippingFee(parseFloat(selectedMethod.PhiVanChuyen) || 0);
       }
     }
   };
@@ -280,10 +308,7 @@ const CheckoutPage = () => {
     }
 
     try {
-      const response = await axios.post("/api/vouchers/validate", {
-        code: voucherCode,
-        totalAmount,
-      });
+      const response = await orderAPI.validateCoupon(voucherCode, totalAmount);
 
       if (response.data && response.data.valid) {
         setAppliedVoucher(response.data.voucher);
@@ -315,14 +340,14 @@ const CheckoutPage = () => {
       <Formik
         enableReinitialize
         initialValues={{
-          TenNguoiNhan: user?.HoTen || "",
-          SDTNguoiNhan: user?.SDT || "",
-          Email: user?.Email || "",
-          DiaChi: "",
+          hoTen: user?.HoTen || "",
+          soDienThoai: user?.SDT || "",
+          email: user?.Email || "",
+          diaChiGiao: "",
           thanhPho: "",
           quan: "",
           phuong: "",
-          GhiChu: "",
+          ghiChu: "",
         }}
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
@@ -341,16 +366,16 @@ const CheckoutPage = () => {
                         Họ và tên *
                       </label>
                       <Field
-                        name="TenNguoiNhan"
+                        name="hoTen"
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          errors.TenNguoiNhan && touched.TenNguoiNhan
+                          errors.hoTen && touched.hoTen
                             ? "border-red-500"
                             : "border-gray-300"
                         }`}
                         placeholder="Nhập họ và tên"
                       />
                       <ErrorMessage
-                        name="TenNguoiNhan"
+                        name="hoTen"
                         component="div"
                         className="text-red-500 text-sm mt-1"
                       />
@@ -361,16 +386,16 @@ const CheckoutPage = () => {
                         Số điện thoại *
                       </label>
                       <Field
-                        name="SDTNguoiNhan"
+                        name="soDienThoai"
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          errors.SDTNguoiNhan && touched.SDTNguoiNhan
+                          errors.soDienThoai && touched.soDienThoai
                             ? "border-red-500"
                             : "border-gray-300"
                         }`}
                         placeholder="Nhập số điện thoại"
                       />
                       <ErrorMessage
-                        name="SDTNguoiNhan"
+                        name="soDienThoai"
                         component="div"
                         className="text-red-500 text-sm mt-1"
                       />
@@ -381,17 +406,17 @@ const CheckoutPage = () => {
                         Email *
                       </label>
                       <Field
-                        name="Email"
+                        name="email"
                         type="email"
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          errors.Email && touched.Email
+                          errors.email && touched.email
                             ? "border-red-500"
                             : "border-gray-300"
                         }`}
                         placeholder="Nhập email"
                       />
                       <ErrorMessage
-                        name="Email"
+                        name="email"
                         component="div"
                         className="text-red-500 text-sm mt-1"
                       />
@@ -402,16 +427,16 @@ const CheckoutPage = () => {
                         Địa chỉ chi tiết *
                       </label>
                       <Field
-                        name="DiaChi"
+                        name="diaChiGiao"
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          errors.DiaChi && touched.DiaChi
+                          errors.diaChiGiao && touched.diaChiGiao
                             ? "border-red-500"
                             : "border-gray-300"
                         }`}
                         placeholder="Số nhà, tên đường..."
                       />
                       <ErrorMessage
-                        name="DiaChi"
+                        name="diaChiGiao"
                         component="div"
                         className="text-red-500 text-sm mt-1"
                       />
@@ -512,7 +537,7 @@ const CheckoutPage = () => {
                       </label>
                       <Field
                         as="textarea"
-                        name="GhiChu"
+                        name="ghiChu"
                         rows="3"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Ghi chú thêm cho đơn hàng (không bắt buộc)"

@@ -1,4 +1,4 @@
-const db = require("../config/db");
+const db = require("../config/database");
 const ProductService = require("./product.service");
 const cloudinaryUtil = require("../utils/cloudinary.util");
 
@@ -42,12 +42,15 @@ class InventoryService {
 
   // Tạo phiếu nhập mới
   async createPhieuNhap(phieuNhapData, userId) {
-    let connection;
     const { id_NhaCungCap, chiTietPhieuNhap, GhiChu, hinhAnh } = phieuNhapData;
     const maPhieuNhap = await this.generateMaPhieuNhap();
 
+    let connection;
     try {
+      // Lấy connection từ pool
       connection = await db.getConnection();
+
+      // Bắt đầu transaction
       await connection.beginTransaction();
 
       // Tính tổng tiền
@@ -70,8 +73,8 @@ class InventoryService {
       const [result] = await connection.execute(
         `INSERT INTO phieunhap (
           MaPhieuNhap, NgayNhap, TongTien, id_NhaCungCap, 
-          id_NguoiTao, TrangThai, GhiChu, HinhAnh
-        ) VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)`,
+          id_NguoiTao, TrangThai, GhiChu
+        ) VALUES (?, NOW(), ?, ?, ?, ?, ?)`,
         [
           maPhieuNhap,
           tongTien,
@@ -79,7 +82,6 @@ class InventoryService {
           userId,
           1, // TrangThai = 1 (Chờ xác nhận)
           GhiChu,
-          imageData,
         ]
       );
 
@@ -99,13 +101,22 @@ class InventoryService {
         );
       }
 
+      // Commit transaction
       await connection.commit();
       return { id: phieuNhapId, MaPhieuNhap: maPhieuNhap };
     } catch (error) {
-      if (connection) await connection.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Error creating phieu nhap:", error);
       throw error;
     } finally {
-      if (connection) connection.release();
+      // Trả connection về pool
+      if (connection) {
+        connection.release();
+      }
     }
   }
 
@@ -113,7 +124,10 @@ class InventoryService {
   async confirmPhieuNhap(phieuNhapId) {
     let connection;
     try {
+      // Lấy connection từ pool
       connection = await db.getConnection();
+
+      // Bắt đầu transaction
       await connection.beginTransaction();
 
       // Kiểm tra trạng thái hiện tại
@@ -140,19 +154,7 @@ class InventoryService {
       for (const item of chiTietPhieuNhap) {
         const { id_ChiTietSanPham, SoLuong } = item;
 
-        // Kiểm tra xem chi tiết sản phẩm đã có cột TonKho chưa
-        const [chiTietSanPhamCheck] = await connection.execute(
-          "SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chitietsanpham' AND COLUMN_NAME = 'TonKho'"
-        );
-
-        // Nếu chưa có cột TonKho, thêm cột này vào bảng
-        if (chiTietSanPhamCheck.length === 0) {
-          await connection.execute(
-            "ALTER TABLE chitietsanpham ADD COLUMN TonKho INT DEFAULT 0"
-          );
-        }
-
-        // Cập nhật tồn kho
+        // Cập nhật tồn kho - database đã có sẵn cột TonKho
         await connection.execute(
           "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
           [SoLuong, id_ChiTietSanPham]
@@ -161,17 +163,26 @@ class InventoryService {
 
       // Cập nhật trạng thái phiếu nhập
       await connection.execute(
-        "UPDATE phieunhap SET TrangThai = 2, NgayCapNhat = NOW() WHERE id = ?",
+        "UPDATE phieunhap SET TrangThai = 2 WHERE id = ?",
         [phieuNhapId]
       );
 
+      // Commit transaction
       await connection.commit();
       return true;
     } catch (error) {
-      if (connection) await connection.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Error confirming phieu nhap:", error);
       throw error;
     } finally {
-      if (connection) connection.release();
+      // Trả connection về pool
+      if (connection) {
+        connection.release();
+      }
     }
   }
 
@@ -179,7 +190,10 @@ class InventoryService {
   async cancelPhieuNhap(phieuNhapId, lyDoHuy) {
     let connection;
     try {
+      // Lấy connection từ pool
       connection = await db.getConnection();
+
+      // Bắt đầu transaction
       await connection.beginTransaction();
 
       // Kiểm tra trạng thái hiện tại
@@ -200,34 +214,31 @@ class InventoryService {
 
       // Cập nhật trạng thái phiếu nhập
       await connection.execute(
-        "UPDATE phieunhap SET TrangThai = 3, GhiChu = CONCAT(GhiChu, ' | Lý do hủy: ', ?), NgayCapNhat = NOW() WHERE id = ?",
+        "UPDATE phieunhap SET TrangThai = 3, GhiChu = CONCAT(IFNULL(GhiChu, ''), ' | Lý do hủy: ', ?) WHERE id = ?",
         [lyDoHuy || "Không có lý do", phieuNhapId]
       );
 
+      // Commit transaction
       await connection.commit();
       return true;
     } catch (error) {
-      if (connection) await connection.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Error canceling phieu nhap:", error);
       throw error;
     } finally {
-      if (connection) connection.release();
+      // Trả connection về pool
+      if (connection) {
+        connection.release();
+      }
     }
   }
 
   // Kiểm tra số lượng tồn kho
   async checkStock(productVariantId, requestedQuantity) {
-    // Kiểm tra xem bảng có cột TonKho chưa
-    const [columnCheck] = await db.execute(
-      "SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chitietsanpham' AND COLUMN_NAME = 'TonKho'"
-    );
-
-    if (columnCheck.length === 0) {
-      // Nếu chưa có cột TonKho, thêm cột này vào bảng
-      await db.execute(
-        "ALTER TABLE chitietsanpham ADD COLUMN TonKho INT DEFAULT 0"
-      );
-    }
-
     const [result] = await db.execute(
       "SELECT TonKho FROM chitietsanpham WHERE id = ?",
       [productVariantId]
@@ -249,18 +260,6 @@ class InventoryService {
 
   // Cập nhật số lượng tồn kho (tăng hoặc giảm)
   async updateStock(productVariantId, quantity, increase = true) {
-    // Kiểm tra xem bảng có cột TonKho chưa
-    const [columnCheck] = await db.execute(
-      "SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chitietsanpham' AND COLUMN_NAME = 'TonKho'"
-    );
-
-    if (columnCheck.length === 0) {
-      // Nếu chưa có cột TonKho, thêm cột này vào bảng
-      await db.execute(
-        "ALTER TABLE chitietsanpham ADD COLUMN TonKho INT DEFAULT 0"
-      );
-    }
-
     if (increase) {
       await db.execute(
         "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
@@ -288,20 +287,11 @@ class InventoryService {
   async bulkUpdateStock(items, increase = true) {
     let connection;
     try {
+      // Lấy connection từ pool
       connection = await db.getConnection();
+
+      // Bắt đầu transaction
       await connection.beginTransaction();
-
-      // Kiểm tra xem bảng có cột TonKho chưa
-      const [columnCheck] = await connection.execute(
-        "SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chitietsanpham' AND COLUMN_NAME = 'TonKho'"
-      );
-
-      if (columnCheck.length === 0) {
-        // Nếu chưa có cột TonKho, thêm cột này vào bảng
-        await connection.execute(
-          "ALTER TABLE chitietsanpham ADD COLUMN TonKho INT DEFAULT 0"
-        );
-      }
 
       for (const item of items) {
         const { id_ChiTietSanPham, SoLuong } = item;
@@ -336,13 +326,22 @@ class InventoryService {
         }
       }
 
+      // Commit transaction
       await connection.commit();
       return true;
     } catch (error) {
-      if (connection) await connection.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Error bulk updating stock:", error);
       throw error;
     } finally {
-      if (connection) connection.release();
+      // Trả connection về pool
+      if (connection) {
+        connection.release();
+      }
     }
   }
 
@@ -490,13 +489,9 @@ class InventoryService {
 
   // Cập nhật phiếu nhập
   async updatePhieuNhap(phieuNhapId, updateData) {
-    let connection;
     try {
-      connection = await db.getConnection();
-      await connection.beginTransaction();
-
       // Kiểm tra phiếu nhập tồn tại
-      const [phieuNhap] = await connection.execute(
+      const [phieuNhap] = await db.execute(
         "SELECT * FROM phieunhap WHERE id = ?",
         [phieuNhapId]
       );
@@ -507,7 +502,7 @@ class InventoryService {
 
       // Cập nhật thông tin phiếu nhập
       const { GhiChu, TrangThai } = updateData;
-      await connection.execute(
+      await db.execute(
         "UPDATE phieunhap SET GhiChu = ?, TrangThai = ?, NgayCapNhat = NOW() WHERE id = ?",
         [
           GhiChu || phieuNhap[0].GhiChu,
@@ -516,13 +511,9 @@ class InventoryService {
         ]
       );
 
-      await connection.commit();
       return { success: true, message: "Cập nhật phiếu nhập thành công" };
     } catch (error) {
-      if (connection) await connection.rollback();
       throw error;
-    } finally {
-      if (connection) connection.release();
     }
   }
 }

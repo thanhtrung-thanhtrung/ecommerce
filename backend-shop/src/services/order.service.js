@@ -6,19 +6,27 @@ const InventoryService = require("./inventory.service");
 
 class OrderService {
   async createOrder(userId, orderData, sessionId = null) {
-    try {
-      await db.beginTransaction();
+    const connection = await db.getConnection();
 
+    try {
+      await connection.beginTransaction();
+
+      // Frontend gửi format: { hoTen, email, diaChiGiao, soDienThoai, ... }
       const {
-        DiaChiNhan,
-        SDTNguoiNhan,
-        TenNguoiNhan,
-        Email,
+        hoTen,
+        email,
+        diaChiGiao,
+        soDienThoai,
         id_ThanhToan,
         id_VanChuyen,
         MaGiamGia,
-        GhiChu,
+        ghiChu,
       } = orderData;
+
+      // Validate required fields
+      if (!hoTen || !email || !diaChiGiao || !soDienThoai) {
+        throw new Error("Thiếu thông tin bắt buộc");
+      }
 
       // 1. Lấy giỏ hàng
       let cartQuery, cartParams;
@@ -42,20 +50,21 @@ class OrderService {
         throw new Error("Không tìm thấy thông tin người dùng hoặc session");
       }
 
-      const [cartItems] = await db.execute(cartQuery, cartParams);
+      const [cartItems] = await connection.execute(cartQuery, cartParams);
       if (cartItems.length === 0) throw new Error("Giỏ hàng trống");
 
       // 2. Kiểm tra tồn kho của tất cả sản phẩm trong giỏ hàng
       for (const item of cartItems) {
-        const stockCheck = await InventoryService.checkStock(
-          item.id_ChiTietSanPham,
-          item.SoLuong
+        const [stockCheck] = await connection.execute(
+          "SELECT TonKho FROM chitietsanpham WHERE id = ?",
+          [item.id_ChiTietSanPham]
         );
 
-        if (!stockCheck.isAvailable) {
-          await db.rollback();
+        if (stockCheck.length === 0 || stockCheck[0].TonKho < item.SoLuong) {
           throw new Error(
-            `Sản phẩm trong giỏ hàng không đủ số lượng tồn kho. Chỉ còn ${stockCheck.tonKho} sản phẩm.`
+            `Sản phẩm trong giỏ hàng không đủ số lượng tồn kho. Chỉ còn ${
+              stockCheck[0]?.TonKho || 0
+            } sản phẩm.`
           );
         }
       }
@@ -66,10 +75,10 @@ class OrderService {
         0
       );
 
-      // 4. Áp dụng mã giảm giá
+      // 4. Áp dụng mã giảm giá (nếu có)
       let GiamGia = 0;
       if (MaGiamGia) {
-        const [vouchers] = await db.execute(
+        const [vouchers] = await connection.execute(
           `SELECT * FROM magiamgia 
            WHERE Ma = ? 
            AND NgayBatDau <= NOW() 
@@ -80,37 +89,36 @@ class OrderService {
         if (vouchers.length > 0) {
           const voucher = vouchers[0];
           if (TongTienHang >= voucher.DieuKienApDung) {
-            GiamGia = (TongTienHang * voucher.PhanTramGiam) / 100;
-            await db.execute(
+            GiamGia = Math.min(
+              (TongTienHang * voucher.PhanTramGiam) / 100,
+              voucher.GiaTriGiamToiDa
+            );
+            await connection.execute(
               `UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung + 1 WHERE Ma = ?`,
               [MaGiamGia]
             );
-          } else {
-            throw new Error("Không đủ điều kiện sử dụng mã giảm giá");
           }
-        } else {
-          throw new Error("Mã giảm giá không hợp lệ hoặc đã hết hạn");
         }
       }
 
       // 5. Tính phí vận chuyển
-      const [shippingMethod] = await db.execute(
+      const [shippingMethod] = await connection.execute(
         `SELECT PhiVanChuyen FROM hinhthucvanchuyen WHERE id = ?`,
         [id_VanChuyen]
       );
       if (shippingMethod.length === 0) {
         throw new Error("Hình thức vận chuyển không hợp lệ");
       }
-      const PhiVanChuyen = shippingMethod[0].PhiVanChuyen;
+      const PhiVanChuyen = shippingMethod[0].PhiVanChuyen || 0;
 
       // 6. Tính tổng thanh toán
       const TongThanhToan = TongTienHang - GiamGia + PhiVanChuyen;
 
       // 7. Tạo đơn hàng
-      const [orderResult] = await db.execute(
+      const [orderResult] = await connection.execute(
         `INSERT INTO donhang (
           id_NguoiMua, NgayDatHang, TongTienHang, GiamGia, PhiVanChuyen, 
-          TongThanhToan, DiaChiNhan, SDTNguoiNhan, HoTenNguoiNhan, EmailNguoiNhan,
+          TongThanhToan, DiaChiNhan, SDTNguoiNhan, TenNguoiNhan, EmailNguoiNhan,
           TrangThai, id_ThanhToan, id_VanChuyen, MaGiamGia, GhiChu, session_id
         ) VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
         [
@@ -119,14 +127,14 @@ class OrderService {
           GiamGia,
           PhiVanChuyen,
           TongThanhToan,
-          DiaChiNhan,
-          SDTNguoiNhan,
-          TenNguoiNhan,
-          Email,
+          diaChiGiao,
+          soDienThoai,
+          hoTen,
+          email,
           id_ThanhToan,
           id_VanChuyen,
           MaGiamGia || null,
-          GhiChu || null,
+          ghiChu || null,
           userId ? null : sessionId,
         ]
       );
@@ -134,7 +142,7 @@ class OrderService {
 
       // 8. Lưu chi tiết đơn hàng và cập nhật tồn kho
       for (const item of cartItems) {
-        await db.execute(
+        await connection.execute(
           `INSERT INTO chitietdonhang (id_DonHang, id_ChiTietSanPham, SoLuong, GiaBan, ThanhTien)
            VALUES (?, ?, ?, ?, ?)`,
           [
@@ -147,31 +155,32 @@ class OrderService {
         );
 
         // Cập nhật giảm tồn kho
-        await InventoryService.updateStock(
-          item.id_ChiTietSanPham,
-          item.SoLuong,
-          false // false = giảm tồn kho
+        await connection.execute(
+          `UPDATE chitietsanpham SET TonKho = TonKho - ? WHERE id = ?`,
+          [item.SoLuong, item.id_ChiTietSanPham]
         );
       }
 
       // 9. Xóa giỏ hàng
       if (userId) {
-        await db.execute(`DELETE FROM giohang WHERE id_NguoiDung = ?`, [
+        await connection.execute(`DELETE FROM giohang WHERE id_NguoiDung = ?`, [
           userId,
         ]);
       } else if (sessionId) {
-        await db.execute(
+        await connection.execute(
           `DELETE FROM giohang WHERE session_id = ? AND id_NguoiDung IS NULL`,
           [sessionId]
         );
       }
 
-      await db.commit();
+      await connection.commit();
+      connection.release();
 
       // 10. Trả lại chi tiết đơn hàng
-      return this.getOrderDetail(orderId);
+      return { id: orderId, TongThanhToan, message: "Đặt hàng thành công" };
     } catch (error) {
-      await db.rollback();
+      await connection.rollback();
+      connection.release();
       throw error;
     }
   }
@@ -195,7 +204,7 @@ class OrderService {
     const order = orders[0];
     const [orderDetails] = await db.execute(
       `SELECT ctdh.*, ctsp.id_SanPham, sp.Ten as tenSanPham, sp.HinhAnh,
-              kc.Ten as tenKichCo, ms.Ten as tenMau
+              kc.Ten as tenKichCo, ms.Ten as tenMauSac
        FROM chitietdonhang ctdh
        JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
        JOIN sanpham sp ON ctsp.id_SanPham = sp.id
@@ -228,7 +237,7 @@ class OrderService {
     const order = orders[0];
     const [orderDetails] = await db.execute(
       `SELECT ctdh.*, ctsp.id_SanPham, sp.Ten as tenSanPham, sp.HinhAnh,
-              kc.Ten as tenKichCo, ms.Ten as tenMau
+              kc.Ten as tenKichCo, ms.Ten as tenMauSac
        FROM chitietdonhang ctdh
        JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
        JOIN sanpham sp ON ctsp.id_SanPham = sp.id
@@ -242,106 +251,134 @@ class OrderService {
   }
 
   async cancelOrder(orderId, userId, cancelReason) {
+    let connection;
     try {
-      await db.beginTransaction();
+      // Lấy connection từ pool
+      connection = await db.getConnection();
 
-      const [orders] = await db.execute(
+      // Bắt đầu transaction
+      await connection.beginTransaction();
+
+      const [orders] = await connection.execute(
         "SELECT * FROM donhang WHERE id = ? AND id_NguoiMua = ?",
         [orderId, userId]
       );
       if (orders.length === 0) {
-        await db.rollback();
         throw new Error("Đơn hàng không tồn tại");
       }
 
       const order = orders[0];
       if (order.TrangThai !== 1) {
-        await db.rollback();
         throw new Error("Không thể hủy đơn hàng ở trạng thái này");
       }
 
-      await db.execute(
+      await connection.execute(
         "UPDATE donhang SET TrangThai = 5, LyDoHuy = ? WHERE id = ?",
         [cancelReason, orderId]
       );
 
-      const [orderDetails] = await db.execute(
+      const [orderDetails] = await connection.execute(
         "SELECT * FROM chitietdonhang WHERE id_DonHang = ?",
         [orderId]
       );
 
       // Cập nhật hoàn lại tồn kho
-      const stockItems = orderDetails.map((item) => ({
-        id_ChiTietSanPham: item.id_ChiTietSanPham,
-        SoLuong: item.SoLuong,
-      }));
-
-      await InventoryService.bulkUpdateStock(stockItems, true); // true = tăng tồn kho
+      for (const item of orderDetails) {
+        await connection.execute(
+          `UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?`,
+          [item.SoLuong, item.id_ChiTietSanPham]
+        );
+      }
 
       if (order.MaGiamGia) {
-        await db.execute(
+        await connection.execute(
           "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
           [order.MaGiamGia]
         );
       }
 
-      await db.commit();
+      // Commit transaction
+      await connection.commit();
+
+      // Release connection before returning
+      connection.release();
+
       return this.getOrderDetail(orderId);
     } catch (error) {
-      await db.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+        connection.release();
+      }
+
+      console.error("Error canceling order:", error);
       throw error;
     }
   }
 
   // Add method to cancel guest order
   async cancelGuestOrder(orderId, email, cancelReason) {
+    let connection;
     try {
-      await db.beginTransaction();
+      // Lấy connection từ pool
+      connection = await db.getConnection();
 
-      const [orders] = await db.execute(
+      // Bắt đầu transaction
+      await connection.beginTransaction();
+
+      const [orders] = await connection.execute(
         "SELECT * FROM donhang WHERE id = ? AND EmailNguoiNhan = ? AND id_NguoiMua IS NULL",
         [orderId, email]
       );
       if (orders.length === 0) {
-        await db.rollback();
         throw new Error("Đơn hàng không tồn tại hoặc email không khớp");
       }
 
       const order = orders[0];
       if (order.TrangThai !== 1) {
-        await db.rollback();
         throw new Error("Không thể hủy đơn hàng ở trạng thái này");
       }
 
-      await db.execute(
+      await connection.execute(
         "UPDATE donhang SET TrangThai = 5, LyDoHuy = ? WHERE id = ?",
         [cancelReason, orderId]
       );
 
-      const [orderDetails] = await db.execute(
+      const [orderDetails] = await connection.execute(
         "SELECT * FROM chitietdonhang WHERE id_DonHang = ?",
         [orderId]
       );
 
       // Cập nhật hoàn lại tồn kho
-      const stockItems = orderDetails.map((item) => ({
-        id_ChiTietSanPham: item.id_ChiTietSanPham,
-        SoLuong: item.SoLuong,
-      }));
-
-      await InventoryService.bulkUpdateStock(stockItems, true); // true = tăng tồn kho
+      for (const item of orderDetails) {
+        await connection.execute(
+          `UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?`,
+          [item.SoLuong, item.id_ChiTietSanPham]
+        );
+      }
 
       if (order.MaGiamGia) {
-        await db.execute(
+        await connection.execute(
           "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
           [order.MaGiamGia]
         );
       }
 
-      await db.commit();
+      // Commit transaction
+      await connection.commit();
+
+      // Release connection before returning
+      connection.release();
+
       return this.getOrderDetail(orderId);
     } catch (error) {
-      await db.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+        connection.release();
+      }
+
+      console.error("Error canceling guest order:", error);
       throw error;
     }
   }

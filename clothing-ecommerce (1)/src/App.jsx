@@ -15,6 +15,8 @@ import ProductsPage from "./pages/ProductsPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
+import OrderSuccessPage from "./pages/OrderSuccessPage";
+import TrackOrderPage from "./pages/TrackOrderPage";
 import LoginPage from "./pages/Auth/LoginPage";
 import RegisterPage from "./pages/Auth/RegisterPage";
 import ForgotPasswordPage from "./pages/Auth/ForgotPasswordPage";
@@ -43,9 +45,14 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-
             <Route path="/checkout" element={<CheckoutPage />} />
+            <Route
+              path="/order-success/:orderId"
+              element={<OrderSuccessPage />}
+            />
+            <Route path="/track-order" element={<TrackOrderPage />} />
 
+            {/* Protected Routes */}
             <Route
               path="/profile"
               element={
@@ -55,7 +62,7 @@ function App() {
               }
             />
             <Route
-              path="/orders"
+              path="/user/orders"
               element={
                 <ProtectedRoute>
                   <OrdersPage />

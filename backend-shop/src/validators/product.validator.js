@@ -446,39 +446,109 @@ const updateProductAdminValidator = [
 
   body("Ten")
     .optional()
-    .notEmpty()
-    .withMessage("Tên sản phẩm không được để trống"),
+    .trim()
+    .isLength({ min: 1, max: 255 })
+    .withMessage("Tên sản phẩm phải từ 1 đến 255 ký tự"),
 
   body("MoTa")
     .optional()
-    .notEmpty()
-    .withMessage("Mô tả sản phẩm không được để trống"),
+    .trim()
+    .isLength({ min: 10, max: 1000 })
+    .withMessage("Mô tả phải từ 10 đến 1000 ký tự"),
 
-  body("Gia").optional().isNumeric().withMessage("Giá sản phẩm phải là số"),
-
-  body("id_DanhMuc")
+  body("MoTaChiTiet")
     .optional()
-    .isNumeric()
-    .withMessage("ID danh mục không hợp lệ"),
+    .trim()
+    .isLength({ min: 50 })
+    .withMessage("Mô tả chi tiết phải có ít nhất 50 ký tự"),
+
+  body("ThongSoKyThuat")
+    .optional()
+    .custom((value, { req }) => {
+      if (!value) return true; // Optional field
+
+      try {
+        // Nếu đã là object, không cần parse
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
+          req.body.ThongSoKyThuat = value;
+          return true;
+        }
+
+        // Nếu là chuỗi, thử parse thành object
+        const parsed = JSON.parse(value);
+        if (
+          typeof parsed !== "object" ||
+          Array.isArray(parsed) ||
+          parsed === null
+        ) {
+          throw new Error("Thông số kỹ thuật phải là đối tượng JSON hợp lệ");
+        }
+        req.body.ThongSoKyThuat = parsed;
+        return true;
+      } catch (e) {
+        throw new Error(
+          "Thông số kỹ thuật phải là chuỗi JSON hoặc đối tượng hợp lệ"
+        );
+      }
+    }),
+
+  body("Gia")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Giá sản phẩm phải là số dương"),
+
+  body("GiaKhuyenMai")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Giá khuyến mãi phải là số dương"),
+
+  body("id_DanhMuc").optional().isInt().withMessage("ID danh mục không hợp lệ"),
 
   body("id_ThuongHieu")
     .optional()
-    .isNumeric()
+    .isInt()
     .withMessage("ID thương hiệu không hợp lệ"),
+
+  body("id_NhaCungCap")
+    .optional()
+    .isInt()
+    .withMessage("ID nhà cung cấp không hợp lệ"),
 
   body("bienThe")
     .optional()
-    .isArray()
-    .withMessage("Biến thể sản phẩm phải là mảng"),
+    .custom((value, { req }) => {
+      if (!value) return true; // Optional field
+
+      try {
+        // Nếu đã là mảng, kiểm tra độ dài
+        if (Array.isArray(value)) {
+          return true;
+        }
+
+        // Nếu là chuỗi, thử parse thành mảng
+        const parsed = JSON.parse(value);
+        if (!Array.isArray(parsed)) {
+          throw new Error("Biến thể sản phẩm phải là mảng");
+        }
+        req.body.bienThe = parsed;
+        return true;
+      } catch (e) {
+        throw new Error("Biến thể sản phẩm phải là mảng JSON hợp lệ");
+      }
+    }),
 
   body("bienThe.*.id_KichCo")
     .optional()
-    .isNumeric()
+    .isInt()
     .withMessage("ID kích cỡ không hợp lệ"),
 
   body("bienThe.*.id_MauSac")
     .optional()
-    .isNumeric()
+    .isInt()
     .withMessage("Mã màu sắc không hợp lệ"),
 
   body("bienThe.*.MaSanPham")
@@ -488,10 +558,15 @@ const updateProductAdminValidator = [
     .matches(/^[A-Z0-9\-]+$/)
     .withMessage("Mã sản phẩm chỉ được chứa chữ in hoa, số và dấu gạch ngang"),
 
-  body("bienThe.*.SoLuong")
+  body("bienThe.*.TonKho")
     .optional()
-    .isNumeric()
-    .withMessage("Số lượng phải là số"),
+    .isInt({ min: 0 })
+    .withMessage("Tồn kho phải là số nguyên không âm"),
+
+  body("TrangThai")
+    .optional()
+    .isIn([0, 1])
+    .withMessage("Trạng thái sản phẩm không hợp lệ"),
 ];
 
 module.exports = {

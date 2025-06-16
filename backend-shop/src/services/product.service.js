@@ -341,7 +341,7 @@ class ProductService {
     }
   }
 
-  async updateProductInfo(productId, productData) {
+  async updateProduct(productId, productData, userId) {
     const {
       Ten,
       MoTa,
@@ -357,12 +357,17 @@ class ProductService {
       TrangThai,
     } = productData;
 
+    let connection;
     try {
-      await db.beginTransaction();
+      // Lấy connection từ pool
+      connection = await db.getConnection();
 
-      // Lấy thông tin hình ảnh hiện tại
-      const [currentProduct] = await db.execute(
-        "SELECT HinhAnh FROM sanpham WHERE id = ?",
+      // Bắt đầu transaction
+      await connection.beginTransaction();
+
+      // Kiểm tra sản phẩm có tồn tại không
+      const [currentProduct] = await connection.execute(
+        "SELECT id, HinhAnh FROM sanpham WHERE id = ?",
         [productId]
       );
 
@@ -373,7 +378,7 @@ class ProductService {
       let currentImageData = JSON.parse(currentProduct[0].HinhAnh || "{}");
       let newImageData = { ...currentImageData };
 
-      // Xử lý cập nhật hình ảnh
+      // Xử lý cập nhật hình ảnh nếu có
       if (hinhAnh) {
         // Xử lý ảnh chính
         if (hinhAnh.anhChinh) {
@@ -388,38 +393,35 @@ class ProductService {
             hinhAnh.anhChinh,
             "shoes_shop/products"
           );
-          newImageData.anhChinh = cloudinaryUtil.getProductPreviewUrl(
-            anhChinh.public_id
-          );
+          newImageData.anhChinh = anhChinh.url;
           newImageData.anhChinh_public_id = anhChinh.public_id;
-          newImageData.anhChinh_thumbnail = cloudinaryUtil.getThumbnailUrl(
-            anhChinh.public_id
-          );
         }
 
         // Xử lý ảnh phụ
-        if (hinhAnh.anhPhu && hinhAnh.anhPhu.length > 0) {
+        if (hinhAnh.anhPhu && Array.isArray(hinhAnh.anhPhu)) {
           // Xóa ảnh phụ cũ nếu có
-          if (currentImageData.anhPhu) {
-            await cloudinaryUtil.deleteMultipleImages(
-              currentImageData.anhPhu.map((img) => img.public_id)
-            );
+          if (
+            currentImageData.anhPhu_public_ids &&
+            Array.isArray(currentImageData.anhPhu_public_ids)
+          ) {
+            for (const publicId of currentImageData.anhPhu_public_ids) {
+              await cloudinaryUtil.deleteImage(publicId);
+            }
           }
           // Upload ảnh phụ mới
-          const anhPhu = await cloudinaryUtil.uploadMultipleImages(
+          const anhPhuResults = await cloudinaryUtil.uploadMultipleImages(
             hinhAnh.anhPhu,
             "shoes_shop/products"
           );
-          newImageData.anhPhu = anhPhu.map((img) => ({
-            url: cloudinaryUtil.getProductPreviewUrl(img.public_id),
-            thumbnail: cloudinaryUtil.getThumbnailUrl(img.public_id),
-            public_id: img.public_id,
-          }));
+          newImageData.anhPhu = anhPhuResults.map((img) => img.url);
+          newImageData.anhPhu_public_ids = anhPhuResults.map(
+            (img) => img.public_id
+          );
         }
       }
 
       // Cập nhật thông tin sản phẩm
-      await db.execute(
+      await connection.execute(
         `UPDATE sanpham SET 
           Ten = ?, MoTa = ?, MoTaChiTiet = ?, ThongSoKyThuat = ?, 
           Gia = ?, GiaKhuyenMai = ?, id_DanhMuc = ?, id_ThuongHieu = ?, 
@@ -441,22 +443,197 @@ class ProductService {
         ]
       );
 
-      // Cập nhật biến thể sản phẩm
-      if (bienThe && bienThe.length > 0) {
-        await this.updateProductVariants(productId, bienThe, Gia);
+      // Cập nhật biến thể sản phẩm nếu có
+      if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
+        // Xóa tất cả biến thể cũ
+        await connection.execute(
+          "DELETE FROM chitietsanpham WHERE id_SanPham = ?",
+          [productId]
+        );
+
+        // Thêm biến thể mới
+        for (const variant of bienThe) {
+          const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
+
+          await connection.execute(
+            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [productId, id_KichCo, id_MauSac, MaSanPham, SoLuong || 0]
+          );
+        }
       }
 
-      await db.commit();
+      // Commit transaction
+      await connection.commit();
+
+      return {
+        id: productId,
+        message: "Sản phẩm đã được cập nhật thành công",
+      };
+    } catch (error) {
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Error updating product:", error);
+      throw new Error("Không thể cập nhật sản phẩm: " + error.message);
+    } finally {
+      // Trả connection về pool
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+
+  async updateProductInfo(productId, productData) {
+    const {
+      Ten,
+      MoTa,
+      MoTaChiTiet,
+      ThongSoKyThuat,
+      Gia,
+      GiaKhuyenMai,
+      id_DanhMuc,
+      id_ThuongHieu,
+      id_NhaCungCap,
+      hinhAnh,
+      bienThe,
+      TrangThai,
+    } = productData;
+
+    let connection;
+    try {
+      // Lấy connection từ pool
+      connection = await db.getConnection();
+
+      // Bắt đầu transaction
+      await connection.beginTransaction();
+
+      // Lấy thông tin hình ảnh hiện tại
+      const [currentProduct] = await connection.execute(
+        "SELECT HinhAnh FROM sanpham WHERE id = ?",
+        [productId]
+      );
+
+      if (currentProduct.length === 0) {
+        throw new Error("Sản phẩm không tồn tại");
+      }
+
+      let currentImageData = JSON.parse(currentProduct[0].HinhAnh || "{}");
+      let newImageData = { ...currentImageData };
+
+      // Xử lý cập nhật hình ảnh nếu có
+      if (hinhAnh) {
+        // Xử lý ảnh chính
+        if (hinhAnh.anhChinh) {
+          // Xóa ảnh cũ nếu có
+          if (currentImageData.anhChinh_public_id) {
+            await cloudinaryUtil.deleteImage(
+              currentImageData.anhChinh_public_id
+            );
+          }
+          // Upload ảnh mới
+          const anhChinh = await cloudinaryUtil.uploadImage(
+            hinhAnh.anhChinh,
+            "shoes_shop/products"
+          );
+          newImageData.anhChinh = cloudinaryUtil.getProductPreviewUrl(
+            anhChinh.public_id
+          );
+          newImageData.anhChinh_public_id = anhChinh.public_id;
+        }
+
+        // Xử lý ảnh phụ
+        if (hinhAnh.anhPhu && Array.isArray(hinhAnh.anhPhu)) {
+          // Xóa ảnh phụ cũ nếu có
+          if (
+            currentImageData.anhPhu_public_ids &&
+            Array.isArray(currentImageData.anhPhu_public_ids)
+          ) {
+            for (const publicId of currentImageData.anhPhu_public_ids) {
+              await cloudinaryUtil.deleteImage(publicId);
+            }
+          }
+          // Upload ảnh phụ mới
+          const anhPhuResults = await cloudinaryUtil.uploadMultipleImages(
+            hinhAnh.anhPhu,
+            "shoes_shop/products"
+          );
+          newImageData.anhPhu = anhPhuResults.map((img) =>
+            cloudinaryUtil.getProductPreviewUrl(img.public_id)
+          );
+          newImageData.anhPhu_public_ids = anhPhuResults.map(
+            (img) => img.public_id
+          );
+        }
+      }
+
+      // Cập nhật thông tin sản phẩm
+      await connection.execute(
+        `UPDATE sanpham SET 
+          Ten = ?, MoTa = ?, MoTaChiTiet = ?, ThongSoKyThuat = ?, 
+          Gia = ?, GiaKhuyenMai = ?, id_DanhMuc = ?, id_ThuongHieu = ?, 
+          id_NhaCungCap = ?, HinhAnh = ?, TrangThai = ?, NgayCapNhat = NOW()
+          WHERE id = ?`,
+        [
+          Ten,
+          MoTa,
+          MoTaChiTiet,
+          JSON.stringify(ThongSoKyThuat),
+          Gia,
+          GiaKhuyenMai || null,
+          id_DanhMuc,
+          id_ThuongHieu,
+          id_NhaCungCap,
+          JSON.stringify(newImageData),
+          TrangThai || 1,
+          productId,
+        ]
+      );
+
+      // Cập nhật biến thể sản phẩm nếu có
+      if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
+        // Xóa tất cả biến thể cũ
+        await connection.execute(
+          "DELETE FROM chitietsanpham WHERE id_SanPham = ?",
+          [productId]
+        );
+
+        // Thêm biến thể mới
+        for (const variant of bienThe) {
+          const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
+
+          await connection.execute(
+            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [productId, id_KichCo, id_MauSac, MaSanPham, SoLuong || 0]
+          );
+        }
+      }
+
+      // Commit transaction
+      await connection.commit();
 
       return {
         id: productId,
         message: "Thông tin sản phẩm đã được cập nhật thành công",
       };
     } catch (error) {
-      await db.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Error updating product info:", error);
       throw new Error(
         "Không thể cập nhật thông tin sản phẩm: " + error.message
       );
+    } finally {
+      // Trả connection về pool
+      if (connection) {
+        connection.release();
+      }
     }
   }
 
@@ -549,11 +726,16 @@ class ProductService {
   }
 
   async deleteProduct(productId) {
+    let connection;
     try {
-      await db.beginTransaction();
+      // Lấy connection từ pool
+      connection = await db.getConnection();
+
+      // Bắt đầu transaction
+      await connection.beginTransaction();
 
       // Lấy thông tin sản phẩm
-      const [product] = await db.execute(
+      const [product] = await connection.execute(
         "SELECT HinhAnh FROM sanpham WHERE id = ?",
         [productId]
       );
@@ -562,40 +744,53 @@ class ProductService {
         throw new Error("Sản phẩm không tồn tại");
       }
 
-      // Xóa hình ảnh trên Cloudinary
-      const imageData = JSON.parse(product[0].HinhAnh || "{}");
-
-      if (imageData.anhChinh_public_id) {
-        await cloudinaryUtil.deleteImage(imageData.anhChinh_public_id);
-      }
-
-      if (imageData.anhPhu && imageData.anhPhu.length > 0) {
-        await cloudinaryUtil.deleteMultipleImages(
-          imageData.anhPhu.map((img) => img.public_id)
-        );
-      }
-
-      // Cập nhật trạng thái sản phẩm
-      await db.execute(
+      // Cập nhật trạng thái sản phẩm thành không hoạt động (soft delete)
+      await connection.execute(
         "UPDATE sanpham SET TrangThai = 0, NgayCapNhat = NOW() WHERE id = ?",
         [productId]
       );
 
-      // Xóa các biến thể sản phẩm hoặc giữ lại nhưng đánh dấu là đã xóa
-      // Vì bảng chitietsanpham không có cột TrangThai, nên ta sẽ xóa hoàn toàn các biến thể
-      await db.execute("DELETE FROM chitietsanpham WHERE id_SanPham = ?", [
-        productId,
-      ]);
+      // Kiểm tra xem sản phẩm đó đã có trong đơn hàng nào chưa
+      const [orderItems] = await connection.execute(
+        `
+        SELECT ctdh.id 
+        FROM chitietdonhang ctdh
+        JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
+        WHERE ctsp.id_SanPham = ?
+        LIMIT 1
+      `,
+        [productId]
+      );
 
-      await db.commit();
+      // Nếu sản phẩm chưa có trong đơn hàng nào, có thể cập nhật tồn kho về 0
+      if (orderItems.length === 0) {
+        await connection.execute(
+          "UPDATE chitietsanpham SET TonKho = 0 WHERE id_SanPham = ?",
+          [productId]
+        );
+      }
+      // Nếu sản phẩm đã có trong đơn hàng, giữ nguyên tồn kho để tránh xung đột dữ liệu
+
+      // Commit transaction
+      await connection.commit();
 
       return {
         id: productId,
         message: "Sản phẩm đã được xóa thành công",
       };
     } catch (error) {
-      await db.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Error deleting product:", error);
       throw new Error("Không thể xóa sản phẩm: " + error.message);
+    } finally {
+      // Trả connection về pool
+      if (connection) {
+        connection.release();
+      }
     }
   }
 
@@ -757,11 +952,16 @@ class ProductService {
 
   // Phương thức mới: Cập nhật tồn kho sau khi bán hàng
   async updateStockAfterSale(chiTietSanPhamId, soLuong) {
+    let connection;
     try {
-      await db.beginTransaction();
+      // Lấy connection từ pool
+      connection = await db.getConnection();
+
+      // Bắt đầu transaction
+      await connection.beginTransaction();
 
       // Cập nhật tồn kho
-      const [result] = await db.execute(
+      const [result] = await connection.execute(
         `UPDATE chitietsanpham 
          SET TonKho = TonKho - ? 
          WHERE id = ? AND TonKho >= ?`,
@@ -775,11 +975,22 @@ class ProductService {
       // Kiểm tra và cập nhật trạng thái sản phẩm
       await this.updateProductStatusIfOutOfStock(chiTietSanPhamId);
 
-      await db.commit();
+      // Commit transaction
+      await connection.commit();
       return true;
     } catch (error) {
-      await db.rollback();
+      // Rollback nếu có lỗi
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Error updating stock after sale:", error);
       throw new Error("Lỗi khi cập nhật tồn kho: " + error.message);
+    } finally {
+      // Trả connection về pool
+      if (connection) {
+        connection.release();
+      }
     }
   }
 

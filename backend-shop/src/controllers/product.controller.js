@@ -344,16 +344,18 @@ class ProductController {
   // Xóa sản phẩm (admin)
   async deleteProduct(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+      const { id } = req.params;
+      if (!id) {
+        return res
+          .status(400)
+          .json({ message: "ID sản phẩm không được cung cấp" });
       }
 
-      const { productId } = req.params;
-      const result = await productService.deleteProduct(parseInt(productId));
+      const result = await productService.deleteProduct(parseInt(id));
       res.json(result);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error("Error in deleteProduct controller:", error);
+      res.status(500).json({ message: error.message });
     }
   }
 
