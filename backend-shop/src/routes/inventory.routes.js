@@ -18,7 +18,7 @@ const {
 // Routes công khai
 router.post(
   "/check-stock",
-  checkSession,
+
   checkStockValidator,
   InventoryController.checkStock
 );

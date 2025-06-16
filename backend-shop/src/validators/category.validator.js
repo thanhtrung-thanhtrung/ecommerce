@@ -15,13 +15,6 @@ const categoryValidator = [
     .isLength({ max: 500 })
     .withMessage("Mô tả không được vượt quá 500 ký tự"),
 
-  body("HinhAnh")
-    .optional()
-    .isString()
-    .withMessage("Hình ảnh không hợp lệ")
-    .isLength({ max: 255 })
-    .withMessage("Đường dẫn hình ảnh không được vượt quá 255 ký tự"),
-
   body("TrangThai")
     .optional()
     .isIn([0, 1])

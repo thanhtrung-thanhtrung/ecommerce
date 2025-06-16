@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
+import { Search, X, TrendingUp, Clock, Star } from "lucide-react";
 import { logoutUser } from "../../store/slices/authSlice";
 import { toggleMobileMenu, closeMobileMenu } from "../../store/slices/uiSlice";
 import {
@@ -21,14 +22,30 @@ const Header = () => {
 
   const [searchQuery, setLocalSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchHistory, setSearchHistory] = useState([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchRef = useRef(null);
   const suggestionsRef = useRef(null);
+
+  // Load search history from localStorage
+  useEffect(() => {
+    const history = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+    setSearchHistory(history.slice(0, 5)); // Limit to 5 recent searches
+  }, []);
+
+  // Popular search terms (could be fetched from API)
+  const popularSearches = [
+    "Nike Air Force 1",
+    "Adidas Stan Smith",
+    "Converse Chuck Taylor",
+    "Vans Old Skool",
+    "Puma Suede",
+  ];
 
   // Debounce search suggestions
   useEffect(() => {
     if (searchQuery.trim().length > 2) {
       const timeoutId = setTimeout(() => {
-        // Format search query for backend API
         dispatch(getSearchSuggestions(searchQuery.trim()));
         setShowSuggestions(true);
       }, 300);
@@ -36,9 +53,11 @@ const Header = () => {
       return () => clearTimeout(timeoutId);
     } else {
       dispatch(clearSearchSuggestions());
-      setShowSuggestions(false);
+      if (isSearchFocused) {
+        setShowSuggestions(true); // Show history and popular searches when focused
+      }
     }
-  }, [searchQuery, dispatch]);
+  }, [searchQuery, dispatch, isSearchFocused]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -50,6 +69,7 @@ const Header = () => {
         !suggestionsRef.current.contains(event.target)
       ) {
         setShowSuggestions(false);
+        setIsSearchFocused(false);
       }
     };
 
@@ -57,28 +77,57 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const saveToSearchHistory = (query) => {
+    if (!query.trim()) return;
+
+    const history = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+    const updatedHistory = [
+      query,
+      ...history.filter((item) => item !== query),
+    ].slice(0, 5);
+    localStorage.setItem("searchHistory", JSON.stringify(updatedHistory));
+    setSearchHistory(updatedHistory);
+  };
+
+  const clearSearchHistory = () => {
+    localStorage.removeItem("searchHistory");
+    setSearchHistory([]);
+  };
+
   const handleLogout = () => {
     dispatch(logoutUser());
     navigate("/");
   };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      dispatch(setSearchQuery(searchQuery.trim()));
-      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+  const handleSearch = (e, query = null) => {
+    e?.preventDefault();
+    const searchTerm = query || searchQuery.trim();
+
+    if (searchTerm) {
+      saveToSearchHistory(searchTerm);
+      dispatch(setSearchQuery(searchTerm));
+      navigate(`/products?search=${encodeURIComponent(searchTerm)}`);
       setLocalSearchQuery("");
       setShowSuggestions(false);
+      setIsSearchFocused(false);
       dispatch(clearSearchSuggestions());
     }
   };
 
   const handleSuggestionClick = (suggestion) => {
     const query = suggestion.Ten || suggestion.query || suggestion;
-    dispatch(setSearchQuery(query));
-    navigate(`/products?search=${encodeURIComponent(query)}`);
+    handleSearch(null, query);
+  };
+
+  const handleSearchFocus = () => {
+    setIsSearchFocused(true);
+    setShowSuggestions(true);
+  };
+
+  const clearSearch = () => {
     setLocalSearchQuery("");
     setShowSuggestions(false);
+    setIsSearchFocused(false);
     dispatch(clearSearchSuggestions());
   };
 
@@ -119,47 +168,133 @@ const Header = () => {
             <span className="text-2xl font-bold text-gray-800">ShoeShop</span>
           </Link>
 
-          {/* Search bar - Desktop */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-8 relative">
+          {/* Enhanced Search bar - Desktop */}
+          <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
             <form onSubmit={handleSearch} className="w-full">
               <div className="relative" ref={searchRef}>
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm sản phẩm..."
-                  value={searchQuery}
-                  onChange={(e) => setLocalSearchQuery(e.target.value)}
-                  onFocus={() =>
-                    searchQuery.trim().length > 2 && setShowSuggestions(true)
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                <button
-                  type="submit"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-primary-600"
+                <div
+                  className={`relative rounded-lg border-2 transition-all duration-200 ${
+                    isSearchFocused
+                      ? "border-primary-500 shadow-lg"
+                      : "border-gray-300"
+                  }`}
                 >
-                  🔍
-                </button>
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm sản phẩm, thương hiệu..."
+                    value={searchQuery}
+                    onChange={(e) => setLocalSearchQuery(e.target.value)}
+                    onFocus={handleSearchFocus}
+                    className="w-full pl-10 pr-12 py-3 rounded-lg focus:outline-none bg-transparent"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors"
+                  >
+                    <Search className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </form>
 
-            {/* Search Suggestions */}
-            {showSuggestions && searchSuggestions.length > 0 && (
+            {/* Enhanced Search Suggestions */}
+            {showSuggestions && (
               <div
                 ref={suggestionsRef}
-                className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-64 overflow-y-auto z-50"
+                className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-xl mt-2 max-h-96 overflow-hidden z-50"
               >
-                {searchSuggestions.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2"
-                  >
-                    <span className="text-gray-400">🔍</span>
-                    <span className="text-gray-700">
-                      {suggestion.Ten || suggestion.query || suggestion}
-                    </span>
-                  </button>
-                ))}
+                {/* Search Results */}
+                {searchQuery.trim().length > 2 &&
+                  searchSuggestions.length > 0 && (
+                    <div className="border-b border-gray-100">
+                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Kết quả tìm kiếm
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {searchSuggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center space-x-3 transition-colors"
+                          >
+                            <Search className="h-4 w-4 text-gray-400" />
+                            <span className="text-gray-700 flex-1">
+                              {suggestion.Ten || suggestion.query || suggestion}
+                            </span>
+                            <Star className="h-3 w-3 text-yellow-400" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Search History */}
+                {searchQuery.trim().length <= 2 && searchHistory.length > 0 && (
+                  <div className="border-b border-gray-100">
+                    <div className="px-4 py-2 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Tìm kiếm gần đây
+                      </span>
+                      <button
+                        onClick={clearSearchHistory}
+                        className="text-xs text-primary-600 hover:text-primary-700"
+                      >
+                        Xóa tất cả
+                      </button>
+                    </div>
+                    {searchHistory.map((item, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSearch(null, item)}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <span className="text-gray-700 flex-1">{item}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Popular Searches */}
+                {searchQuery.trim().length <= 2 && (
+                  <div>
+                    <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Tìm kiếm phổ biến
+                    </div>
+                    {popularSearches.map((item, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSearch(null, item)}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <TrendingUp className="h-4 w-4 text-red-400" />
+                        <span className="text-gray-700 flex-1">{item}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* No results */}
+                {searchQuery.trim().length > 2 &&
+                  searchSuggestions.length === 0 && (
+                    <div className="px-4 py-8 text-center text-gray-500">
+                      <Search className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">Không tìm thấy kết quả nào</p>
+                      <p className="text-xs mt-1">
+                        Thử tìm kiếm với từ khóa khác
+                      </p>
+                    </div>
+                  )}
               </div>
             )}
           </div>
@@ -276,47 +411,105 @@ const Header = () => {
           </button>
         </div>
 
-        {/* Mobile search */}
+        {/* Enhanced Mobile search */}
         <div className="md:hidden pb-4 relative">
           <form onSubmit={handleSearch}>
             <div className="relative" ref={searchRef}>
-              <input
-                type="text"
-                placeholder="Tìm kiếm sản phẩm..."
-                value={searchQuery}
-                onChange={(e) => setLocalSearchQuery(e.target.value)}
-                onFocus={() =>
-                  searchQuery.trim().length > 2 && setShowSuggestions(true)
-                }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              <button
-                type="submit"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400"
+              <div
+                className={`relative rounded-lg border-2 transition-all duration-200 ${
+                  isSearchFocused
+                    ? "border-primary-500 shadow-lg"
+                    : "border-gray-300"
+                }`}
               >
-                🔍
-              </button>
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm sản phẩm..."
+                  value={searchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
+                  onFocus={handleSearchFocus}
+                  className="w-full pl-10 pr-12 py-3 rounded-lg focus:outline-none bg-transparent"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 text-white bg-primary-600 rounded-md"
+                >
+                  <Search className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </form>
 
           {/* Mobile Search Suggestions */}
-          {showSuggestions && searchSuggestions.length > 0 && (
+          {showSuggestions && (
             <div
               ref={suggestionsRef}
-              className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-64 overflow-y-auto z-50"
+              className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-xl mt-2 max-h-80 overflow-hidden z-50"
             >
-              {searchSuggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2"
-                >
-                  <span className="text-gray-400">🔍</span>
-                  <span className="text-gray-700">
-                    {suggestion.Ten || suggestion.query || suggestion}
-                  </span>
-                </button>
-              ))}
+              {/* Mobile suggestions similar to desktop but more compact */}
+              {searchQuery.trim().length > 2 &&
+                searchSuggestions.length > 0 && (
+                  <div className="max-h-64 overflow-y-auto">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center space-x-3"
+                      >
+                        <Search className="h-4 w-4 text-gray-400" />
+                        <span className="text-gray-700 text-sm">
+                          {suggestion.Ten || suggestion.query || suggestion}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+              {searchQuery.trim().length <= 2 && (
+                <div className="max-h-64 overflow-y-auto">
+                  {searchHistory.length > 0 && (
+                    <>
+                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 border-b">
+                        Tìm kiếm gần đây
+                      </div>
+                      {searchHistory.slice(0, 3).map((item, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleSearch(null, item)}
+                          className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center space-x-3"
+                        >
+                          <Clock className="h-4 w-4 text-gray-400" />
+                          <span className="text-gray-700 text-sm">{item}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 border-b">
+                    Phổ biến
+                  </div>
+                  {popularSearches.slice(0, 3).map((item, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSearch(null, item)}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center space-x-3"
+                    >
+                      <TrendingUp className="h-4 w-4 text-red-400" />
+                      <span className="text-gray-700 text-sm">{item}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -487,6 +487,44 @@ class InventoryService {
     const [results] = await db.execute(query, [productVariantId]);
     return results;
   }
+
+  // Cập nhật phiếu nhập
+  async updatePhieuNhap(phieuNhapId, updateData) {
+    let connection;
+    try {
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // Kiểm tra phiếu nhập tồn tại
+      const [phieuNhap] = await connection.execute(
+        "SELECT * FROM phieunhap WHERE id = ?",
+        [phieuNhapId]
+      );
+
+      if (phieuNhap.length === 0) {
+        throw new Error("Phiếu nhập không tồn tại");
+      }
+
+      // Cập nhật thông tin phiếu nhập
+      const { GhiChu, TrangThai } = updateData;
+      await connection.execute(
+        "UPDATE phieunhap SET GhiChu = ?, TrangThai = ?, NgayCapNhat = NOW() WHERE id = ?",
+        [
+          GhiChu || phieuNhap[0].GhiChu,
+          TrangThai || phieuNhap[0].TrangThai,
+          phieuNhapId,
+        ]
+      );
+
+      await connection.commit();
+      return { success: true, message: "Cập nhật phiếu nhập thành công" };
+    } catch (error) {
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
+  }
 }
 
 module.exports = new InventoryService();

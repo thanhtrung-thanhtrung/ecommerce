@@ -96,8 +96,8 @@ class BrandService {
         COUNT(DISTINCT sp.id) as soSanPham,
         COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
         COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong,
-        SUM(sp.SoLuongBan) as tongSoLuongBan,
-        SUM(sp.SoLuongBan * sp.GiaBan) as tongDoanhThu
+        SUM(sp.SoLuongDaBan) as tongSoLuongBan,
+        SUM(sp.SoLuongDaBan * sp.Gia) as tongDoanhThu
       FROM thuonghieu th
       LEFT JOIN sanpham sp ON th.id = sp.id_ThuongHieu
       WHERE th.id = ?
@@ -111,10 +111,10 @@ class BrandService {
 
     // Lấy danh sách sản phẩm bán chạy nhất của thương hiệu
     const [topProducts] = await db.execute(
-      `SELECT id, Ten, GiaBan, HinhAnh, TrangThai, SoLuongBan
+      `SELECT id, Ten, Gia, HinhAnh, TrangThai, SoLuongDaBan
        FROM sanpham
        WHERE id_ThuongHieu = ?
-       ORDER BY SoLuongBan DESC
+       ORDER BY SoLuongDaBan DESC
        LIMIT 5`,
       [id]
     );
@@ -144,8 +144,8 @@ class BrandService {
         COUNT(DISTINCT sp.id) as soSanPham,
         COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
         COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong,
-        SUM(sp.SoLuongBan) as tongSoLuongBan,
-        SUM(sp.SoLuongBan * sp.GiaBan) as tongDoanhThu
+        SUM(sp.SoLuongDaBan) as tongSoLuongBan,
+        SUM(sp.SoLuongDaBan * sp.Gia) as tongDoanhThu
       FROM thuonghieu th
       LEFT JOIN sanpham sp ON th.id = sp.id_ThuongHieu
       WHERE 1=1
@@ -184,8 +184,8 @@ class BrandService {
         th.id,
         th.Ten,
         COUNT(sp.id) as soSanPham,
-        SUM(sp.SoLuongBan) as tongSoLuongBan,
-        SUM(sp.SoLuongBan * sp.GiaBan) as tongDoanhThu
+        SUM(sp.SoLuongDaBan) as tongSoLuongBan,
+        SUM(sp.SoLuongDaBan * sp.Gia) as tongDoanhThu
       FROM thuonghieu th
       LEFT JOIN sanpham sp ON th.id = sp.id_ThuongHieu
       WHERE YEAR(sp.NgayTao) = YEAR(CURRENT_DATE)

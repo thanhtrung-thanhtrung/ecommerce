@@ -13,10 +13,28 @@ const productAPI = {
     return api.get(`/products/${id}`);
   },
 
-  // Tìm kiếm sản phẩm - POST method to match backend
-  searchProducts: (searchData, page = 1, limit = 10) => {
-    return api.post("/products/search", searchData, {
-      params: { page, limit },
+  // Tìm kiếm sản phẩm - Fixed to use GET with query parameters
+  searchProducts: (searchData = {}, page = 1, limit = 10) => {
+    // Convert searchData object to query parameters
+    const queryParams = {
+      page,
+      limit,
+      ...searchData,
+    };
+
+    // Remove empty/null/undefined values
+    Object.keys(queryParams).forEach((key) => {
+      if (
+        queryParams[key] === null ||
+        queryParams[key] === undefined ||
+        queryParams[key] === ""
+      ) {
+        delete queryParams[key];
+      }
+    });
+
+    return api.get("/products/search", {
+      params: queryParams,
     });
   },
 
@@ -45,16 +63,15 @@ const productAPI = {
     return api.get("/sizes");
   },
 
-  // Gợi ý tìm kiếm - simplified for basic suggestions
+  // Gợi ý tìm kiếm - Updated to use GET with query parameters
   getSearchSuggestions: (query) => {
-    // Use a simple search for suggestions
-    return api.post(
-      "/products/search",
-      { tuKhoa: query },
-      {
-        params: { page: 1, limit: 5 },
-      }
-    );
+    return api.get("/products/search", {
+      params: {
+        tuKhoa: query,
+        page: 1,
+        limit: 5,
+      },
+    });
   },
 };
 

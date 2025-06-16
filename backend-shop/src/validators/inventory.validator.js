@@ -1,5 +1,13 @@
-const { body, param, query } = require("express-validator");
-const { validateResult } = require("../utils/validator.util");
+const { body, param, query, validationResult } = require("express-validator");
+
+// Custom middleware to handle validation results
+const handleValidationResult = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
 
 // Validator cho tạo phiếu nhập
 const createPhieuNhapValidator = [
@@ -50,7 +58,7 @@ const createPhieuNhapValidator = [
       return true;
     }),
 
-  validateResult,
+  handleValidationResult,
 ];
 
 // Validator cho cập nhật trạng thái phiếu nhập
@@ -65,7 +73,7 @@ const updatePhieuNhapStatusValidator = [
     .isIn(["Chờ duyệt", "Đã duyệt", "Từ chối"])
     .withMessage("Trạng thái không hợp lệ"),
 
-  validateResult,
+  handleValidationResult,
 ];
 
 // Validator cho lấy danh sách phiếu nhập
@@ -90,7 +98,7 @@ const getPhieuNhapListValidator = [
     .isIn(["Chờ duyệt", "Đã duyệt", "Từ chối"])
     .withMessage("Trạng thái không hợp lệ"),
 
-  validateResult,
+  handleValidationResult,
 ];
 
 // Validator cho lấy chi tiết phiếu nhập
@@ -101,7 +109,7 @@ const getPhieuNhapDetailValidator = [
     .matches(/^PN-\d{6}-\d{3}$/)
     .withMessage("Mã phiếu nhập không đúng định dạng"),
 
-  validateResult,
+  handleValidationResult,
 ];
 
 // Validator cho thống kê tồn kho
@@ -121,7 +129,7 @@ const thongKeTonKhoValidator = [
     .isString()
     .withMessage("Từ khóa tìm kiếm không hợp lệ"),
 
-  validateResult,
+  handleValidationResult,
 ];
 
 // Validator cho lấy lịch sử nhập kho của sản phẩm
@@ -142,7 +150,7 @@ const getProductImportHistoryValidator = [
     .isInt({ min: 1, max: 100 })
     .withMessage("Số lượng bản ghi mỗi trang phải từ 1 đến 100"),
 
-  validateResult,
+  handleValidationResult,
 ];
 
 // Validator cho thống kê nhập kho theo thời gian
@@ -165,7 +173,24 @@ const thongKeNhapKhoTheoThoiGianValidator = [
       return true;
     }),
 
-  validateResult,
+  handleValidationResult,
+];
+
+// Validator cho kiểm tra tồn kho
+const checkStockValidator = [
+  body("chiTietSanPhamId")
+    .notEmpty()
+    .withMessage("ID chi tiết sản phẩm không được để trống")
+    .isInt()
+    .withMessage("ID chi tiết sản phẩm phải là số nguyên"),
+
+  body("soLuong")
+    .notEmpty()
+    .withMessage("Số lượng không được để trống")
+    .isInt({ min: 1 })
+    .withMessage("Số lượng phải là số nguyên lớn hơn 0"),
+
+  handleValidationResult,
 ];
 
 module.exports = {
@@ -176,4 +201,5 @@ module.exports = {
   thongKeTonKhoValidator,
   getProductImportHistoryValidator,
   thongKeNhapKhoTheoThoiGianValidator,
+  checkStockValidator,
 };

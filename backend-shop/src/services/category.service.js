@@ -14,14 +14,9 @@ class CategoryService {
     }
 
     const [result] = await db.execute(
-      `INSERT INTO danhmuc (Ten, MoTa, HinhAnh, TrangThai) 
-       VALUES (?, ?, ?, ?)`,
-      [
-        categoryData.Ten,
-        categoryData.MoTa || null,
-        categoryData.HinhAnh || null,
-        categoryData.TrangThai ?? 1,
-      ]
+      `INSERT INTO danhmuc (Ten, MoTa, TrangThai) 
+       VALUES (?, ?, ?)`,
+      [categoryData.Ten, categoryData.MoTa || null, categoryData.TrangThai ?? 1]
     );
 
     return {
@@ -45,12 +40,11 @@ class CategoryService {
 
     const [result] = await db.execute(
       `UPDATE danhmuc SET 
-        Ten = ?, MoTa = ?, HinhAnh = ?, TrangThai = ?
+        Ten = ?, MoTa = ?, TrangThai = ?
       WHERE id = ?`,
       [
         categoryData.Ten,
         categoryData.MoTa || null,
-        categoryData.HinhAnh || null,
         categoryData.TrangThai ?? 1,
         id,
       ]
@@ -118,7 +112,7 @@ class CategoryService {
 
     // Lấy danh sách sản phẩm mới nhất trong danh mục
     const [latestProducts] = await db.execute(
-      `SELECT id, Ten, GiaBan, HinhAnh, TrangThai
+      `SELECT id, Ten, Gia, HinhAnh, TrangThai
        FROM sanpham
        WHERE id_DanhMuc = ?
        ORDER BY NgayTao DESC
@@ -177,11 +171,11 @@ class CategoryService {
         dm.id,
         dm.Ten,
         COUNT(sp.id) as soSanPham,
-        SUM(sp.SoLuongBan) as tongSoLuongBan,
-        SUM(sp.SoLuongBan * sp.GiaBan) as tongDoanhThu
+        COALESCE(SUM(sp.SoLuongDaBan), 0) as tongSoLuongBan,
+        COALESCE(SUM(sp.SoLuongDaBan * sp.Gia), 0) as tongDoanhThu
       FROM danhmuc dm
       LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
-      WHERE YEAR(sp.NgayTao) = YEAR(CURRENT_DATE)
+      WHERE sp.id IS NOT NULL AND YEAR(sp.NgayTao) = YEAR(CURRENT_DATE)
       GROUP BY dm.id
       ORDER BY tongDoanhThu DESC
       LIMIT 5

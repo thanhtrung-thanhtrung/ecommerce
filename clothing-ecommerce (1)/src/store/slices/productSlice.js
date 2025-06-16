@@ -1,15 +1,18 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import productAPI from "../../services/productAPI";
+import categoryAPI from "../../services/categoryAPI";
+import brandAPI from "../../services/brandAPI";
 
-// Async thunks
+// Fetch Products
 export const fetchProducts = createAsyncThunk(
   "products/fetchProducts",
-  async (
-    { page = 1, limit = 12, sortBy = "newest" } = {},
-    { rejectWithValue }
-  ) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await productAPI.getProducts(page, limit, sortBy);
+      const response = await productAPI.getProducts(
+        params.page,
+        params.limit,
+        params.sortBy
+      );
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -19,11 +22,12 @@ export const fetchProducts = createAsyncThunk(
   }
 );
 
+// Fetch Product by ID
 export const fetchProductById = createAsyncThunk(
   "products/fetchProductById",
-  async (id, { rejectWithValue }) => {
+  async (productId, { rejectWithValue }) => {
     try {
-      const response = await productAPI.getProductById(id);
+      const response = await productAPI.getProductById(productId);
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -33,6 +37,7 @@ export const fetchProductById = createAsyncThunk(
   }
 );
 
+// Search Products - Updated to match backend API format
 export const searchProducts = createAsyncThunk(
   "products/searchProducts",
   async ({ searchData, page = 1, limit = 10 }, { rejectWithValue }) => {
@@ -66,7 +71,7 @@ export const fetchCategories = createAsyncThunk(
   "products/fetchCategories",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await productAPI.getCategories();
+      const response = await categoryAPI.getCategories();
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -80,7 +85,7 @@ export const fetchBrands = createAsyncThunk(
   "products/fetchBrands",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await productAPI.getBrands();
+      const response = await brandAPI.getBrands();
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -105,6 +110,9 @@ const initialState = {
   filters: {
     category: "",
     brand: "",
+    search: "",
+    minPrice: "",
+    maxPrice: "",
     priceRange: [0, 10000000],
     sortBy: "newest",
   },
@@ -144,21 +152,27 @@ const productSlice = createSlice({
       .addCase(fetchProducts.fulfilled, (state, action) => {
         state.isLoading = false;
 
-        // Nếu API trả về dữ liệu theo cấu trúc pagination
-        if (action.payload.products) {
+        // Handle your backend API response structure
+        if (action.payload && action.payload.products) {
           state.products = action.payload.products;
-          state.totalProducts =
-            action.payload.total || action.payload.products.length;
-          state.totalPages =
-            action.payload.totalPages ||
-            Math.ceil(state.totalProducts / (action.payload.limit || 12));
-          state.currentPage = action.payload.page || 1;
-        }
-        // Nếu API chỉ trả về mảng sản phẩm
-        else {
-          state.products = action.payload;
-          state.totalProducts = action.payload.length;
-          state.totalPages = 1;
+
+          // Handle pagination from your API response
+          const pagination = action.payload.pagination;
+          if (pagination) {
+            state.totalProducts = pagination.total || 0;
+            state.totalPages =
+              Math.ceil(pagination.total / pagination.limit) || 1;
+            state.currentPage = pagination.page || 1;
+          } else {
+            state.totalProducts = action.payload.products.length;
+            state.totalPages = 1;
+            state.currentPage = 1;
+          }
+        } else {
+          // Fallback for different response structure
+          state.products = Array.isArray(action.payload) ? action.payload : [];
+          state.totalProducts = state.products.length;
+          state.totalPages = state.products.length > 0 ? 1 : 0;
           state.currentPage = 1;
         }
       })
@@ -167,7 +181,8 @@ const productSlice = createSlice({
         state.error = action.payload;
         state.products = [];
         state.totalProducts = 0;
-        state.totalPages = 1;
+        state.totalPages = 0;
+        state.currentPage = 1;
       })
       // Fetch Product by ID
       .addCase(fetchProductById.pending, (state) => {
@@ -189,19 +204,26 @@ const productSlice = createSlice({
       })
       .addCase(searchProducts.fulfilled, (state, action) => {
         state.isSearching = false;
-        state.products = action.payload.products || [];
 
-        // Xử lý dữ liệu phân trang
-        const pagination = action.payload.pagination;
+        // Handle your backend API response structure
+        if (action.payload && action.payload.products) {
+          state.products = action.payload.products;
 
-        if (pagination) {
-          state.totalProducts = pagination.total || 0;
-          state.totalPages =
-            pagination.totalPages ||
-            Math.ceil((pagination.total || 0) / (pagination.limit || 12));
-          state.currentPage = pagination.page || 1;
+          // Handle pagination from your API response
+          const pagination = action.payload.pagination;
+          if (pagination) {
+            state.totalProducts = pagination.total || 0;
+            state.totalPages =
+              Math.ceil(pagination.total / pagination.limit) || 1;
+            state.currentPage = pagination.page || 1;
+          } else {
+            state.totalProducts = action.payload.products.length;
+            state.totalPages = 1;
+            state.currentPage = 1;
+          }
         } else {
-          // Xử lý trường hợp không có dữ liệu phân trang
+          // Fallback for different response structure
+          state.products = Array.isArray(action.payload) ? action.payload : [];
           state.totalProducts = state.products.length;
           state.totalPages = state.products.length > 0 ? 1 : 0;
           state.currentPage = 1;
@@ -230,12 +252,42 @@ const productSlice = createSlice({
         state.searchSuggestions = [];
       })
       // Fetch Categories
+      .addCase(fetchCategories.pending, (state) => {
+        state.error = null;
+      })
       .addCase(fetchCategories.fulfilled, (state, action) => {
-        state.categories = action.payload;
+        // Handle the response structure from your backend API
+        // Your API returns { success: true, data: [...] }
+        if (action.payload.success && action.payload.data) {
+          state.categories = action.payload.data;
+        } else if (Array.isArray(action.payload)) {
+          state.categories = action.payload;
+        } else {
+          state.categories = action.payload.data || [];
+        }
+      })
+      .addCase(fetchCategories.rejected, (state, action) => {
+        state.error = action.payload;
+        state.categories = [];
       })
       // Fetch Brands
+      .addCase(fetchBrands.pending, (state) => {
+        state.error = null;
+      })
       .addCase(fetchBrands.fulfilled, (state, action) => {
-        state.brands = action.payload;
+        // Handle the response structure from your backend API
+        // Your API returns { success: true, data: [...] }
+        if (action.payload.success && action.payload.data) {
+          state.brands = action.payload.data;
+        } else if (Array.isArray(action.payload)) {
+          state.brands = action.payload;
+        } else {
+          state.brands = action.payload.data || [];
+        }
+      })
+      .addCase(fetchBrands.rejected, (state, action) => {
+        state.error = action.payload;
+        state.brands = [];
       });
   },
 });
