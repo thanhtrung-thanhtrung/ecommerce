@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   return (
@@ -14,7 +14,8 @@ const Footer = () => {
               <span className="text-xl font-bold">ShoeShop</span>
             </div>
             <p className="text-gray-300 mb-4">
-              Cửa hàng giày thể thao hàng đầu Việt Nam với các thương hiệu nổi tiếng thế giới.
+              Cửa hàng giày thể thao hàng đầu Việt Nam với các thương hiệu nổi
+              tiếng thế giới.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-gray-300 hover:text-white">
@@ -42,22 +43,34 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/products?category=nam" className="text-gray-300 hover:text-white">
+                <Link
+                  to="/products?category=nam"
+                  className="text-gray-300 hover:text-white"
+                >
                   Giày nam
                 </Link>
               </li>
               <li>
-                <Link to="/products?category=nu" className="text-gray-300 hover:text-white">
+                <Link
+                  to="/products?category=nu"
+                  className="text-gray-300 hover:text-white"
+                >
                   Giày nữ
                 </Link>
               </li>
               <li>
-                <Link to="/products?category=the-thao" className="text-gray-300 hover:text-white">
+                <Link
+                  to="/products?category=the-thao"
+                  className="text-gray-300 hover:text-white"
+                >
                   Giày thể thao
                 </Link>
               </li>
               <li>
-                <Link to="/products?sale=true" className="text-gray-300 hover:text-white">
+                <Link
+                  to="/products?sale=true"
+                  className="text-gray-300 hover:text-white"
+                >
                   Khuyến mãi
                 </Link>
               </li>
@@ -84,7 +97,10 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/size-guide" className="text-gray-300 hover:text-white">
+                <Link
+                  to="/size-guide"
+                  className="text-gray-300 hover:text-white"
+                >
                   Hướng dẫn chọn size
                 </Link>
               </li>
@@ -102,7 +118,9 @@ const Footer = () => {
             <div className="space-y-3">
               <div className="flex items-start space-x-2">
                 <span>📍</span>
-                <span className="text-gray-300">123 Đường Nguyễn Huệ, Quận 1, TP.HCM</span>
+                <span className="text-gray-300">
+                  123 Đường Nguyễn Huệ, Quận 1, TP.HCM
+                </span>
               </div>
               <div className="flex items-center space-x-2">
                 <span>📞</span>
@@ -123,23 +141,32 @@ const Footer = () => {
         {/* Bottom bar */}
         <div className="border-t border-gray-700 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-300 text-sm">© 2024 ShoeShop. Tất cả quyền được bảo lưu.</p>
+            <p className="text-gray-300 text-sm">© 2024 ShoeShop.</p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <Link to="/privacy" className="text-gray-300 hover:text-white text-sm">
+              <Link
+                to="/privacy"
+                className="text-gray-300 hover:text-white text-sm"
+              >
                 Chính sách bảo mật
               </Link>
-              <Link to="/terms" className="text-gray-300 hover:text-white text-sm">
+              <Link
+                to="/terms"
+                className="text-gray-300 hover:text-white text-sm"
+              >
                 Điều khoản sử dụng
               </Link>
-              <Link to="/cookies" className="text-gray-300 hover:text-white text-sm">
-                Chính sách Cookie
+              <Link
+                to="/cookies"
+                className="text-gray-300 hover:text-white text-sm"
+              >
+                Liên hệ{" "}
               </Link>
             </div>
           </div>
         </div>
       </div>
     </footer>
-  )
-}
+  );
+};
 
-export default Footer
+export default Footer;

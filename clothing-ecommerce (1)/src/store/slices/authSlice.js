@@ -10,13 +10,13 @@ export const loginUser = createAsyncThunk(
       const response = await authAPI.login(credentials);
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("refreshToken", response.data.refreshToken);
-
-      // Gộp giỏ hàng sau khi đăng nhập thành công
+      console.log("Access Token:", response.data.token);
+      console.log("Refresh Token:", response.data.refreshToken);
       try {
         const { mergeCart } = await import("./cartSlice");
         dispatch(mergeCart());
       } catch (error) {
-        console.log("Merge cart error:",      error);
+        console.log("Merge cart error:", error);
       }
 
       toast.success("Đăng nhập thành công!");

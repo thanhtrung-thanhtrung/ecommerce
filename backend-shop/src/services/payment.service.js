@@ -1,7 +1,113 @@
-const db = require("../config/db");
+const db = require("../config/database");
 const crypto = require("crypto");
 
 class PaymentService {
+  // Quản lý phương thức thanh toán
+  async taoPhuongThucThanhToan(paymentData) {
+    const [result] = await db.execute(
+      `INSERT INTO hinhthucthanhtoan (Ten, MoTa, TrangThai) 
+       VALUES (?, ?, ?)`,
+      [paymentData.Ten, paymentData.MoTa || null, paymentData.TrangThai ?? 1]
+    );
+
+    return {
+      id: result.insertId,
+      ...paymentData,
+      TrangThai: paymentData.TrangThai ?? 1,
+    };
+  }
+
+  async capNhatPhuongThucThanhToan(id, paymentData) {
+    const [result] = await db.execute(
+      `UPDATE hinhthucthanhtoan 
+       SET Ten = ?, MoTa = ?, TrangThai = ?
+       WHERE id = ?`,
+      [
+        paymentData.Ten,
+        paymentData.MoTa || null,
+        paymentData.TrangThai ?? 1,
+        id,
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error("Không tìm thấy phương thức thanh toán");
+    }
+
+    return this.layChiTietPhuongThucThanhToan(id);
+  }
+
+  async xoaPhuongThucThanhToan(id) {
+    // Kiểm tra xem phương thức thanh toán có đang được sử dụng không
+    const [orders] = await db.execute(
+      "SELECT COUNT(*) as count FROM donhang WHERE id_ThanhToan = ?",
+      [id]
+    );
+
+    if (orders[0].count > 0) {
+      throw new Error("Không thể xóa phương thức thanh toán đang được sử dụng");
+    }
+
+    const [result] = await db.execute(
+      "DELETE FROM hinhthucthanhtoan WHERE id = ?",
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error("Không tìm thấy phương thức thanh toán");
+    }
+
+    return { message: "Xóa phương thức thanh toán thành công" };
+  }
+
+  async capNhatTrangThai(id, trangThai) {
+    const [result] = await db.execute(
+      "UPDATE hinhthucthanhtoan SET TrangThai = ? WHERE id = ?",
+      [trangThai, id]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error("Không tìm thấy phương thức thanh toán");
+    }
+
+    return { id, TrangThai: trangThai };
+  }
+
+  async layChiTietPhuongThucThanhToan(id) {
+    const [methods] = await db.execute(
+      "SELECT * FROM hinhthucthanhtoan WHERE id = ?",
+      [id]
+    );
+
+    if (methods.length === 0) {
+      throw new Error("Không tìm thấy phương thức thanh toán");
+    }
+
+    return methods[0];
+  }
+
+  async layDanhSachPhuongThucThanhToan(filters = {}) {
+    let query = "SELECT * FROM hinhthucthanhtoan WHERE 1=1";
+    const params = [];
+
+    if (filters.trangThai !== undefined) {
+      query += " AND TrangThai = ?";
+      params.push(filters.trangThai);
+    }
+
+    if (filters.tuKhoa) {
+      query += " AND (Ten LIKE ? OR MoTa LIKE ?)";
+      const searchTerm = `%${filters.tuKhoa}%`;
+      params.push(searchTerm, searchTerm);
+    }
+
+    query += " ORDER BY id DESC";
+
+    const [methods] = await db.execute(query, params);
+    return methods;
+  }
+
+  // Các phương thức thanh toán hiện có
   async createPayment(orderId, userId, paymentMethodId) {
     orderId = orderId ?? null;
     userId = userId ?? null;

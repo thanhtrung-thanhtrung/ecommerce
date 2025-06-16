@@ -61,6 +61,19 @@ class PaymentController {
   async handleZaloPayIPN(req, res) {
     res.status(501).json({ message: "Chức năng đang được phát triển" });
   }
+
+  // Lấy danh sách phương thức thanh toán
+  async getPaymentMethods(req, res) {
+    try {
+      const paymentMethods =
+        await paymentService.layDanhSachPhuongThucThanhToan({
+          trangThai: 1, // Chỉ lấy những phương thức đang hoạt động
+        });
+      res.json(paymentMethods);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
 }
 
 module.exports = new PaymentController();

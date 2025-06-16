@@ -1,17 +1,17 @@
 const db = require("../config/database");
+const InventoryService = require('./inventory.service');
 
 class CartService {
   async getCart(userId = null, sessionId = null) {
     let query = `
       SELECT gh.*, ctsp.id_SanPham, sp.Ten as tenSanPham, sp.HinhAnh, sp.Gia,
              kc.Ten as tenKichCo, ms.Ten as tenMau,
-             vts.TonKho as SoLuongTon
+             ctsp.TonKho as SoLuongTon
       FROM giohang gh
       JOIN chitietsanpham ctsp ON gh.id_ChiTietSanPham = ctsp.id
       JOIN sanpham sp ON ctsp.id_SanPham = sp.id
       JOIN kichco kc ON ctsp.id_KichCo = kc.id
       JOIN mausac ms ON ctsp.id_MauSac = ms.id
-      LEFT JOIN v_tonkho_sanpham vts ON ctsp.id = vts.id_ChiTietSanPham
     `;
     const params = [];
     if (userId) {
@@ -27,14 +27,14 @@ class CartService {
 
   async addToCart(cartData, userId = null, sessionId = null) {
     const { id_ChiTietSanPham, soLuong } = cartData;
-    // Kiểm tra số lượng tồn
-    const [inventory] = await db.execute(
-      "SELECT TonKho FROM v_tonkho_sanpham WHERE id_ChiTietSanPham = ?",
-      [id_ChiTietSanPham]
-    );
-    if (inventory.length === 0 || inventory[0].TonKho < soLuong) {
-      throw new Error("Số lượng sản phẩm không đủ");
+    
+    // Kiểm tra số lượng tồn kho
+    const stockCheck = await InventoryService.checkStock(id_ChiTietSanPham, soLuong);
+    
+    if (!stockCheck.isAvailable) {
+      throw new Error(`Số lượng sản phẩm trong kho không đủ. Hiện có ${stockCheck.tonKho} sản phẩm.`);
     }
+    
     // Kiểm tra sản phẩm đã có trong giỏ hàng chưa
     let where = userId
       ? "id_NguoiDung = ?"
@@ -43,12 +43,18 @@ class CartService {
       `SELECT * FROM giohang WHERE id_ChiTietSanPham = ? AND ${where}`,
       userId ? [id_ChiTietSanPham, userId] : [id_ChiTietSanPham, sessionId]
     );
+    
     if (existingItem.length > 0) {
       // Cập nhật số lượng
       const newQuantity = existingItem[0].SoLuong + soLuong;
-      if (newQuantity > inventory[0].TonKho) {
-        throw new Error("Số lượng sản phẩm không đủ");
+      
+      // Kiểm tra lại số lượng tồn kho với số lượng mới
+      const newStockCheck = await InventoryService.checkStock(id_ChiTietSanPham, newQuantity);
+      
+      if (!newStockCheck.isAvailable) {
+        throw new Error(`Số lượng sản phẩm trong kho không đủ. Hiện có ${newStockCheck.tonKho} sản phẩm.`);
       }
+      
       await db.execute("UPDATE giohang SET SoLuong = ? WHERE id = ?", [
         newQuantity,
         existingItem[0].id,
@@ -60,6 +66,7 @@ class CartService {
         [id_ChiTietSanPham, soLuong, userId, sessionId]
       );
     }
+    
     return this.getCart(userId, sessionId);
   }
 
@@ -72,22 +79,24 @@ class CartService {
       `SELECT * FROM giohang WHERE id = ? AND ${where}`,
       userId ? [cartId, userId] : [cartId, sessionId]
     );
+    
     if (cartItem.length === 0) {
       throw new Error("Không tìm thấy sản phẩm trong giỏ hàng");
     }
-    // Kiểm tra số lượng tồn
-    const [inventory] = await db.execute(
-      "SELECT TonKho FROM v_tonkho_sanpham WHERE id_ChiTietSanPham = ?",
-      [cartItem[0].id_ChiTietSanPham]
-    );
-    if (inventory[0].TonKho < soLuong) {
-      throw new Error("Số lượng sản phẩm không đủ");
+    
+    // Kiểm tra số lượng tồn kho với số lượng mới
+    const stockCheck = await InventoryService.checkStock(cartItem[0].id_ChiTietSanPham, soLuong);
+    
+    if (!stockCheck.isAvailable) {
+      throw new Error(`Số lượng sản phẩm trong kho không đủ. Hiện có ${stockCheck.tonKho} sản phẩm.`);
     }
+    
     // Cập nhật số lượng
     await db.execute("UPDATE giohang SET SoLuong = ? WHERE id = ?", [
       soLuong,
       cartId,
     ]);
+    
     return this.getCart(userId, sessionId);
   }
 

@@ -1,4 +1,3 @@
-
 xây dựng dự án nghiệp vụ bán giày cho người việt sử dụng chỉ cần src/ frontend đễ mở rộng với reatjs vite .jsx .js taiwind với các thư viện như {{
   "name": "kinhdoanh",
   "private": true,
@@ -717,3 +716,185 @@ trước tiên đọc thật kĩ @backend-shop  và @shoes_shop (18).sql  và @n
     }
   ]
 }
+
+# GIẢI THÍCH NGHIỆP VỤ XÁC THỰC VÀ LUỒNG HOẠT ĐỘNG TOÀN BỘ WEBSITE
+
+---
+
+## 1. LUỒNG XÁC THỰC (AUTH FLOW)
+
+### 1.1. Đăng ký (Register)
+- Người dùng nhập thông tin trên form đăng ký (frontend: Login/Register page).
+- Gọi `authAPI.register(userData)` (file: src/services/authAPI.js) gửi dữ liệu lên backend.
+- Backend:
+  - Route: POST /auth/register (auth.routes.js)
+  - Validator: registerValidator (auth.validator.js)
+  - Controller: auth.controller.js → gọi authService.register (auth.service.js)
+  - Kiểm tra email, mã hóa mật khẩu, lưu user, gán quyền mặc định.
+- Trả về userId nếu thành công.
+
+### 1.2. Đăng nhập (Login)
+- Người dùng nhập email, mật khẩu.
+- Gọi `authAPI.login(credentials)` (authAPI.js).
+- Trong `authSlice.js` (Redux):
+  - Thunk loginUser gọi API, nhận về token và refreshToken.
+  - Lưu vào localStorage, cập nhật Redux state.
+  - Có thể log ra console (chỉ khi dev):
+    ```js
+    console.log("Access Token:", response.data.token);
+    console.log("Refresh Token:", response.data.refreshToken);
+    ```
+- Backend:
+  - Route: POST /auth/login (auth.routes.js)
+  - Validator: loginValidator
+  - Controller: auth.controller.js → gọi authService.login
+  - Kiểm tra user, so sánh mật khẩu, sinh access token (JWT) và refresh token (JWT), lưu refresh token vào DB.
+  - Trả về `{ token, refreshToken, user }`.
+
+### 1.3. Làm mới token (Refresh Token)
+- Khi access token hết hạn, frontend lấy refreshToken từ localStorage, gọi `authAPI.refreshToken(refreshToken)`.
+- Backend:
+  - Route: POST /auth/refresh-token
+  - Controller: auth.controller.js → gọi authService.refreshToken
+  - Kiểm tra refresh token hợp lệ, còn hạn, có trong DB không.
+  - Nếu hợp lệ, sinh access token mới, trả về cho frontend.
+- Frontend cập nhật lại localStorage và Redux state với access token mới.
+
+### 1.4. Đăng xuất (Logout)
+- Frontend gọi `authAPI.logout()` (gửi refreshToken).
+- Backend:
+  - Route: POST /auth/logout (yêu cầu verifyToken middleware)
+  - Controller: auth.controller.js → gọi authService.logout
+  - Xóa refresh token khỏi DB.
+- Frontend xóa token khỏi localStorage, cập nhật Redux state.
+
+### 1.5. Quên mật khẩu & Đặt lại mật khẩu
+- Gửi email, sinh token đặt lại, xác thực token, đổi mật khẩu (luồng tương tự như trên, xem chi tiết ở các file controller/service/validator).
+
+---
+
+## 2. CÁC FILE VÀ NHIỆM VỤ
+
+### FRONTEND
+- **authAPI.js**: Định nghĩa các hàm gọi API xác thực (login, register, logout, refreshToken, ...).
+- **authSlice.js**: Quản lý state xác thực (Redux), định nghĩa các async thunk, gọi các hàm trong authAPI.js, lưu token vào localStorage, cập nhật state khi đăng nhập/thành công/thất bại.
+- **Các page như LoginPage.jsx/RegisterPage.jsx**: Giao diện, dispatch các action từ authSlice.
+
+### BACKEND
+- **auth.routes.js**: Định nghĩa các endpoint xác thực, gắn validator và controller cho từng route.
+- **auth.validator.js**: Định nghĩa các rule kiểm tra dữ liệu đầu vào cho từng endpoint (email, mật khẩu, xác nhận mật khẩu, ...).
+- **auth.controller.js**: Xử lý request từ route, gọi các hàm trong authService để thực hiện logic nghiệp vụ, trả response về cho client.
+- **auth.service.js**: Thực hiện logic nghiệp vụ (đăng ký, đăng nhập, quên mật khẩu, refresh token, đăng xuất, ...).
+- **auth.middleware.js**: Middleware bảo vệ route (verifyToken: kiểm tra access token hợp lệ, gán user vào req).
+
+---
+
+## 3. LUỒNG ĐIỂN HÌNH ĐĂNG NHẬP
+
+1. Người dùng nhập email, mật khẩu ở LoginPage.jsx → dispatch(loginUser(credentials))
+2. Trong authSlice.js:
+   - Gọi authAPI.login(credentials) → gửi POST /auth/login lên backend
+3. Backend:
+   - auth.routes.js nhận request, gọi loginValidator, rồi gọi auth.controller.js.login
+   - auth.controller.js gọi authService.login(email, matKhau)
+   - authService kiểm tra user, so sánh mật khẩu, sinh token, refreshToken, lưu refreshToken vào DB
+   - Trả về { token, refreshToken, user }
+4. Frontend nhận response, lưu token vào localStorage, cập nhật Redux state, chuyển hướng sang trang chính.
+
+---
+
+## 4. LUỒNG REFRESH TOKEN
+
+1. Khi access token hết hạn, mọi request API trả về 401.
+2. Frontend lấy refreshToken từ localStorage, gọi authAPI.refreshToken(refreshToken).
+3. Backend kiểm tra refreshToken, nếu hợp lệ sinh access token mới, trả về cho frontend.
+4. Frontend cập nhật lại localStorage và Redux state với access token mới.
+
+---
+
+## 5. LUỒNG ĐĂNG XUẤT
+
+1. Frontend gọi authAPI.logout() (gửi refreshToken).
+2. Backend xóa refreshToken khỏi DB.
+3. Frontend xóa token khỏi localStorage, cập nhật Redux state.
+
+---
+
+## 6. LUỒNG BẢO VỆ ROUTE
+
+- Các route cần đăng nhập sẽ kiểm tra isAuthenticated từ Redux state (frontend) hoặc dùng verifyToken middleware (backend).
+- Nếu chưa đăng nhập, frontend tự động chuyển hướng về trang đăng nhập.
+- Backend trả về lỗi 401 nếu token không hợp lệ hoặc hết hạn.
+
+---
+
+## 7. TÓM TẮT LIÊN KẾT FILE
+
+- **Frontend:**
+  - LoginPage.jsx → authSlice.js (dispatch) → authAPI.js (gọi API)
+- **Backend:**
+  - auth.routes.js (route) → auth.validator.js (kiểm tra) → auth.controller.js (xử lý request) → auth.service.js (logic nghiệp vụ, DB)
+  - Middleware auth.middleware.js bảo vệ các route cần xác thực
+
+---
+
+## 8. ĐOẠN CODE THEN CHỐT (MINH HỌA)
+
+### authSlice.js (frontend)
+```js
+export const loginUser = createAsyncThunk(
+  "auth/login",
+  async (credentials, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await authAPI.login(credentials);
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("refreshToken", response.data.refreshToken);
+      // Log token khi dev
+      console.log("Access Token:", response.data.token);
+      console.log("Refresh Token:", response.data.refreshToken);
+      // ...
+      return response.data;
+    } catch (error) {
+      // ...
+    }
+  }
+);
+```
+
+### auth.service.js (backend)
+```js
+async login(email, matKhau) {
+  // ...
+  const token = jwt.sign({ userId: user.id, ... }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
+  const refreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN });
+  await db.execute("INSERT INTO token_lammoi ...", [refreshToken, user.id]);
+  return { token, refreshToken, user: { ... } };
+}
+```
+
+### auth.middleware.js (backend)
+```js
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Không tìm thấy token xác thực" });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: "Token không hợp lệ hoặc đã hết hạn" });
+  }
+};
+```
+
+---
+
+## 9. LƯU Ý BẢO MẬT
+- Không log token ở production.
+- Nên dùng httpOnly cookie cho refreshToken nếu muốn bảo mật cao hơn.
+- Luôn kiểm tra hạn sử dụng và tính hợp lệ của token ở backend.
+
+---
+
+**Tài liệu này giúp bạn hình dung toàn bộ nghiệp vụ xác thực, các file liên quan, nhiệm vụ từng file, và cách các thành phần frontend-backend liên kết với nhau trong dự án của bạn.**

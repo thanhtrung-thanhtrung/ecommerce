@@ -17,13 +17,13 @@ const ProfilePage = () => {
   }, [dispatch]);
 
   const profileValidationSchema = Yup.object({
-    HoTen: Yup.string()
+    hoTen: Yup.string()
       .min(2, "Họ tên phải có ít nhất 2 ký tự")
       .required("Vui lòng nhập họ tên"),
-    SDT: Yup.string()
+    soDienThoai: Yup.string()
       .matches(/^[0-9]{10,11}$/, "Số điện thoại không hợp lệ")
       .required("Vui lòng nhập số điện thoại"),
-    DiaChi: Yup.string()
+    diaChi: Yup.string()
       .min(10, "Địa chỉ phải có ít nhất 10 ký tự")
       .required("Vui lòng nhập địa chỉ"),
   });
@@ -136,9 +136,9 @@ const ProfilePage = () => {
               </h2>
               <Formik
                 initialValues={{
-                  HoTen: user?.HoTen || "",
-                  SDT: user?.SDT || "",
-                  DiaChi: user?.DiaChi || "",
+                  hoTen: user?.HoTen || "",
+                  soDienThoai: user?.SDT || "",
+                  diaChi: user?.DiaChi || "",
                 }}
                 validationSchema={profileValidationSchema}
                 onSubmit={handleUpdateProfile}
@@ -149,9 +149,9 @@ const ProfilePage = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="form-label">Họ và tên</label>
-                        <Field name="HoTen" className="form-input" />
+                        <Field name="hoTen" className="form-input" />
                         <ErrorMessage
-                          name="HoTen"
+                          name="hoTen"
                           component="div"
                           className="form-error"
                         />
@@ -169,18 +169,18 @@ const ProfilePage = () => {
                       </div>
                       <div>
                         <label className="form-label">Số điện thoại</label>
-                        <Field name="SDT" className="form-input" />
+                        <Field name="soDienThoai" className="form-input" />
                         <ErrorMessage
-                          name="SDT"
+                          name="soDienThoai"
                           component="div"
                           className="form-error"
                         />
                       </div>
                       <div className="md:col-span-2">
                         <label className="form-label">Địa chỉ</label>
-                        <Field name="DiaChi" className="form-input" />
+                        <Field name="diaChi" className="form-input" />
                         <ErrorMessage
-                          name="DiaChi"
+                          name="diaChi"
                           component="div"
                           className="form-error"
                         />

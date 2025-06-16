@@ -71,19 +71,15 @@ const ProductsPage = () => {
     return searchData;
   }, []);
 
-  // Cập nhật URL dựa trên các bộ lọc và trang hiện tại
-  const updateUrl = useCallback(
-    (filters, page) => {
+  // Cập nhật URL params
+  const updateUrlParams = useCallback(
+    (newParams) => {
       const params = new URLSearchParams();
-
-      if (filters.category) params.set("category", filters.category);
-      if (filters.brand) params.set("brand", filters.brand);
-      if (filters.search) params.set("search", filters.search);
-      if (filters.minPrice) params.set("minPrice", filters.minPrice);
-      if (filters.maxPrice) params.set("maxPrice", filters.maxPrice);
-      if (filters.sortBy && filters.sortBy !== "newest")
-        params.set("sortBy", filters.sortBy);
-      if (page && page > 1) params.set("page", page.toString());
+      Object.entries(newParams).forEach(([key, value]) => {
+        if (value && value !== "" && value !== "0") {
+          params.set(key, value.toString());
+        }
+      });
 
       navigate(
         {
@@ -125,145 +121,132 @@ const ProductsPage = () => {
         return dispatch(
           searchProducts({
             searchData,
-            
+            page: page,
             limit: ITEMS_PER_PAGE,
           })
         );
       }
-      // Sử dụng API sản phẩm thông thường nếu không có tiêu chí
-      else {
-        return dispatch(
-          fetchProducts({
-            sortBy: urlFilters.sortBy,
-            page,
-            limit: ITEMS_PER_PAGE,
-          })
-        );
-      }
+
+      // Nếu không có tiêu chí tìm kiếm, tải tất cả sản phẩm
+      return dispatch(
+        fetchProducts({
+          page: page,
+          limit: ITEMS_PER_PAGE,
+          sortBy: urlFilters.sortBy,
+        })
+      );
     },
     [dispatch, formatSearchData, currentPage]
   );
 
-  // Effect chính để tải dữ liệu khi URL hoặc trang thay đổi
+  // Load dữ liệu khi component mount và URL thay đổi
   useEffect(() => {
     const urlFilters = getFiltersFromUrl();
-    const page = urlFilters.page;
+    loadProducts(urlFilters, urlFilters.page);
+  }, [searchParams, getFiltersFromUrl, loadProducts]);
 
-    loadProducts(urlFilters, page);
-  }, [getFiltersFromUrl, loadProducts]);
+  // Xử lý thay đổi bộ lọc
+  const handleFilterChange = useCallback(
+    (newFilters) => {
+      const urlFilters = {
+        ...getFiltersFromUrl(),
+        ...newFilters,
+        page: 1, // Reset về trang 1 khi thay đổi bộ lọc
+      };
 
-  // Xử lý khi thay đổi trang
-  const handlePageChange = (page) => {
-    const urlFilters = getFiltersFromUrl();
-    updateUrl(urlFilters, page);
-    loadProducts(urlFilters, page);
-  };
+      updateUrlParams(urlFilters);
+    },
+    [getFiltersFromUrl, updateUrlParams]
+  );
 
-  // Xử lý khi thay đổi bộ lọc
-  const handleFilterChange = (newFilters) => {
-    // Khi thay đổi bộ lọc, luôn quay về trang 1
-    updateUrl(newFilters, 1);
-    loadProducts(newFilters, 1);
-  };
+  // Xử lý thay đổi sắp xếp
+  const handleSortChange = useCallback(
+    (sortBy) => {
+      const urlFilters = {
+        ...getFiltersFromUrl(),
+        sortBy,
+        page: 1,
+      };
 
-  const isLoadingData = isLoading || isSearching;
-  const hasSearchQuery = searchParams.get("search");
+      updateUrlParams(urlFilters);
+    },
+    [getFiltersFromUrl, updateUrlParams]
+  );
+
+  // Xử lý thay đổi trang
+  const handlePageChange = useCallback(
+    (page) => {
+      const urlFilters = {
+        ...getFiltersFromUrl(),
+        page,
+      };
+
+      updateUrlParams(urlFilters);
+    },
+    [getFiltersFromUrl, updateUrlParams]
+  );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            {hasSearchQuery
-              ? `Kết quả tìm kiếm: "${hasSearchQuery}"`
-              : "Sản Phẩm"}
-          </h1>
-          <p className="text-gray-600">
-            {totalProducts > 0
-              ? `Tìm thấy ${totalProducts} sản phẩm`
-              : "Không tìm thấy sản phẩm nào"}
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-4 mt-4 md:mt-0">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="md:hidden btn-outline flex items-center space-x-2"
-          >
-            <span>🔍</span>
-            <span>Bộ lọc</span>
-          </button>
-          <ProductSort
-            onSortChange={(sortBy) =>
-              handleFilterChange({ ...filters, sortBy })
-            }
-            currentSort={filters.sortBy}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Filters Sidebar */}
-        <div
-          className={`lg:w-1/4 ${showFilters ? "block" : "hidden lg:block"}`}
-        >
-          <ProductFilters
-            filters={filters}
-            onFilterChange={handleFilterChange}
-          />
-        </div>
-
-        {/* Products Grid */}
-        <div className="lg:w-3/4">
-          {isLoadingData ? (
-            <div className="flex justify-center py-12">
-              <div className="spinner"></div>
-            </div>
-          ) : products.length > 0 ? (
-            <>
-              <ProductGrid products={products} />
-              {totalPages > 0 && (
-                <div className="mt-8">
-                  <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={handlePageChange}
-                    itemsPerPage={ITEMS_PER_PAGE}
-                    totalItems={totalProducts}
-                    showItemsInfo={true}
-                    className="mb-4"
-                  />
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">😔</div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                {hasSearchQuery
-                  ? "Không tìm thấy sản phẩm"
-                  : "Chưa có sản phẩm"}
-              </h3>
-              <p className="text-gray-600">
-                {hasSearchQuery
-                  ? "Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc"
-                  : "Thử thay đổi bộ lọc hoặc quay lại sau"}
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Sản phẩm</h1>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="lg:hidden inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                {showFilters ? "Ẩn bộ lọc" : "Hiện bộ lọc"}
+              </button>
+              <p className="text-sm text-gray-500">
+                {totalProducts} sản phẩm được tìm thấy
               </p>
-              {hasSearchQuery && (
-                <div className="mt-4">
-                  <button
-                    onClick={() => {
-                      navigate("/products");
-                    }}
-                    className="btn-primary"
-                  >
-                    Xem tất cả sản phẩm
-                  </button>
-                </div>
-              )}
             </div>
-          )}
+            <ProductSort
+              currentSort={filters.sortBy}
+              onSortChange={handleSortChange}
+            />
+          </div>
+        </div>
+
+        <div className="lg:grid lg:grid-cols-4 lg:gap-8">
+          {/* Filters Sidebar */}
+          <div
+            className={`lg:col-span-1 ${
+              showFilters ? "block" : "hidden lg:block"
+            }`}
+          >
+            <div className="sticky top-8">
+              <ProductFilters
+                filters={filters}
+                onFilterChange={handleFilterChange}
+              />
+            </div>
+          </div>
+
+          {/* Products Grid */}
+          <div className="lg:col-span-3">
+            {isLoading || isSearching ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+              </div>
+            ) : (
+              <>
+                <ProductGrid products={products} />
+                {totalPages > 1 && (
+                  <div className="mt-8">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={handlePageChange}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,0 +1,366 @@
+http://localhost:5000/api/payments/methods
+[
+    {
+        "id": 3,
+        "Ten": "Thẻ tín dụng",
+        "MoTa": "Thanh toán qua thẻ tín dụng",
+        "TrangThai": 1
+    },
+    {
+        "id": 2,
+        "Ten": "Chuyển khoản",
+        "MoTa": "Chuyển khoản ngân hàng",
+        "TrangThai": 1
+    },
+    {
+        "id": 1,
+        "Ten": "Tiền mặt",
+        "MoTa": "Thanh toán khi nhận hàng",
+        "TrangThai": 1
+    }
+]
+
+
+http://localhost:5000/api/shipping/methods [
+    {
+        "id": 1,
+        "Ten": "Giao hàng tiêu chuẩn",
+        "MoTa": "Giao hàng trong 2-3 ngày",
+        "PhiVanChuyen": "30000.00",
+        "ThoiGianDuKien": "2-3 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 2,
+        "Ten": "Giao hàng nhanh",
+        "MoTa": "Giao hàng trong 1-2 ngày",
+        "PhiVanChuyen": "50000.00",
+        "ThoiGianDuKien": "1-2 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 3,
+        "Ten": "Giao hàng siêu tốc",
+        "MoTa": "Giao hàng trong ngày",
+        "PhiVanChuyen": "80000.00",
+        "ThoiGianDuKien": "Trong ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 4,
+        "Ten": "Giao hàng miễn phí",
+        "MoTa": "Miễn phí giao hàng cho đơn hàng trên 1.000.000đ",
+        "PhiVanChuyen": "0.00",
+        "ThoiGianDuKien": "3-7 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 5,
+        "Ten": "Giao hàng miễn phí",
+        "MoTa": "Miễn phí giao hàng cho đơn hàng trên 1.000.000đ",
+        "PhiVanChuyen": "0.00",
+        "ThoiGianDuKien": "3-7 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 6,
+        "Ten": "Giao hàng miễn phí",
+        "MoTa": "Miễn phí giao hàng cho đơn hàng trên 1.000.000đ",
+        "PhiVanChuyen": "0.00",
+        "ThoiGianDuKien": "3-7 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 7,
+        "Ten": "Giao hàng miễn phí",
+        "MoTa": "Miễn phí giao hàng cho đơn hàng trên 1.000.000đ",
+        "PhiVanChuyen": "0.00",
+        "ThoiGianDuKien": "3-7 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 8,
+        "Ten": "Giao hàng miễn phí",
+        "MoTa": "Miễn phí giao hàng cho đơn hàng trên 1.000.000đ",
+        "PhiVanChuyen": "0.00",
+        "ThoiGianDuKien": "3-7 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 9,
+        "Ten": "Giao hàng miễn phí",
+        "MoTa": "Miễn phí giao hàng cho đơn hàng trên 1.000.000đ",
+        "PhiVanChuyen": "0.00",
+        "ThoiGianDuKien": "3-7 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 10,
+        "Ten": "Giao hàng miễn phí",
+        "MoTa": "Miễn phí giao hàng cho đơn hàng trên 1.000.000đ",
+        "PhiVanChuyen": "0.00",
+        "ThoiGianDuKien": "3-7 ngày",
+        "TrangThai": 1
+    },
+    {
+        "id": 11,
+        "Ten": "Giao hàng miễn phí",
+        "MoTa": "Miễn phí giao hàng cho đơn hàng trên 1.000.000đ",
+        "PhiVanChuyen": "0.00",
+        "ThoiGianDuKien": "3-7 ngày",
+        "TrangThai": 1
+    }
+]
+
+
+
+
+
+http://localhost:5000/api/cart 
+[
+    {
+        "id": 31,
+        "id_NguoiDung": null,
+        "session_id": "tWcv5uiBfQ-n2OBNCGlP38WwEapFK-uB",
+        "id_ChiTietSanPham": 1,
+        "SoLuong": 1,
+        "NgayThem": "2025-06-16T02:35:30.000Z",
+        "id_SanPham": 1,
+        "tenSanPham": "Nike Air Max 270",
+        "HinhAnh": "{\"anhChinh\": \"nike-air-max-270.jpg\", \"anhPhu\": [\"nike-air-max-270-1.jpg\", \"nike-air-max-270-2.jpg\"]}",
+        "Gia": "3500000.00",
+        "tenKichCo": "36",
+        "tenMau": "Đen",
+        "SoLuongTon": 10
+    }
+]
+
+http://localhost:5000/api/cart
+
+{
+    "id_ChiTietSanPham": 1,
+    "soLuong": 1
+  }
+
+  [
+    {
+        "id": 31,
+        "id_NguoiDung": null,
+        "session_id": "tWcv5uiBfQ-n2OBNCGlP38WwEapFK-uB",
+        "id_ChiTietSanPham": 1,
+        "SoLuong": 1,
+        "NgayThem": "2025-06-16T02:35:30.000Z",
+        "id_SanPham": 1,
+        "tenSanPham": "Nike Air Max 270",
+        "HinhAnh": "{\"anhChinh\": \"nike-air-max-270.jpg\", \"anhPhu\": [\"nike-air-max-270-1.jpg\", \"nike-air-max-270-2.jpg\"]}",
+        "Gia": "3500000.00",
+        "tenKichCo": "36",
+        "tenMau": "Đen",
+        "SoLuongTon": 10
+    }
+]
+
+
+
+http://localhost:5000/api/orders?sessionId=ygAWRDMJEXL50Su8M5EZr9hxRZ00cxNr
+{"hoTen": "Test Order Demo", "email": "testdemo@example.com", "diaChiGiao": "123 Demo Street, TP.HCM", "soDienThoai": "0987654321", "id_ThanhToan": 1, "id_VanChuyen": 1, "ghiChu": "Test order demo"}
+{
+    "id": 2,
+    "TongThanhToan": "250000030000.00",
+    "message": "Đặt hàng thành công"
+}
+
+# =================================================
+# TEST API ORDER - SHOES SHOP
+# =================================================
+
+# 1. THÊM SẢN PHẨM VÀO GIỎ HÀNG (Guest)
+echo "=== 1. THÊM SẢN PHẨM VÀO GIỎ HÀNG ==="
+curl -X POST http://localhost:5000/api/cart \
+  -H "Content-Type: application/json" \
+  -H "X-Session-ID: test-session-guest-001" \
+  -d '{
+    "id_ChiTietSanPham": 1,
+    "soLuong": 2
+  }'
+
+echo -e "\n"
+
+# 2. KIỂM TRA GIỎ HÀNG
+echo "=== 2. KIỂM TRA GIỎ HÀNG ==="
+curl -X GET http://localhost:5000/api/cart \
+  -H "X-Session-ID: test-session-guest-001"
+
+echo -e "\n"
+
+# 3. ĐẶT HÀNG CHO KHÁCH VÃNG LAI
+echo "=== 3. ĐẶT HÀNG CHO KHÁCH VÃNG LAI ==="
+curl -X POST "http://localhost:5000/api/orders?sessionId=test-session-guest-001" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hoTen": "Nguyễn Văn Test",
+    "email": "test@example.com",
+    "diaChiGiao": "123 Đường Test, Quận 1, TP.HCM",
+    "soDienThoai": "0987654321",
+    "id_ThanhToan": 1,
+    "id_VanChuyen": 1,
+    "ghiChu": "Giao hàng buổi sáng"
+  }'
+
+echo -e "\n"
+
+# 4. KIỂM TRA CHI TIẾT ĐỚN HÀNG (ID từ response trên)
+echo "=== 4. KIỂM TRA CHI TIẾT ĐỚN HÀNG ==="
+curl -X GET http://localhost:5000/api/orders/1
+
+echo -e "\n"
+
+# =================================================
+# TEST ĐẶT HÀNG VỚI USER ĐĂNG NHẬP
+# =================================================
+
+# 5. ĐĂNG NHẬP USER
+echo "=== 5. ĐĂNG NHẬP USER ==="
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "testuser@example.com",
+    "matKhau": "123456"
+  }'
+
+echo -e "\n"
+
+# 6. THÊM SẢN PHẨM VÀO GIỎ HÀNG (User đã đăng nhập)
+echo "=== 6. THÊM SẢN PHẨM VÀO GIỎ HÀNG (USER) ==="
+curl -X POST http://localhost:5000/api/cart \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer [REPLACE_WITH_TOKEN]" \
+  -d '{
+    "id_ChiTietSanPham": 298,
+    "soLuong": 1
+  }'
+
+echo -e "\n"
+
+# 7. ĐẶT HÀNG CHO USER ĐĂNG NHẬP
+echo "=== 7. ĐẶT HÀNG CHO USER ĐĂNG NHẬP ==="
+curl -X POST http://localhost:5000/api/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer [REPLACE_WITH_TOKEN]" \
+  -d '{
+    "hoTen": "User Test",
+    "email": "user@example.com",
+    "diaChiGiao": "456 User Street, Quận 3, TP.HCM",
+    "soDienThoai": "0909090909",
+    "id_ThanhToan": 2,
+    "id_VanChuyen": 2,
+    "MaGiamGia": "WELCOME10",
+    "ghiChu": "Giao hàng nhanh"
+  }'
+
+echo -e "\n"
+
+# =================================================
+# TEST CÁC TÍNH NĂNG KHÁC
+# =================================================
+
+# 8. LẤY LỊCH SỬ ĐỚN HÀNG
+echo "=== 8. LỊCH SỬ ĐỚN HÀNG ==="
+curl -X GET http://localhost:5000/api/orders/history \
+  -H "Authorization: Bearer [REPLACE_WITH_TOKEN]"
+
+echo -e "\n"
+
+# 9. HỦY ĐỚN HÀNG
+echo "=== 9. HỦY ĐỚN HÀNG ==="
+curl -X PUT http://localhost:5000/api/orders/1/cancel \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer [REPLACE_WITH_TOKEN]" \
+  -d '{
+    "lyDoHuy": "Đổi ý không muốn mua nữa"
+  }'
+
+echo -e "\n"
+
+# 10. TRA CỨU ĐỚN HÀNG KHÁCH VÃNG LAI
+echo "=== 10. TRA CỨU ĐỚN HÀNG KHÁCH VÃNG LAI ==="
+curl -X GET "http://localhost:5000/api/orders/guest/1?email=test@example.com"
+
+echo -e "\n"
+
+# =================================================
+# TEST VỚI MÃ GIẢM GIÁ
+# =================================================
+
+# 11. THÊM SẢN PHẨM VÀO GIỎ HÀNG (Đơn hàng lớn để test mã giảm giá)
+echo "=== 11. THÊM SẢN PHẨM VÀO GIỎ HÀNG (ĐƠN LỚN) ==="
+curl -X POST http://localhost:5000/api/cart \
+  -H "Content-Type: application/json" \
+  -H "X-Session-ID: test-session-large-order" \
+  -d '{
+    "id_ChiTietSanPham": 298,
+    "soLuong": 5
+  }'
+
+echo -e "\n"
+
+# 12. ĐẶT HÀNG VỚI MÃ GIẢM GIÁ
+echo "=== 12. ĐẶT HÀNG VỚI MÃ GIẢM GIÁ ==="
+curl -X POST "http://localhost:5000/api/orders?sessionId=test-session-large-order" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hoTen": "Khách Hàng VIP",
+    "email": "vip@example.com",
+    "diaChiGiao": "789 VIP Street, Quận 7, TP.HCM",
+    "soDienThoai": "0911111111",
+    "id_ThanhToan": 3,
+    "id_VanChuyen": 4,
+    "MaGiamGia": "WELCOME10",
+    "ghiChu": "Khách hàng VIP, giao hàng cẩn thận"
+  }'
+
+echo -e "\n"
+
+# =================================================
+# HƯỚNG DẪN SỬ DỤNG
+# =================================================
+
+echo "=== HƯỚNG DẪN SỬ DỤNG ==="
+echo "1. Chạy từng lệnh curl một cách thủ công"
+echo "2. Thay thế [REPLACE_WITH_TOKEN] bằng token thực từ response đăng nhập"
+echo "3. Kiểm tra response để lấy ID đơn hàng cho các test tiếp theo"
+echo "4. Đảm bảo server đang chạy trên port 5000"
+echo "5. Database đã có dữ liệu sản phẩm và tồn kho"
+
+# =================================================
+# TEST NHANH - CHẠY NGAY LẬP TỨC
+# =================================================
+
+echo "=== TEST NHANH - TẠO ĐƠN HÀNG HOÀN CHỈNH ==="
+
+# Bước 1: Thêm sản phẩm vào giỏ
+SESSION_ID="quick-test-$(date +%s)"
+echo "Session ID: $SESSION_ID"
+
+curl -X POST http://localhost:5000/api/cart \
+  -H "Content-Type: application/json" \
+  -H "X-Session-ID: $SESSION_ID" \
+  -d '{
+    "id_ChiTietSanPham": 1,
+    "soLuong": 1
+  }'
+
+echo -e "\n"
+
+# Bước 2: Đặt hàng ngay lập tức
+curl -X POST "http://localhost:5000/api/orders?sessionId=$SESSION_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hoTen": "Test Nhanh",
+    "email": "quicktest@example.com",
+    "diaChiGiao": "Test Address",
+    "soDienThoai": "0123456789",
+    "id_ThanhToan": 1,
+    "id_VanChuyen": 1,
+    "ghiChu": "Test order"
+  }'

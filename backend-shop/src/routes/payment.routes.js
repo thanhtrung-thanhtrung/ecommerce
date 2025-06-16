@@ -2,12 +2,13 @@ const express = require("express");
 const router = express.Router();
 const paymentController = require("../controllers/payment.controller");
 const { createPaymentValidator } = require("../validators/payment.validator");
-const { optionalAuth } = require("../middlewares/auth.middleware");
 
-// Route tạo thanh toán (hỗ trợ cả guest và user đã đăng nhập)
+// Route lấy danh sách phương thức thanh toán
+router.get("/methods", paymentController.getPaymentMethods);
+
+// Route tạo thanh toán (không cần xác thực)
 router.post(
   "/create",
-  optionalAuth,
   createPaymentValidator,
   paymentController.createPayment
 );

@@ -4,32 +4,46 @@ const orderService = require("../services/order.service");
 class OrderController {
   async createOrder(req, res) {
     try {
+      // Log chi tiết dữ liệu nhận được
+      console.log("===== CREATE ORDER DEBUG =====");
+      console.log("Request body:", JSON.stringify(req.body, null, 2));
+      console.log("User ID:", req.user?.userId);
+      console.log("Session ID from query:", req.query.sessionId);
+      console.log("Session ID from cookies:", req.cookies?.sessionId);
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.log("Validation errors:", errors.array());
         return res.status(400).json({ errors: errors.array() });
       }
 
       const userId = req.user?.userId || null;
-      const sessionId = req.session?.id || null;
 
-      // For guest checkout, require customer information
-      if (!userId) {
-        const { hoTen, email } = req.body;
-        if (!hoTen || !email) {
-          return res.status(400).json({
-            message: "Vui lòng cung cấp họ tên và email để đặt hàng",
-          });
-        }
-        if (!sessionId) {
-          return res.status(400).json({
-            message: "Không tìm thấy session để tạo đơn hàng",
-          });
-        }
+      // Get session ID from various sources for guest checkout
+      let sessionId =
+        req.query.sessionId ||
+        req.cookies?.sessionId ||
+        req.session?.id ||
+        req.headers["x-session-id"] ||
+        null;
+
+      console.log("Final session ID:", sessionId);
+
+      // For guest checkout, require sessionId
+      if (!userId && !sessionId) {
+        console.log("Missing session ID for guest checkout");
+        return res.status(400).json({
+          message: "Không tìm thấy session để tạo đơn hàng",
+        });
       }
 
+      console.log("Calling orderService.createOrder...");
       const order = await orderService.createOrder(userId, req.body, sessionId);
+      console.log("Order created successfully:", order);
       res.status(201).json(order);
     } catch (error) {
+      console.error("Create order error:", error);
+      console.error("Error stack:", error.stack);
       res.status(400).json({ message: error.message });
     }
   }
