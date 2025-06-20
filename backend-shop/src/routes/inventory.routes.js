@@ -2,11 +2,10 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
-const { checkSession } = require("../middlewares/auth.middleware");
 const InventoryController = require("../controllers/inventory.controller");
 const {
   createPhieuNhapValidator,
-  updatePhieuNhapValidator,
+  updatePhieuNhapStatusValidator,
   getPhieuNhapListValidator,
   getPhieuNhapDetailValidator,
   thongKeTonKhoValidator,
@@ -32,7 +31,7 @@ router.post(
 
 router.put(
   "/admin/phieu-nhap/:phieuNhapId",
-  updatePhieuNhapValidator,
+  updatePhieuNhapStatusValidator,
   InventoryController.updatePhieuNhap
 );
 

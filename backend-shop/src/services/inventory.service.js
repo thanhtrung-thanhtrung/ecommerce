@@ -1,6 +1,4 @@
 const db = require("../config/database");
-const ProductService = require("./product.service");
-const cloudinaryUtil = require("../utils/cloudinary.util");
 
 class InventoryService {
   // Tạo mã phiếu nhập tự động
@@ -20,57 +18,20 @@ class InventoryService {
     return `PN-${year}${month}${day}-${count.toString().padStart(3, "0")}`;
   }
 
-  // Thêm phương thức mới: Upload hình ảnh phiếu nhập
-  async uploadPhieuNhapImage(file) {
-    try {
-      const result = await cloudinaryUtil.uploadImage(
-        file,
-        "shoes_shop/phieunhap"
-      );
-      return {
-        url: cloudinaryUtil.getImageUrl(result.public_id, {
-          width: 800,
-          height: 600,
-          crop: "fill",
-        }),
-        public_id: result.public_id,
-      };
-    } catch (error) {
-      throw new Error("Không thể upload hình ảnh phiếu nhập: " + error.message);
-    }
-  }
-
   // Tạo phiếu nhập mới
   async createPhieuNhap(phieuNhapData, userId) {
-    const { id_NhaCungCap, chiTietPhieuNhap, GhiChu, hinhAnh } = phieuNhapData;
+    const { id_NhaCungCap, chiTietPhieuNhap, GhiChu } = phieuNhapData;
     const maPhieuNhap = await this.generateMaPhieuNhap();
 
-    let connection;
     try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
-
-      // Bắt đầu transaction
-      await connection.beginTransaction();
-
       // Tính tổng tiền
       const tongTien = chiTietPhieuNhap.reduce(
         (sum, item) => sum + item.SoLuong * item.GiaNhap,
         0
       );
 
-      // Xử lý hình ảnh nếu có
-      let imageData = null;
-      if (hinhAnh) {
-        const uploadedImage = await this.uploadPhieuNhapImage(hinhAnh);
-        imageData = JSON.stringify({
-          url: uploadedImage.url,
-          public_id: uploadedImage.public_id,
-        });
-      }
-
       // Tạo phiếu nhập
-      const [result] = await connection.execute(
+      const [result] = await db.execute(
         `INSERT INTO phieunhap (
           MaPhieuNhap, NgayNhap, TongTien, id_NhaCungCap, 
           id_NguoiTao, TrangThai, GhiChu
@@ -92,7 +53,7 @@ class InventoryService {
         const { id_ChiTietSanPham, SoLuong, GiaNhap } = item;
         const thanhTien = SoLuong * GiaNhap;
 
-        await connection.execute(
+        await db.execute(
           `INSERT INTO chitietphieunhap (
             id_PhieuNhap, id_ChiTietSanPham, 
             SoLuong, GiaNhap, ThanhTien
@@ -101,390 +62,112 @@ class InventoryService {
         );
       }
 
-      // Commit transaction
-      await connection.commit();
-      return { id: phieuNhapId, MaPhieuNhap: maPhieuNhap };
+      return {
+        success: true,
+        message: "Tạo phiếu nhập thành công",
+        data: { id: phieuNhapId, MaPhieuNhap: maPhieuNhap },
+      };
     } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
       console.error("Error creating phieu nhap:", error);
-      throw error;
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
+      throw new Error("Không thể tạo phiếu nhập: " + error.message);
     }
   }
 
-  // Xác nhận phiếu nhập và cập nhật tồn kho
-  async confirmPhieuNhap(phieuNhapId) {
-    let connection;
+  // Thống kê tồn kho
+  async thongKeTonKho(query = {}) {
     try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
+      let whereClause = "WHERE 1=1";
+      let queryParams = [];
 
-      // Bắt đầu transaction
-      await connection.beginTransaction();
-
-      // Kiểm tra trạng thái hiện tại
-      const [phieuNhap] = await connection.execute(
-        "SELECT TrangThai FROM phieunhap WHERE id = ?",
-        [phieuNhapId]
-      );
-
-      if (phieuNhap.length === 0) {
-        throw new Error("Phiếu nhập không tồn tại");
+      // Lọc theo danh mục
+      if (query.danhMuc) {
+        whereClause += " AND sp.id_DanhMuc = ?";
+        queryParams.push(query.danhMuc);
       }
 
-      if (phieuNhap[0].TrangThai !== 1) {
-        throw new Error("Phiếu nhập không ở trạng thái chờ xác nhận");
+      // Lọc theo thương hiệu
+      if (query.thuongHieu) {
+        whereClause += " AND sp.id_ThuongHieu = ?";
+        queryParams.push(query.thuongHieu);
       }
 
-      // Lấy chi tiết phiếu nhập
-      const [chiTietPhieuNhap] = await connection.execute(
-        "SELECT * FROM chitietphieunhap WHERE id_PhieuNhap = ?",
-        [phieuNhapId]
-      );
+      // Xử lý tham số sapHet một cách chính xác
+      const sapHet = query.sapHet === "true" || query.sapHet === true;
+      const tatCa = query.tatCa === "true" || query.tatCa === true;
 
-      // Cập nhật tồn kho cho từng sản phẩm
-      for (const item of chiTietPhieuNhap) {
-        const { id_ChiTietSanPham, SoLuong } = item;
-
-        // Cập nhật tồn kho - database đã có sẵn cột TonKho
-        await connection.execute(
-          "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
-          [SoLuong, id_ChiTietSanPham]
-        );
+      if (sapHet) {
+        // Chỉ lấy sản phẩm sắp hết hàng (≤ 10)
+        whereClause += " AND cts.TonKho <= 10 AND cts.TonKho > 0";
+      } else if (!tatCa) {
+        // Mặc định: chỉ lấy sản phẩm còn hàng (> 0)
+        whereClause += " AND cts.TonKho > 0";
       }
+      // Nếu tatCa = true thì không thêm filter nào về tồn kho
 
-      // Cập nhật trạng thái phiếu nhập
-      await connection.execute(
-        "UPDATE phieunhap SET TrangThai = 2 WHERE id = ?",
-        [phieuNhapId]
-      );
+      const sqlQuery = `
+        SELECT 
+          cts.id,
+          sp.Ten as TenSanPham,
+          th.Ten as TenThuongHieu,
+          dm.Ten as TenDanhMuc,
+          kc.Ten as KichCo,
+          ms.Ten as MauSac,
+          cts.MaSanPham,
+          cts.TonKho,
+          sp.Gia
+        FROM chitietsanpham cts
+        JOIN sanpham sp ON cts.id_SanPham = sp.id
+        JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
+        JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
+        JOIN kichco kc ON cts.id_KichCo = kc.id
+        JOIN mausac ms ON cts.id_MauSac = ms.id
+        ${whereClause}
+        AND sp.TrangThai = 1
+        ORDER BY cts.TonKho ASC, sp.Ten
+      `;
 
-      // Commit transaction
-      await connection.commit();
-      return true;
+      const [results] = await db.execute(sqlQuery, queryParams);
+      return {
+        success: true,
+        data: results,
+        filter: {
+          sapHet: sapHet,
+          tatCa: tatCa,
+          count: results.length,
+        },
+      };
     } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
-      console.error("Error confirming phieu nhap:", error);
-      throw error;
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
-    }
-  }
-
-  // Hủy phiếu nhập
-  async cancelPhieuNhap(phieuNhapId, lyDoHuy) {
-    let connection;
-    try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
-
-      // Bắt đầu transaction
-      await connection.beginTransaction();
-
-      // Kiểm tra trạng thái hiện tại
-      const [phieuNhap] = await connection.execute(
-        "SELECT TrangThai FROM phieunhap WHERE id = ?",
-        [phieuNhapId]
-      );
-
-      if (phieuNhap.length === 0) {
-        throw new Error("Phiếu nhập không tồn tại");
-      }
-
-      if (phieuNhap[0].TrangThai !== 1) {
-        throw new Error(
-          "Chỉ có thể hủy phiếu nhập đang ở trạng thái chờ xác nhận"
-        );
-      }
-
-      // Cập nhật trạng thái phiếu nhập
-      await connection.execute(
-        "UPDATE phieunhap SET TrangThai = 3, GhiChu = CONCAT(IFNULL(GhiChu, ''), ' | Lý do hủy: ', ?) WHERE id = ?",
-        [lyDoHuy || "Không có lý do", phieuNhapId]
-      );
-
-      // Commit transaction
-      await connection.commit();
-      return true;
-    } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
-      console.error("Error canceling phieu nhap:", error);
-      throw error;
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
+      throw new Error("Không thể thống kê tồn kho: " + error.message);
     }
   }
 
   // Kiểm tra số lượng tồn kho
   async checkStock(productVariantId, requestedQuantity) {
-    const [result] = await db.execute(
-      "SELECT TonKho FROM chitietsanpham WHERE id = ?",
-      [productVariantId]
-    );
-
-    if (result.length === 0) {
-      throw new Error("Sản phẩm không tồn tại");
-    }
-
-    const tonKho = result[0].TonKho || 0;
-    const isAvailable = tonKho >= requestedQuantity;
-
-    return {
-      tonKho,
-      isAvailable,
-      thieu: isAvailable ? 0 : requestedQuantity - tonKho,
-    };
-  }
-
-  // Cập nhật số lượng tồn kho (tăng hoặc giảm)
-  async updateStock(productVariantId, quantity, increase = true) {
-    if (increase) {
-      await db.execute(
-        "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
-        [quantity, productVariantId]
-      );
-    } else {
-      // Kiểm tra đủ số lượng trước khi giảm
-      const stockCheck = await this.checkStock(productVariantId, quantity);
-      if (!stockCheck.isAvailable) {
-        throw new Error(
-          `Số lượng tồn kho không đủ. Hiện có ${stockCheck.tonKho} sản phẩm.`
-        );
-      }
-
-      await db.execute(
-        "UPDATE chitietsanpham SET TonKho = TonKho - ? WHERE id = ?",
-        [quantity, productVariantId]
-      );
-    }
-
-    return true;
-  }
-
-  // Cập nhật số lượng tồn kho hàng loạt
-  async bulkUpdateStock(items, increase = true) {
-    let connection;
     try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
+      // Sử dụng trực tiếp trường TonKho từ bảng chitietsanpham
+      const [result] = await db.execute(
+        "SELECT TonKho FROM chitietsanpham WHERE id = ?",
+        [productVariantId]
+      );
 
-      // Bắt đầu transaction
-      await connection.beginTransaction();
-
-      for (const item of items) {
-        const { id_ChiTietSanPham, SoLuong } = item;
-
-        if (increase) {
-          await connection.execute(
-            "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
-            [SoLuong, id_ChiTietSanPham]
-          );
-        } else {
-          // Kiểm tra đủ số lượng trước khi giảm
-          const [result] = await connection.execute(
-            "SELECT TonKho FROM chitietsanpham WHERE id = ?",
-            [id_ChiTietSanPham]
-          );
-
-          if (result.length === 0) {
-            throw new Error("Sản phẩm không tồn tại");
-          }
-
-          const tonKho = result[0].TonKho || 0;
-          if (tonKho < SoLuong) {
-            throw new Error(
-              `Sản phẩm ${id_ChiTietSanPham} không đủ tồn kho. Hiện có ${tonKho} sản phẩm.`
-            );
-          }
-
-          await connection.execute(
-            "UPDATE chitietsanpham SET TonKho = TonKho - ? WHERE id = ?",
-            [SoLuong, id_ChiTietSanPham]
-          );
-        }
+      if (result.length === 0) {
+        throw new Error("Sản phẩm không tồn tại");
       }
 
-      // Commit transaction
-      await connection.commit();
-      return true;
+      const tonKho = result[0].TonKho || 0;
+      const isAvailable = tonKho >= requestedQuantity;
+
+      return {
+        success: true,
+        data: {
+          tonKho,
+          isAvailable,
+          thieu: isAvailable ? 0 : requestedQuantity - tonKho,
+        },
+      };
     } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
-      console.error("Error bulk updating stock:", error);
-      throw error;
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
+      throw new Error("Không thể kiểm tra tồn kho: " + error.message);
     }
-  }
-
-  // Báo cáo tồn kho
-  async getInventoryReport(filter = {}) {
-    let whereClause = "";
-    let queryParams = [];
-
-    // Lọc theo danh mục
-    if (filter.categoryId) {
-      whereClause += " AND sp.id_DanhMuc = ?";
-      queryParams.push(filter.categoryId);
-    }
-
-    // Lọc theo thương hiệu
-    if (filter.brandId) {
-      whereClause += " AND sp.id_ThuongHieu = ?";
-      queryParams.push(filter.brandId);
-    }
-
-    // Lọc theo trạng thái tồn kho
-    if (filter.stockStatus === "low") {
-      whereClause += " AND ctsp.TonKho > 0 AND ctsp.TonKho <= 5";
-    } else if (filter.stockStatus === "out") {
-      whereClause += " AND ctsp.TonKho = 0";
-    } else if (filter.stockStatus === "in") {
-      whereClause += " AND ctsp.TonKho > 5";
-    }
-
-    const query = `
-      SELECT 
-        ctsp.id,
-        sp.id as id_SanPham,
-        sp.Ten as TenSanPham,
-        th.Ten as TenThuongHieu,
-        dm.Ten as TenDanhMuc,
-        kc.Ten as KichCo,
-        ms.Ten as MauSac,
-        ctsp.MaSanPham,
-        IFNULL(ctsp.TonKho, 0) as TonKho,
-        sp.Gia
-      FROM chitietsanpham ctsp
-      JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-      JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-      JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-      JOIN kichco kc ON ctsp.id_KichCo = kc.id
-      JOIN mausac ms ON ctsp.id_MauSac = ms.id
-      WHERE 1=1 ${whereClause}
-      ORDER BY TonKho ASC, sp.Ten
-    `;
-
-    const [results] = await db.execute(query, queryParams);
-    return results;
-  }
-
-  // Thống kê tồn kho theo thương hiệu
-  async getInventorySummaryByBrand() {
-    const query = `
-      SELECT 
-        th.id as id_ThuongHieu,
-        th.Ten as TenThuongHieu,
-        SUM(IFNULL(ctsp.TonKho, 0)) as TongTonKho,
-        COUNT(DISTINCT sp.id) as SoSanPham
-      FROM chitietsanpham ctsp
-      JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-      JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-      GROUP BY th.id
-      ORDER BY TongTonKho DESC
-    `;
-
-    const [results] = await db.execute(query);
-    return results;
-  }
-
-  // Thống kê tồn kho theo danh mục
-  async getInventorySummaryByCategory() {
-    const query = `
-      SELECT 
-        dm.id as id_DanhMuc,
-        dm.Ten as TenDanhMuc,
-        SUM(IFNULL(ctsp.TonKho, 0)) as TongTonKho,
-        COUNT(DISTINCT sp.id) as SoSanPham
-      FROM chitietsanpham ctsp
-      JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-      JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-      GROUP BY dm.id
-      ORDER BY TongTonKho DESC
-    `;
-
-    const [results] = await db.execute(query);
-    return results;
-  }
-
-  // Kiểm tra sản phẩm sắp hết hàng
-  async getLowStockProducts(threshold = 5) {
-    const query = `
-      SELECT 
-        ctsp.id,
-        sp.id as id_SanPham,
-        sp.Ten as TenSanPham,
-        th.Ten as TenThuongHieu,
-        dm.Ten as TenDanhMuc,
-        kc.Ten as KichCo,
-        ms.Ten as MauSac,
-        ctsp.MaSanPham,
-        IFNULL(ctsp.TonKho, 0) as TonKho,
-        sp.Gia
-      FROM chitietsanpham ctsp
-      JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-      JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-      JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-      JOIN kichco kc ON ctsp.id_KichCo = kc.id
-      JOIN mausac ms ON ctsp.id_MauSac = ms.id
-      WHERE IFNULL(ctsp.TonKho, 0) > 0 AND IFNULL(ctsp.TonKho, 0) <= ?
-      ORDER BY TonKho ASC, sp.Ten
-    `;
-
-    const [results] = await db.execute(query, [threshold]);
-    return results;
-  }
-
-  // Lấy lịch sử nhập kho của một sản phẩm
-  async getProductStockHistory(productVariantId) {
-    const query = `
-      SELECT 
-        ctpn.id,
-        pn.MaPhieuNhap,
-        pn.NgayNhap,
-        ctpn.SoLuong,
-        ctpn.GiaNhap,
-        ctpn.ThanhTien,
-        ncc.Ten as TenNhaCungCap,
-        nd.HoTen as NguoiTao
-      FROM chitietphieunhap ctpn
-      JOIN phieunhap pn ON ctpn.id_PhieuNhap = pn.id
-      JOIN nhacungcap ncc ON pn.id_NhaCungCap = ncc.id
-      JOIN nguoidung nd ON pn.id_NguoiTao = nd.id
-      WHERE ctpn.id_ChiTietSanPham = ? AND pn.TrangThai = 2
-      ORDER BY pn.NgayNhap DESC
-    `;
-
-    const [results] = await db.execute(query, [productVariantId]);
-    return results;
   }
 
   // Cập nhật phiếu nhập
@@ -503,7 +186,7 @@ class InventoryService {
       // Cập nhật thông tin phiếu nhập
       const { GhiChu, TrangThai } = updateData;
       await db.execute(
-        "UPDATE phieunhap SET GhiChu = ?, TrangThai = ?, NgayCapNhat = NOW() WHERE id = ?",
+        "UPDATE phieunhap SET GhiChu = ?, TrangThai = ? WHERE id = ?",
         [
           GhiChu || phieuNhap[0].GhiChu,
           TrangThai || phieuNhap[0].TrangThai,
@@ -511,9 +194,225 @@ class InventoryService {
         ]
       );
 
-      return { success: true, message: "Cập nhật phiếu nhập thành công" };
+      // Nếu phiếu nhập được xác nhận (TrangThai = 2), cập nhật tồn kho
+      if (TrangThai === 2 && phieuNhap[0].TrangThai !== 2) {
+        await this.updateStockAfterImport(phieuNhapId);
+      }
+
+      return {
+        success: true,
+        message: "Cập nhật phiếu nhập thành công",
+      };
     } catch (error) {
-      throw error;
+      throw new Error("Không thể cập nhật phiếu nhập: " + error.message);
+    }
+  }
+
+  // Cập nhật tồn kho sau khi nhập hàng
+  async updateStockAfterImport(phieuNhapId) {
+    try {
+      // Lấy chi tiết phiếu nhập
+      const [chiTietList] = await db.execute(
+        "SELECT id_ChiTietSanPham, SoLuong FROM chitietphieunhap WHERE id_PhieuNhap = ?",
+        [phieuNhapId]
+      );
+
+      // Cập nhật tồn kho cho từng sản phẩm
+      for (const item of chiTietList) {
+        await db.execute(
+          "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
+          [item.SoLuong, item.id_ChiTietSanPham]
+        );
+      }
+    } catch (error) {
+      throw new Error("Không thể cập nhật tồn kho: " + error.message);
+    }
+  }
+
+  // Lấy danh sách phiếu nhập
+  async getPhieuNhapList(query = {}) {
+    try {
+      let whereClause = "WHERE 1=1";
+      let queryParams = [];
+
+      // Lọc theo trạng thái
+      if (query.trangThai) {
+        whereClause += " AND pn.TrangThai = ?";
+        queryParams.push(query.trangThai);
+      }
+
+      // Lọc theo nhà cung cấp
+      if (query.nhaCungCap) {
+        whereClause += " AND pn.id_NhaCungCap = ?";
+        queryParams.push(query.nhaCungCap);
+      }
+
+      // Lọc theo thời gian
+      if (query.tuNgay) {
+        whereClause += " AND DATE(pn.NgayNhap) >= ?";
+        queryParams.push(query.tuNgay);
+      }
+
+      if (query.denNgay) {
+        whereClause += " AND DATE(pn.NgayNhap) <= ?";
+        queryParams.push(query.denNgay);
+      }
+
+      const sqlQuery = `
+        SELECT 
+          pn.id,
+          pn.MaPhieuNhap,
+          pn.NgayNhap,
+          pn.TongTien,
+          pn.TrangThai,
+          pn.GhiChu,
+          ncc.Ten as TenNhaCungCap,
+          nd.HoTen as NguoiTao
+        FROM phieunhap pn
+        JOIN nhacungcap ncc ON pn.id_NhaCungCap = ncc.id
+        JOIN nguoidung nd ON pn.id_NguoiTao = nd.id
+        ${whereClause}
+        ORDER BY pn.NgayNhap DESC
+      `;
+
+      const [results] = await db.execute(sqlQuery, queryParams);
+      return {
+        success: true,
+        data: results,
+      };
+    } catch (error) {
+      throw new Error("Không thể lấy danh sách phiếu nhập: " + error.message);
+    }
+  }
+
+  // Lấy chi tiết phiếu nhập
+  async getPhieuNhapDetail(phieuNhapId) {
+    try {
+      // Lấy thông tin phiếu nhập
+      const [phieuNhap] = await db.execute(
+        `SELECT 
+          pn.*,
+          ncc.Ten as TenNhaCungCap,
+          nd.HoTen as NguoiTao
+        FROM phieunhap pn
+        JOIN nhacungcap ncc ON pn.id_NhaCungCap = ncc.id
+        JOIN nguoidung nd ON pn.id_NguoiTao = nd.id
+        WHERE pn.id = ?`,
+        [phieuNhapId]
+      );
+
+      if (phieuNhap.length === 0) {
+        throw new Error("Phiếu nhập không tồn tại");
+      }
+
+      // Lấy chi tiết phiếu nhập
+      const [chiTiet] = await db.execute(
+        `SELECT 
+          ctpn.*,
+          sp.Ten as TenSanPham,
+          kc.Ten as KichCo,
+          ms.Ten as MauSac,
+          cts.MaSanPham
+        FROM chitietphieunhap ctpn
+        JOIN chitietsanpham cts ON ctpn.id_ChiTietSanPham = cts.id
+        JOIN sanpham sp ON cts.id_SanPham = sp.id
+        JOIN kichco kc ON cts.id_KichCo = kc.id
+        JOIN mausac ms ON cts.id_MauSac = ms.id
+        WHERE ctpn.id_PhieuNhap = ?`,
+        [phieuNhapId]
+      );
+
+      return {
+        success: true,
+        data: {
+          phieuNhap: phieuNhap[0],
+          chiTiet: chiTiet,
+        },
+      };
+    } catch (error) {
+      throw new Error("Không thể lấy chi tiết phiếu nhập: " + error.message);
+    }
+  }
+
+  // Thống kê nhập kho theo thời gian
+  async thongKeNhapKhoTheoThoiGian(query = {}) {
+    try {
+      let whereClause = "WHERE pn.TrangThai = 2";
+      let queryParams = [];
+
+      if (query.tuNgay) {
+        whereClause += " AND DATE(pn.NgayNhap) >= ?";
+        queryParams.push(query.tuNgay);
+      }
+
+      if (query.denNgay) {
+        whereClause += " AND DATE(pn.NgayNhap) <= ?";
+        queryParams.push(query.denNgay);
+      }
+
+      const sqlQuery = `
+        SELECT 
+          DATE(pn.NgayNhap) as NgayNhap,
+          COUNT(pn.id) as SoPhieuNhap,
+          SUM(pn.TongTien) as TongTien,
+          COUNT(DISTINCT pn.id_NhaCungCap) as SoNhaCungCap
+        FROM phieunhap pn
+        ${whereClause}
+        GROUP BY DATE(pn.NgayNhap)
+        ORDER BY NgayNhap DESC
+      `;
+
+      const [results] = await db.execute(sqlQuery, queryParams);
+      return {
+        success: true,
+        data: results,
+      };
+    } catch (error) {
+      throw new Error("Không thể thống kê nhập kho: " + error.message);
+    }
+  }
+
+  // Lấy lịch sử nhập kho của sản phẩm
+  async getProductImportHistory(chiTietSanPhamId, query = {}) {
+    try {
+      let whereClause = "WHERE ctpn.id_ChiTietSanPham = ? AND pn.TrangThai = 2";
+      let queryParams = [chiTietSanPhamId];
+
+      if (query.tuNgay) {
+        whereClause += " AND DATE(pn.NgayNhap) >= ?";
+        queryParams.push(query.tuNgay);
+      }
+
+      if (query.denNgay) {
+        whereClause += " AND DATE(pn.NgayNhap) <= ?";
+        queryParams.push(query.denNgay);
+      }
+
+      const sqlQuery = `
+        SELECT 
+          ctpn.id,
+          pn.MaPhieuNhap,
+          pn.NgayNhap,
+          ctpn.SoLuong,
+          ctpn.GiaNhap,
+          ctpn.ThanhTien,
+          ncc.Ten as TenNhaCungCap,
+          nd.HoTen as NguoiTao
+        FROM chitietphieunhap ctpn
+        JOIN phieunhap pn ON ctpn.id_PhieuNhap = pn.id
+        JOIN nhacungcap ncc ON pn.id_NhaCungCap = ncc.id
+        JOIN nguoidung nd ON pn.id_NguoiTao = nd.id
+        ${whereClause}
+        ORDER BY pn.NgayNhap DESC
+      `;
+
+      const [results] = await db.execute(sqlQuery, queryParams);
+      return {
+        success: true,
+        data: results,
+      };
+    } catch (error) {
+      throw new Error("Không thể lấy lịch sử nhập kho: " + error.message);
     }
   }
 }

@@ -19,7 +19,7 @@ class InventoryController {
   async createPhieuNhap(req, res, next) {
     try {
       const phieuNhapData = req.body;
-      const userId = req.user.id; // Assuming user ID is available in req.user
+      const userId = req.body.userId || req.query.userId || 1; // Default to user ID 1 if not provided
       const result = await InventoryService.createPhieuNhap(
         phieuNhapData,
         userId
@@ -99,6 +99,24 @@ class InventoryController {
         query
       );
       res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Kiểm tra tồn kho trước khi nhập
+  async checkStockBeforeImport(req, res, next) {
+    try {
+      const { chiTietSanPhamId, soLuong } = req.body;
+      const result = await InventoryService.checkStock(
+        chiTietSanPhamId,
+        soLuong
+      );
+      res.status(200).json({
+        success: true,
+        message: "Kiểm tra tồn kho thành công",
+        data: result,
+      });
     } catch (error) {
       next(error);
     }

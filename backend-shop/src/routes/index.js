@@ -11,7 +11,11 @@ const paymentRoutes = require("./payment.routes");
 const categoryRoutes = require("./category.routes");
 const brandRoutes = require("./brand.routes");
 const shippingRoutes = require("./shipping.routes");
-//const inventoryRoutes = require("./inventory.routes");
+const voucherRoutes = require("./voucher.routes");
+const inventoryRoutes = require("./inventory.routes");
+const supplierRoutes = require("./supplier.routes");
+const wishlistRoutes = require("./wishlist.routes");
+const revenueRoutes = require("./revenue.routes");
 // Định nghĩa các routes
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
@@ -22,6 +26,13 @@ router.use("/payments", paymentRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/brands", brandRoutes);
 router.use("/shipping", shippingRoutes);
-// router.use("/inventory", inventoryRoutes);
+router.use("/vouchers", voucherRoutes);
+router.use("/wishlists", wishlistRoutes);
+
+//admin routes
+
+router.use("/inventory", inventoryRoutes);
+router.use("/suppliers", supplierRoutes);
+router.use("/revenue", revenueRoutes);
 
 module.exports = router;

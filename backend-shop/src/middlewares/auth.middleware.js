@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const db = require("../config/db");
+const db = require("../config/database");
 
 // Middleware xác thực token bắt buộc
 const verifyToken = (req, res, next) => {

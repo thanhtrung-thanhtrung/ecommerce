@@ -9,6 +9,26 @@ const handleValidationResult = (req, res, next) => {
   next();
 };
 
+// Validator cho cập nhật phiếu nhập
+const updatePhieuNhapStatusValidator = [
+  param("phieuNhapId")
+    .notEmpty()
+    .withMessage("ID phiếu nhập không được để trống")
+    .isInt()
+    .withMessage("ID phiếu nhập không hợp lệ"),
+
+  body("TrangThai")
+    .optional()
+    .isIn([1, 2, 3])
+    .withMessage(
+      "Trạng thái không hợp lệ (1: Chờ xác nhận, 2: Đã nhập kho, 3: Đã hủy)"
+    ),
+
+  body("GhiChu").optional().isString().withMessage("Ghi chú không hợp lệ"),
+
+  handleValidationResult,
+];
+
 // Validator cho tạo phiếu nhập
 const createPhieuNhapValidator = [
   body("id_NhaCungCap")
@@ -33,101 +53,68 @@ const createPhieuNhapValidator = [
     .isInt({ min: 1 })
     .withMessage("Số lượng phải lớn hơn 0"),
 
-  body("chiTietPhieuNhap.*.DonGia")
+  body("chiTietPhieuNhap.*.GiaNhap")
     .notEmpty()
-    .withMessage("Vui lòng nhập đơn giá")
+    .withMessage("Vui lòng nhập giá nhập")
     .isFloat({ min: 0 })
-    .withMessage("Đơn giá không hợp lệ"),
+    .withMessage("Giá nhập không hợp lệ"),
 
   body("GhiChu").optional().isString().withMessage("Ghi chú không hợp lệ"),
-
-  body("hinhAnh")
-    .optional()
-    .custom((value, { req }) => {
-      if (req.file) {
-        // Kiểm tra kích thước file (tối đa 5MB)
-        if (req.file.size > 5 * 1024 * 1024) {
-          throw new Error("Kích thước file không được vượt quá 5MB");
-        }
-        // Kiểm tra định dạng file
-        const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
-        if (!allowedTypes.includes(req.file.mimetype)) {
-          throw new Error("Chỉ chấp nhận file ảnh (JPEG, PNG, JPG)");
-        }
-      }
-      return true;
-    }),
-
-  handleValidationResult,
-];
-
-// Validator cho cập nhật trạng thái phiếu nhập
-const updatePhieuNhapStatusValidator = [
-  param("maPhieuNhap")
-    .notEmpty()
-    .withMessage("Mã phiếu nhập không được để trống")
-    .matches(/^PN-\d{6}-\d{3}$/)
-    .withMessage("Mã phiếu nhập không đúng định dạng"),
-
-  body("trangThai")
-    .isIn(["Chờ duyệt", "Đã duyệt", "Từ chối"])
-    .withMessage("Trạng thái không hợp lệ"),
 
   handleValidationResult,
 ];
 
 // Validator cho lấy danh sách phiếu nhập
 const getPhieuNhapListValidator = [
-  query("page")
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage("Số trang không hợp lệ"),
-
-  query("limit")
-    .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage("Số lượng bản ghi mỗi trang phải từ 1 đến 100"),
-
-  query("search")
-    .optional()
-    .isString()
-    .withMessage("Từ khóa tìm kiếm không hợp lệ"),
-
   query("trangThai")
     .optional()
-    .isIn(["Chờ duyệt", "Đã duyệt", "Từ chối"])
+    .isIn(["1", "2", "3"])
     .withMessage("Trạng thái không hợp lệ"),
+
+  query("nhaCungCap")
+    .optional()
+    .isInt()
+    .withMessage("ID nhà cung cấp không hợp lệ"),
+
+  query("tuNgay").optional().isDate().withMessage("Ngày bắt đầu không hợp lệ"),
+
+  query("denNgay")
+    .optional()
+    .isDate()
+    .withMessage("Ngày kết thúc không hợp lệ"),
 
   handleValidationResult,
 ];
 
 // Validator cho lấy chi tiết phiếu nhập
 const getPhieuNhapDetailValidator = [
-  param("maPhieuNhap")
+  param("phieuNhapId")
     .notEmpty()
-    .withMessage("Mã phiếu nhập không được để trống")
-    .matches(/^PN-\d{6}-\d{3}$/)
-    .withMessage("Mã phiếu nhập không đúng định dạng"),
+    .withMessage("ID phiếu nhập không được để trống")
+    .isInt()
+    .withMessage("ID phiếu nhập không hợp lệ"),
 
   handleValidationResult,
 ];
 
 // Validator cho thống kê tồn kho
 const thongKeTonKhoValidator = [
-  query("id_DanhMuc")
-    .optional()
-    .isInt()
-    .withMessage("ID danh mục không hợp lệ"),
+  query("danhMuc").optional().isInt().withMessage("ID danh mục không hợp lệ"),
 
-  query("id_ThuongHieu")
+  query("thuongHieu")
     .optional()
     .isInt()
     .withMessage("ID thương hiệu không hợp lệ"),
 
-  query("tuKhoa")
+  query("sapHet")
     .optional()
-    .isString()
-    .withMessage("Từ khóa tìm kiếm không hợp lệ"),
+    .isIn(["true", "false"])
+    .withMessage("Tham số sắp hết hàng phải là true hoặc false"),
+
+  query("tatCa")
+    .optional()
+    .isIn(["true", "false"])
+    .withMessage("Tham số tất cả phải là true hoặc false"),
 
   handleValidationResult,
 ];

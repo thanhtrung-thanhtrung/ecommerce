@@ -1,45 +1,58 @@
 const express = require("express");
 const router = express.Router();
-const wishlistController = require("../controllers/wishlist.controller");
-const { validateRequest } = require("../middlewares/validateRequest");
-const { authenticate } = require("../middlewares/authenticate");
+const WishlistController = require("../controllers/wishlist.controller");
 const {
-  addToWishlistValidator,
-  removeFromWishlistValidator,
-  checkWishlistValidator,
+  wishlistValidator,
+  getWishlistValidator,
+  checkMultipleProductsValidator,
+  getWishlistDetailValidator,
 } = require("../validators/wishlist.validator");
 
-// Tất cả các routes đều yêu cầu xác thực người dùng
-router.use(authenticate);
+// Lấy danh sách wishlist của người dùng hiện tại
+router.get("/", getWishlistValidator, WishlistController.layDanhSachWishlist);
+
+// Đếm số lượng sản phẩm trong wishlist
+router.get("/count", WishlistController.demSoLuongWishlist);
+
+// Kiểm tra nhiều sản phẩm có trong wishlist không
+router.get(
+  "/check-multiple",
+  checkMultipleProductsValidator,
+  WishlistController.kiemTraNhieuSanPham
+);
+
+// Thống kê wishlist (admin only)
+router.get("/statistics", WishlistController.thongKeWishlist);
+
+// Lấy wishlist chi tiết (admin only)
+router.get(
+  "/details",
+  getWishlistDetailValidator,
+  WishlistController.layWishlistChiTiet
+);
+
+// Kiểm tra sản phẩm có trong wishlist không
+router.get(
+  "/check/:productId",
+  wishlistValidator,
+  WishlistController.kiemTraTrongWishlist
+);
 
 // Thêm sản phẩm vào wishlist
 router.post(
-  "/",
-  addToWishlistValidator,
-  validateRequest,
-  wishlistController.addToWishlist
+  "/:productId",
+  wishlistValidator,
+  WishlistController.themVaoWishlist
 );
 
 // Xóa sản phẩm khỏi wishlist
 router.delete(
-  "/:id_SanPham",
-  removeFromWishlistValidator,
-  validateRequest,
-  wishlistController.removeFromWishlist
-);
-
-// Lấy danh sách sản phẩm trong wishlist
-router.get("/", wishlistController.getWishlist);
-
-// Kiểm tra sản phẩm có trong wishlist không
-router.get(
-  "/check/:id_SanPham",
-  checkWishlistValidator,
-  validateRequest,
-  wishlistController.checkInWishlist
+  "/:productId",
+  wishlistValidator,
+  WishlistController.xoaKhoiWishlist
 );
 
 // Xóa toàn bộ wishlist
-router.delete("/", wishlistController.clearWishlist);
+router.delete("/", WishlistController.xoaToanBoWishlist);
 
 module.exports = router;

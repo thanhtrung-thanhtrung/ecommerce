@@ -4,14 +4,18 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser"); // Add this import
 const routes = require("./routes");
 require("dotenv").config();
-require("./config/db");
+require("./config/database"); // Import database configuration
 
 const app = express();
 
 // Middleware
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5713",
+    origin: [
+      process.env.CLIENT_ORIGIN || "http://localhost:3001",
+      "http://localhost:5713", // clothing-ecommerce frontend
+      "http://localhost:3001", // financial-dashboard frontend
+    ],
     credentials: true, // Allow cookies to be sent cross-origin
   })
 );

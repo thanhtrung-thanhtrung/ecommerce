@@ -1,36 +1,34 @@
-const db = require("../config/db");
-const { generateCode } = require("../utils/helper.util");
+const db = require("../config/database");
 
 class VoucherService {
   // Tạo voucher mới
   async taoVoucher(voucherData) {
-    const maVoucher = await generateCode("VOUCHER");
+    // Tạo mã voucher đơn giản
+    const maVoucher = `VOUCHER${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
     const [result] = await db.execute(
       `INSERT INTO magiamgia (
-        MaGiamGia, Ten, MoTa, LoaiGiamGia, GiaTri, 
-        GiaTriToiThieu, GiaTriToiDa, SoLuong, DaSuDung,
+        Ma, Ten, MoTa, PhanTramGiam, GiaTriGiamToiDa, 
+        DieuKienApDung, SoLuotSuDung, SoLuotDaSuDung,
         NgayBatDau, NgayKetThuc, TrangThai
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1)`,
       [
         maVoucher,
         voucherData.Ten,
         voucherData.MoTa,
-        voucherData.LoaiGiamGia,
-        voucherData.GiaTri,
-        voucherData.GiaTriToiThieu,
-        voucherData.GiaTriToiDa || null,
-        voucherData.SoLuong,
+        voucherData.PhanTramGiam,
+        voucherData.GiaTriGiamToiDa || null,
+        voucherData.DieuKienApDung,
+        voucherData.SoLuotSuDung,
         voucherData.NgayBatDau,
         voucherData.NgayKetThuc,
       ]
     );
 
     return {
-      id: result.insertId,
-      MaGiamGia: maVoucher,
+      Ma: maVoucher,
       ...voucherData,
-      DaSuDung: 0,
+      SoLuotDaSuDung: 0,
       TrangThai: 1,
     };
   }
@@ -39,18 +37,17 @@ class VoucherService {
   async capNhatVoucher(maVoucher, voucherData) {
     const [result] = await db.execute(
       `UPDATE magiamgia SET 
-        Ten = ?, MoTa = ?, LoaiGiamGia = ?, GiaTri = ?,
-        GiaTriToiThieu = ?, GiaTriToiDa = ?, SoLuong = ?,
+        Ten = ?, MoTa = ?, PhanTramGiam = ?, GiaTriGiamToiDa = ?,
+        DieuKienApDung = ?, SoLuotSuDung = ?,
         NgayBatDau = ?, NgayKetThuc = ?
-      WHERE MaGiamGia = ?`,
+      WHERE Ma = ?`,
       [
         voucherData.Ten,
         voucherData.MoTa,
-        voucherData.LoaiGiamGia,
-        voucherData.GiaTri,
-        voucherData.GiaTriToiThieu,
-        voucherData.GiaTriToiDa || null,
-        voucherData.SoLuong,
+        voucherData.PhanTramGiam,
+        voucherData.GiaTriGiamToiDa || null,
+        voucherData.DieuKienApDung,
+        voucherData.SoLuotSuDung,
         voucherData.NgayBatDau,
         voucherData.NgayKetThuc,
         maVoucher,
@@ -67,7 +64,7 @@ class VoucherService {
   // Cập nhật trạng thái voucher
   async capNhatTrangThai(maVoucher, trangThai) {
     const [result] = await db.execute(
-      "UPDATE magiamgia SET TrangThai = ? WHERE MaGiamGia = ?",
+      "UPDATE magiamgia SET TrangThai = ? WHERE Ma = ?",
       [trangThai, maVoucher]
     );
 
@@ -75,13 +72,13 @@ class VoucherService {
       throw new Error("Không tìm thấy voucher");
     }
 
-    return { MaGiamGia: maVoucher, TrangThai: trangThai };
+    return { Ma: maVoucher, TrangThai: trangThai };
   }
 
   // Lấy chi tiết voucher
   async layChiTietVoucher(maVoucher) {
     const [vouchers] = await db.execute(
-      `SELECT * FROM magiamgia WHERE MaGiamGia = ?`,
+      `SELECT * FROM magiamgia WHERE Ma = ?`,
       [maVoucher]
     );
 
@@ -98,7 +95,7 @@ class VoucherService {
     const params = [];
 
     if (filters.tuKhoa) {
-      query += " AND (MaGiamGia LIKE ? OR Ten LIKE ? OR MoTa LIKE ?)";
+      query += " AND (Ma LIKE ? OR Ten LIKE ? OR MoTa LIKE ?)";
       const searchTerm = `%${filters.tuKhoa}%`;
       params.push(searchTerm, searchTerm, searchTerm);
     }
@@ -108,11 +105,6 @@ class VoucherService {
       params.push(filters.trangThai);
     }
 
-    if (filters.loaiGiamGia) {
-      query += " AND LoaiGiamGia = ?";
-      params.push(filters.loaiGiamGia);
-    }
-
     // Lọc theo thời gian hiệu lực
     if (filters.dangHieuLuc) {
       const now = new Date().toISOString().split("T")[0];
@@ -120,7 +112,7 @@ class VoucherService {
       params.push(now, now);
     }
 
-    query += " ORDER BY NgayTao DESC";
+    query += " ORDER BY NgayBatDau DESC";
 
     const [vouchers] = await db.execute(query, params);
     return vouchers;
@@ -145,26 +137,21 @@ class VoucherService {
     }
 
     // Kiểm tra số lượng
-    if (voucher.DaSuDung >= voucher.SoLuong) {
+    if (voucher.SoLuotDaSuDung >= voucher.SoLuotSuDung) {
       throw new Error("Voucher đã hết lượt sử dụng");
     }
 
     // Kiểm tra giá trị đơn hàng tối thiểu
-    if (tongTien < voucher.GiaTriToiThieu) {
+    if (tongTien < voucher.DieuKienApDung) {
       throw new Error(
-        `Đơn hàng phải có giá trị tối thiểu ${voucher.GiaTriToiThieu}đ`
+        `Đơn hàng phải có giá trị tối thiểu ${voucher.DieuKienApDung}đ`
       );
     }
 
     // Tính giá trị giảm giá
-    let giaTriGiam = 0;
-    if (voucher.LoaiGiamGia === "Phần trăm") {
-      giaTriGiam = (tongTien * voucher.GiaTri) / 100;
-      if (voucher.GiaTriToiDa && giaTriGiam > voucher.GiaTriToiDa) {
-        giaTriGiam = voucher.GiaTriToiDa;
-      }
-    } else {
-      giaTriGiam = voucher.GiaTri;
+    let giaTriGiam = (tongTien * voucher.PhanTramGiam) / 100;
+    if (voucher.GiaTriGiamToiDa && giaTriGiam > voucher.GiaTriGiamToiDa) {
+      giaTriGiam = voucher.GiaTriGiamToiDa;
     }
 
     return {
@@ -177,7 +164,7 @@ class VoucherService {
   // Tăng số lượt sử dụng voucher
   async tangSoLuotSuDung(maVoucher) {
     const [result] = await db.execute(
-      "UPDATE magiamgia SET DaSuDung = DaSuDung + 1 WHERE MaGiamGia = ?",
+      "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung + 1 WHERE Ma = ?",
       [maVoucher]
     );
 

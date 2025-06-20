@@ -1,38 +1,53 @@
-import { createSlice } from "@reduxjs/toolkit"
+import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   isLoading: false,
-  isMobileMenuOpen: false,
-  isSearchModalOpen: false,
+  sidebarOpen: false,
   theme: "light",
-}
+  notifications: [],
+};
 
 const uiSlice = createSlice({
   name: "ui",
   initialState,
   reducers: {
     setLoading: (state, action) => {
-      state.isLoading = action.payload
+      state.isLoading = action.payload;
     },
-    toggleMobileMenu: (state) => {
-      state.isMobileMenuOpen = !state.isMobileMenuOpen
+    toggleSidebar: (state) => {
+      state.sidebarOpen = !state.sidebarOpen;
     },
-    closeMobileMenu: (state) => {
-      state.isMobileMenuOpen = false
-    },
-    toggleSearchModal: (state) => {
-      state.isSearchModalOpen = !state.isSearchModalOpen
-    },
-    closeSearchModal: (state) => {
-      state.isSearchModalOpen = false
+    setSidebarOpen: (state, action) => {
+      state.sidebarOpen = action.payload;
     },
     setTheme: (state, action) => {
-      state.theme = action.payload
+      state.theme = action.payload;
+    },
+    addNotification: (state, action) => {
+      state.notifications.push({
+        id: Date.now(),
+        ...action.payload,
+      });
+    },
+    removeNotification: (state, action) => {
+      state.notifications = state.notifications.filter(
+        (notification) => notification.id !== action.payload
+      );
+    },
+    clearNotifications: (state) => {
+      state.notifications = [];
     },
   },
-})
+});
 
-export const { setLoading, toggleMobileMenu, closeMobileMenu, toggleSearchModal, closeSearchModal, setTheme } =
-  uiSlice.actions
+export const {
+  setLoading,
+  toggleSidebar,
+  setSidebarOpen,
+  setTheme,
+  addNotification,
+  removeNotification,
+  clearNotifications,
+} = uiSlice.actions;
 
-export default uiSlice.reducer
+export default uiSlice.reducer;

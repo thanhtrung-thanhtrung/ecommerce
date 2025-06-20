@@ -1,5 +1,17 @@
-const { body, param, query } = require("express-validator");
-const { validateResult } = require("../utils/validator.util");
+const { body, param, query, validationResult } = require("express-validator");
+
+// Middleware xử lý kết quả validation
+const validateResult = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: "Dữ liệu không hợp lệ",
+      errors: errors.array(),
+    });
+  }
+  next();
+};
 
 // Validator cho tạo/cập nhật voucher
 const voucherValidator = [
@@ -11,46 +23,28 @@ const voucherValidator = [
 
   body("MoTa").optional().isString().withMessage("Mô tả không hợp lệ"),
 
-  body("LoaiGiamGia")
+  body("PhanTramGiam")
     .notEmpty()
-    .withMessage("Vui lòng chọn loại giảm giá")
-    .isIn(["Phần trăm", "Cố định"])
-    .withMessage("Loại giảm giá không hợp lệ"),
+    .withMessage("Vui lòng nhập phần trăm giảm giá")
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Phần trăm giảm giá phải từ 1-100%"),
 
-  body("GiaTri")
-    .notEmpty()
-    .withMessage("Vui lòng nhập giá trị giảm giá")
-    .custom((value, { req }) => {
-      if (req.body.LoaiGiamGia === "Phần trăm") {
-        return value >= 0 && value <= 100;
-      }
-      return value > 0;
-    })
-    .withMessage("Giá trị giảm giá không hợp lệ"),
-
-  body("GiaTriToiThieu")
-    .notEmpty()
-    .withMessage("Vui lòng nhập giá trị đơn hàng tối thiểu")
-    .isFloat({ min: 0 })
-    .withMessage("Giá trị tối thiểu phải lớn hơn 0"),
-
-  body("GiaTriToiDa")
+  body("GiaTriGiamToiDa")
     .optional()
     .isFloat({ min: 0 })
-    .withMessage("Giá trị tối đa phải lớn hơn 0")
-    .custom((value, { req }) => {
-      if (req.body.LoaiGiamGia === "Phần trăm" && value) {
-        return value >= req.body.GiaTriToiThieu;
-      }
-      return true;
-    })
-    .withMessage("Giá trị tối đa phải lớn hơn giá trị tối thiểu"),
+    .withMessage("Giá trị giảm tối đa phải lớn hơn 0"),
 
-  body("SoLuong")
+  body("DieuKienApDung")
     .notEmpty()
-    .withMessage("Vui lòng nhập số lượng voucher")
+    .withMessage("Vui lòng nhập điều kiện áp dụng")
+    .isFloat({ min: 0 })
+    .withMessage("Điều kiện áp dụng phải lớn hơn 0"),
+
+  body("SoLuotSuDung")
+    .notEmpty()
+    .withMessage("Vui lòng nhập số lượt sử dụng")
     .isInt({ min: 1 })
-    .withMessage("Số lượng phải lớn hơn 0"),
+    .withMessage("Số lượt sử dụng phải lớn hơn 0"),
 
   body("NgayBatDau")
     .notEmpty()
@@ -91,13 +85,13 @@ const searchVoucherValidator = [
 
   query("trangThai")
     .optional()
-    .isIn([0, 1])
+    .isIn(["0", "1"])
     .withMessage("Trạng thái không hợp lệ"),
 
-  query("loaiGiamGia")
+  query("dangHieuLuc")
     .optional()
-    .isIn(["Phần trăm", "Cố định"])
-    .withMessage("Loại giảm giá không hợp lệ"),
+    .isBoolean()
+    .withMessage("Tham số đang hiệu lực không hợp lệ"),
 
   validateResult,
 ];
