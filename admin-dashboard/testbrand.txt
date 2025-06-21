@@ -1,0 +1,392 @@
+curl --silent --location --request PATCH "http://localhost:5000/api/brands/1/trang-thai" \
+--header "Content-Type: application/json" \
+--header "Cookie: connect.sid=s%3AqxhVPWaChxo04z5xH1xsvzNusMjAn6zy.Fl7eUxs%2BytDYmNXAvH4xq8K9AOh46wQZYm6epLSzyiw" \
+--data "{\"TrangThai\":1}"
+
+{
+    "success": true,
+    "message": "Cập nhật trạng thái thương hiệu thành công",
+    "data": {
+        "id": "1",
+        "TrangThai": 1
+    }
+}
+
+curl --silent --location --request PUT "http://localhost:5000/api/brands/1" \
+--header "Content-Type: application/json" \
+--header "Cookie: connect.sid=s%3AqxhVPWaChxo04z5xH1xsvzNusMjAn6zy.Fl7eUxs%2BytDYmNXAvH4xq8K9AOh46wQZYm6epLSzyiw" \
+--data "{\"Ten\":\"Nike Updated\",\"MoTa\":\"Thương hiệu giày thể thao hàng đầu thế giới\",\"TrangThai\":1}"
+
+
+{"Ten":"Nike Updated","MoTa":"Thương hiệu giày thể thao hàng đầu thế giới","TrangThai":1}
+
+
+{
+    "success": true,
+    "message": "Cập nhật thương hiệu thành công",
+    "data": {
+        "id": 1,
+        "Ten": "Nike Updated",
+        "MoTa": "Thương hiệu giày thể thao hàng đầu thế giới",
+        "TrangThai": 1,
+        "soSanPham": 0,
+        "soSanPhamHoatDong": 0,
+        "soSanPhamKhongHoatDong": 0,
+        "tongSoLuongBan": null,
+        "tongDoanhThu": null,
+        "sanPhamBanChay": [],
+        "danhMuc": []
+    }
+}
+
+
+
+curl --silent --location --request POST "http://localhost:5000/api/brands" \
+--header "Content-Type: application/json" \
+--header "Cookie: connect.sid=s%3AqxhVPWaChxo04z5xH1xsvzNusMjAn6zy.Fl7eUxs%2BytDYmNXAvH4xq8K9AOh46wQZYm6epLSzyiw" \
+--data "{\"Ten\":\"Nike Test\",\"MoTa\":\"Thương hiệu giày thể thao hàng đầu\",\"TrangThai\":1}"
+
+{
+    "success": true,
+    "message": "Tạo thương hiệu thành công",
+    "data": {
+        "id": 53,
+        "Ten": "Nike Test",
+        "MoTa": "Thương hiệu giày thể thao hàng đầu",
+        "TrangThai": 1
+    }
+}
+
+{
+    "success": true,
+    "data": {
+        "id": 1,
+        "Ten": "Nike Updated",
+        "MoTa": "Thương hiệu giày thể thao hàng đầu thế giới",
+        "TrangThai": 1,
+        "soSanPham": 0,
+        "soSanPhamHoatDong": 0,
+        "soSanPhamKhongHoatDong": 0,
+        "tongSoLuongBan": null,
+        "tongDoanhThu": null,
+        "sanPhamBanChay": [],
+        "danhMuc": []
+    }
+}curl --silent --location --request GET "http://localhost:5000/api/brands/1" \
+--header "Content-Type: application/json" \
+--header "Cookie: connect.sid=s%3AqxhVPWaChxo04z5xH1xsvzNusMjAn6zy.Fl7eUxs%2BytDYmNXAvH4xq8K9AOh46wQZYm6epLSzyiw"
+
+
+{
+    "success": true,
+    "data": {
+        "tongQuat": {
+            "tongSoThuongHieu": 50,
+            "soThuongHieuHoatDong": "50",
+            "soThuongHieuKhongHoatDong": "0"
+        },
+        "topThuongHieu": [
+            {
+                "id": 6,
+                "Ten": "Vans",
+                "soSanPham": 1,
+                "tongSoLuongBan": "0",
+                "tongDoanhThu": "0.00"
+            },
+            {
+                "id": 5,
+                "Ten": "Converse",
+                "soSanPham": 1,
+                "tongSoLuongBan": "0",
+                "tongDoanhThu": "0.00"
+            },
+            {
+                "id": 3,
+                "Ten": "Puma",
+                "soSanPham": 1,
+                "tongSoLuongBan": "0",
+                "tongDoanhThu": "0.00"
+            },
+            {
+                "id": 2,
+                "Ten": "Adidas",
+                "soSanPham": 3,
+                "tongSoLuongBan": "0",
+                "tongDoanhThu": "0.00"
+            },
+            {
+                "id": 7,
+                "Ten": "Reebok",
+                "soSanPham": 1,
+                "tongSoLuongBan": "0",
+                "tongDoanhThu": "0.00"
+            }
+        ],
+        "phanBoThuongHieu": [
+            {
+                "Ten": "Adidas",
+                "soSanPham": 3,
+                "phanTram": "42.86"
+            },
+            {
+                "Ten": "Reebok",
+                "soSanPham": 1,
+                "phanTram": "14.29"
+            },
+            {
+                "Ten": "Puma",
+                "soSanPham": 1,
+                "phanTram": "14.29"
+            },
+            {
+                "Ten": "Vans",
+                "soSanPham": 1,
+                "phanTram": "14.29"
+            },
+            {
+                "Ten": "Converse",
+                "soSanPham": 1,
+                "phanTram": "14.29"
+            },
+            {
+                "Ten": "New Balance",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Under Armour",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Vans",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Converse",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "ASICS",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "New Balance",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Under Armour",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Vans",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Reebok",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Converse",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "ASICS",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "New Balance",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Under Armour",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Vans",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Reebok",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Converse",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "New Balance",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Under Armour",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "ASICS",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Reebok",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Converse",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Vans",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "New Balance",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Under Armour",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "ASICS",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Reebok",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Converse",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Vans",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "New Balance",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Nike Test",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "ASICS",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Reebok",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Under Armour",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Vans",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "New Balance",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Converse",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "ASICS",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Reebok",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Under Armour",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Vans",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "New Balance",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Nike Updated",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Converse",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "ASICS",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            },
+            {
+                "Ten": "Reebok",
+                "soSanPham": 0,
+                "phanTram": "0.00"
+            }
+        ]
+    }
+}curl --silent --location --request GET "http://localhost:5000/api/brands/thong-ke/all" \
+--header "Content-Type: application/json" \
+--header "Cookie: connect.sid=s%3AqxhVPWaChxo04z5xH1xsvzNusMjAn6zy.Fl7eUxs%2BytDYmNXAvH4xq8K9AOh46wQZYm6epLSzyiw" \
+--data-binary "@"
+
+
+
+curl --silent --location --request DELETE "http://localhost:5000/api/brands/7" \
+--header "Content-Type: application/json" \
+--header "Cookie: connect.sid=s%3AqxhVPWaChxo04z5xH1xsvzNusMjAn6zy.Fl7eUxs%2BytDYmNXAvH4xq8K9AOh46wQZYm6epLSzyiw"
+
+{
+    "success": true,
+    "message": "Xóa thương hiệu thành công"
+}

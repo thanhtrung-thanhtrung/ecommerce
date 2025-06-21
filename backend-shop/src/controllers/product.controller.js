@@ -355,6 +355,20 @@ class ProductController {
       res.json(result);
     } catch (error) {
       console.error("Error in deleteProduct controller:", error);
+      
+      // Kiểm tra loại lỗi để trả về status code phù hợp
+      if (error.message.includes("không tồn tại")) {
+        return res.status(404).json({ message: error.message });
+      }
+      
+      if (error.message.includes("đã có khách hàng mua")) {
+        return res.status(400).json({ 
+          message: error.message,
+          cannotDelete: true,
+          suggestion: "Bạn có thể ẩn sản phẩm bằng cách đổi trạng thái thành 'Ngừng bán'"
+        });
+      }
+      
       res.status(500).json({ message: error.message });
     }
   }
@@ -389,10 +403,10 @@ class ProductController {
       }
 
       const { productId } = req.params;
-      const { status } = req.body;
+      const { TrangThai } = req.body; // Sửa từ 'status' thành 'TrangThai' để khớp với frontend
       const result = await productService.updateProductStatus(
         parseInt(productId),
-        status
+        TrangThai
       );
       res.json(result);
     } catch (error) {
@@ -453,6 +467,138 @@ class ProductController {
       res.json(stockInfo);
     } catch (error) {
       res.status(400).json({ message: error.message });
+    }
+  }
+
+  ///////////////////////// Colors and Sizes API endpoints ////////////////////////////
+
+  // Lấy danh sách màu sắc
+  async getAllColors(req, res) {
+    try {
+      const colors = await productService.getAllColors();
+      res.json(colors);
+    } catch (error) {
+      console.error("Error getting colors:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Lấy danh sách kích cỡ
+  async getAllSizes(req, res) {
+    try {
+      const sizes = await productService.getAllSizes();
+      res.json(sizes);
+    } catch (error) {
+      console.error("Error getting sizes:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Tạo màu sắc mới (admin)
+  async createColor(req, res) {
+    try {
+      const { Ten, MaMau } = req.body;
+      
+      if (!Ten || !MaMau) {
+        return res.status(400).json({ 
+          message: "Tên màu và mã màu là bắt buộc" 
+        });
+      }
+
+      const result = await productService.createColor({ Ten, MaMau });
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error creating color:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Tạo kích cỡ mới (admin)
+  async createSize(req, res) {
+    try {
+      const { Ten } = req.body;
+      
+      if (!Ten) {
+        return res.status(400).json({ 
+          message: "Tên kích cỡ là bắt buộc" 
+        });
+      }
+
+      const result = await productService.createSize({ Ten });
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error creating size:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Cập nhật màu sắc (admin)
+  async updateColor(req, res) {
+    try {
+      const { id } = req.params;
+      const { Ten, MaMau } = req.body;
+      
+      if (!Ten || !MaMau) {
+        return res.status(400).json({ 
+          message: "Tên màu và mã màu là bắt buộc" 
+        });
+      }
+
+      const result = await productService.updateColor(id, { Ten, MaMau });
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating color:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Cập nhật kích cỡ (admin)
+  async updateSize(req, res) {
+    try {
+      const { id } = req.params;
+      const { Ten } = req.body;
+      
+      if (!Ten) {
+        return res.status(400).json({ 
+          message: "Tên kích cỡ là bắt buộc" 
+        });
+      }
+
+      const result = await productService.updateSize(id, { Ten });
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating size:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Xóa màu sắc (admin)
+  async deleteColor(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await productService.deleteColor(id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error deleting color:", error);
+      if (error.message.includes("đang được sử dụng")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  // Xóa kích cỡ (admin)
+  async deleteSize(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await productService.deleteSize(id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error deleting size:", error);
+      if (error.message.includes("đang được sử dụng")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message });
     }
   }
 }

@@ -9,6 +9,7 @@ const {
   getProductDetailValidator,
   reviewProductValidator,
   createProductValidator,
+  createProductAdminValidator,
   updateProductAdminValidator,
   deleteProductValidator,
   getAllProductsAdminValidator,
@@ -76,6 +77,12 @@ router.get(
   searchProductsValidator,
   productController.searchProducts
 );
+
+// ✅ Colors and Sizes routes (public) - Đặt TRƯỚC /:productId
+router.get("/colors", productController.getAllColors);
+router.get("/sizes", productController.getAllSizes);
+
+// ✅ Route /:productId đặt sau để tránh conflict
 router.get(
   "/:productId",
   getProductDetailValidator,
@@ -100,7 +107,7 @@ adminRouter.post(
   "/admin/create",
   upload.any(), // Chấp nhận tất cả các trường file
   handleUploadError,
-  createProductValidator,
+  createProductAdminValidator,
   productController.createProduct
 );
 adminRouter.put(
@@ -110,7 +117,11 @@ adminRouter.put(
   updateProductAdminValidator,
   productController.updateProduct
 );
-adminRouter.delete("/admin/delete/:id", productController.deleteProduct);
+adminRouter.delete(
+  "/admin/delete/:id",
+  deleteProductValidator,
+  productController.deleteProduct
+);
 adminRouter.get(
   "/admin/list",
   getAllProductsAdminValidator,
@@ -131,6 +142,15 @@ adminRouter.get(
   getProductDetailValidator,
   productController.getProductStockInfo
 );
+
+// Quản lý màu sắc và kích cỡ (admin)
+adminRouter.post("/admin/colors", productController.createColor);
+adminRouter.put("/admin/colors/:id", productController.updateColor);
+adminRouter.delete("/admin/colors/:id", productController.deleteColor);
+
+adminRouter.post("/admin/sizes", productController.createSize);
+adminRouter.put("/admin/sizes/:id", productController.updateSize);
+adminRouter.delete("/admin/sizes/:id", productController.deleteSize);
 
 // Thêm adminRouter vào router chính
 router.use(adminRouter);

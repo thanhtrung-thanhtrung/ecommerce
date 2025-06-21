@@ -8,17 +8,34 @@ require("./config/database"); // Import database configuration
 
 const app = express();
 
-// Middleware
+// Enhanced CORS configuration
 app.use(
   cors({
     origin: [
       process.env.CLIENT_ORIGIN || "http://localhost:3001",
-      "http://localhost:5713", // clothing-ecommerce frontend
-      "http://localhost:3001", // financial-dashboard frontend
+      "http://localhost:5714", // clothing-ecommerce frontend
+      "http://localhost:5173", // admin-dashboard frontend (Vite dev server)
+      "http://localhost:5174", // backup Vite port
     ],
     credentials: true, // Allow cookies to be sent cross-origin
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // Allowed HTTP methods
+    allowedHeaders: [
+      "Origin",
+      "X-Requested-With",
+      "Content-Type",
+      "Accept",
+      "Authorization",
+      "Cookie",
+    ], // Allowed headers
+    exposedHeaders: ["Set-Cookie"], // Headers that client can access
+    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   })
 );
+
+// Handle preflight requests explicitly
+app.options("*", cors()); // Enable pre-flight for all routes
+
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser()); // Add cookie parser before session middleware
@@ -57,7 +74,7 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000; // Changed from 3000 to 5000 to match API calls
 app.listen(PORT, () => {
   console.log(`Server đang chạy trên port ${PORT}`);
   console.log(`API có thể truy cập tại http://localhost:${PORT}/api`);

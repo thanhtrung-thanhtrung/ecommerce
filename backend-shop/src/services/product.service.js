@@ -206,7 +206,7 @@ class ProductService {
       `SELECT dh.* 
         FROM donhang dh
         JOIN chitietdonhang ctdh ON dh.id = ctdh.id_DonHang
-        WHERE dh.id_NguoiMua = ? AND ctdh.id_ChiTietSanPham IN (SELECT id FROM chitietsanpham WHERE id_SanPham = ?) AND dh.TrangThai = 'Đã giao'`,
+        WHERE dh.id_NguoiMua = ? AND ctdh.id_ChiTietSanPham IN (SELECT id FROM chitietsanpham WHERE id_SanPham = ?) AND dh.TrangThai = 4`,
       [userId, productId]
     );
 
@@ -307,13 +307,13 @@ class ProductService {
       // Thêm các biến thể sản phẩm
       if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
         for (const variant of bienThe) {
-          const { id_KichCo, id_MauSac, MaSanPham } = variant;
+          const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
 
-          // Chỉ sử dụng các cột tồn tại trong bảng chitietsanpham theo cấu trúc database
+          // ✅ Sửa: Thêm cột TonKho vào INSERT statement
           await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
-             VALUES (?, ?, ?, ?)`,
-            [productId, id_KichCo, id_MauSac, MaSanPham]
+            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [productId, id_KichCo, id_MauSac, MaSanPham, SoLuong || 0]
           );
         }
       }
@@ -726,127 +726,108 @@ class ProductService {
   }
 
   async deleteProduct(productId) {
-    let connection;
     try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
-
-      // Bắt đầu transaction
-      await connection.beginTransaction();
-
-      // Lấy thông tin sản phẩm
-      const [product] = await connection.execute(
-        "SELECT HinhAnh FROM sanpham WHERE id = ?",
+      // Kiểm tra sản phẩm có tồn tại không
+      const [existingProduct] = await db.execute(
+        "SELECT id, Ten FROM sanpham WHERE id = ?",
         [productId]
       );
 
-      if (product.length === 0) {
+      if (existingProduct.length === 0) {
         throw new Error("Sản phẩm không tồn tại");
       }
 
-      // Cập nhật trạng thái sản phẩm thành không hoạt động (soft delete)
-      await connection.execute(
+      // Kiểm tra sản phẩm có trong đơn hàng hay không
+      const hasOrders = await this.checkProductInOrders(productId);
+      
+      if (hasOrders) {
+        throw new Error("Không thể xóa sản phẩm này vì đã có khách hàng mua. Bạn chỉ có thể ẩn sản phẩm bằng cách đổi trạng thái thành 'Ngừng bán'.");
+      }
+
+      // Nếu không có trong đơn hàng, thực hiện soft delete chỉ bảng sanpham
+      await db.execute(
         "UPDATE sanpham SET TrangThai = 0, NgayCapNhat = NOW() WHERE id = ?",
         [productId]
       );
 
-      // Kiểm tra xem sản phẩm đó đã có trong đơn hàng nào chưa
-      const [orderItems] = await connection.execute(
-        `
-        SELECT ctdh.id 
-        FROM chitietdonhang ctdh
-        JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
-        WHERE ctsp.id_SanPham = ?
-        LIMIT 1
-      `,
-        [productId]
-      );
-
-      // Nếu sản phẩm chưa có trong đơn hàng nào, có thể cập nhật tồn kho về 0
-      if (orderItems.length === 0) {
-        await connection.execute(
-          "UPDATE chitietsanpham SET TonKho = 0 WHERE id_SanPham = ?",
-          [productId]
-        );
-      }
-      // Nếu sản phẩm đã có trong đơn hàng, giữ nguyên tồn kho để tránh xung đột dữ liệu
-
-      // Commit transaction
-      await connection.commit();
-
       return {
-        id: productId,
-        message: "Sản phẩm đã được xóa thành công",
+        success: true,
+        message: "Xóa sản phẩm thành công",
+        productName: existingProduct[0].Ten
       };
     } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
       console.error("Error deleting product:", error);
-      throw new Error("Không thể xóa sản phẩm: " + error.message);
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
+      throw error;
+    }
+  }
+
+  // Phương thức mới: Kiểm tra sản phẩm có trong đơn hàng hay không
+  async checkProductInOrders(productId) {
+    try {
+      const [orders] = await db.execute(
+        `SELECT COUNT(*) as count 
+         FROM chitietdonhang ctdh 
+         JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id 
+         WHERE ctsp.id_SanPham = ?`,
+        [productId]
+      );
+      
+      return orders[0].count > 0;
+    } catch (error) {
+      console.error("Error checking product in orders:", error);
+      throw new Error("Lỗi khi kiểm tra sản phẩm trong đơn hàng");
     }
   }
 
   async getAllProductsAdmin(page = 1, limit = 10, search = "", status = null) {
     const offset = (page - 1) * limit;
-
+    
     let query = `
-        SELECT sp.*, dm.Ten as tenDanhMuc, th.Ten as tenThuongHieu, ncc.Ten as tenNhaCungCap,
-              (SELECT COUNT(*) FROM chitietsanpham WHERE id_SanPham = sp.id) as soBienThe
-        FROM sanpham sp
-        LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-        LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-        LEFT JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
-        WHERE 1=1
-      `;
-
+      SELECT sp.*, dm.Ten as tenDanhMuc, th.Ten as tenThuongHieu, ncc.Ten as tenNhaCungCap,
+             COUNT(ctsp.id) as soBienThe,
+             COALESCE(SUM(ctdh.SoLuong), 0) as SoLuongDaBan
+      FROM sanpham sp
+      LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
+      LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
+      LEFT JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
+      LEFT JOIN chitietsanpham ctsp ON sp.id = ctsp.id_SanPham
+      LEFT JOIN chitietdonhang ctdh ON ctsp.id = ctdh.id_ChiTietSanPham
+      WHERE 1=1
+    `;
+    
     const params = [];
-
-    // Add search condition if provided
+    
     if (search) {
       query += " AND (sp.Ten LIKE ? OR sp.MoTa LIKE ?)";
       params.push(`%${search}%`, `%${search}%`);
     }
-
-    // Add status condition if provided
+    
     if (status !== null) {
       query += " AND sp.TrangThai = ?";
       params.push(status);
     }
-
-    query += " ORDER BY sp.NgayCapNhat DESC LIMIT ? OFFSET ?";
+    
+    query += " GROUP BY sp.id ORDER BY sp.NgayTao DESC LIMIT ? OFFSET ?";
     params.push(limit, offset);
-
+    
     const [products] = await db.execute(query, params);
-
-    // Count total for pagination
-    let countQuery = `
-        SELECT COUNT(*) as total
-        FROM sanpham sp
-        WHERE 1=1
-      `;
-
+    
+    // Count total
+    let countQuery = "SELECT COUNT(DISTINCT sp.id) as total FROM sanpham sp WHERE 1=1";
     const countParams = [];
-
+    
     if (search) {
       countQuery += " AND (sp.Ten LIKE ? OR sp.MoTa LIKE ?)";
       countParams.push(`%${search}%`, `%${search}%`);
     }
-
+    
     if (status !== null) {
       countQuery += " AND sp.TrangThai = ?";
       countParams.push(status);
     }
-
+    
     const [total] = await db.execute(countQuery, countParams);
-
+    
     return {
       products,
       pagination: {
@@ -857,224 +838,175 @@ class ProductService {
     };
   }
 
-  async getProductVariants(productId) {
-    const [variants] = await db.execute(
-      `SELECT ctsp.*, kc.Ten as tenKichCo, ms.Ten as tenMau, ms.MaMau
-        FROM chitietsanpham ctsp
-        JOIN kichco kc ON ctsp.id_KichCo = kc.id
-        JOIN mausac ms ON ctsp.id_MauSac = ms.id
-        WHERE ctsp.id_SanPham = ?
-        ORDER BY kc.Ten, ms.Ten`,
-      [productId]
-    );
-
-    return variants;
-  }
-
   async updateProductStatus(productId, status) {
     try {
+      // Kiểm tra sản phẩm có tồn tại không
+      const [existingProduct] = await db.execute(
+        "SELECT id, Ten FROM sanpham WHERE id = ?",
+        [productId]
+      );
+
+      if (existingProduct.length === 0) {
+        throw new Error("Sản phẩm không tồn tại");
+      }
+
+      // Cập nhật trạng thái sản phẩm
       await db.execute(
         "UPDATE sanpham SET TrangThai = ?, NgayCapNhat = NOW() WHERE id = ?",
         [status, productId]
       );
 
       return {
-        id: productId,
-        message: `Trạng thái sản phẩm đã được cập nhật thành ${
-          status === 1 ? "hoạt động" : "ngừng kinh doanh"
-        }`,
+        success: true,
+        message: status === 1 ? "Đã kích hoạt sản phẩm" : "Đã ẩn sản phẩm",
+        productName: existingProduct[0].Ten,
+        newStatus: status
       };
     } catch (error) {
       console.error("Error updating product status:", error);
-      throw new Error(
-        "Không thể cập nhật trạng thái sản phẩm: " + error.message
-      );
-    }
-  }
-
-  async checkStockBeforeOrder(productId, soLuong) {
-    try {
-      // Lấy thông tin chi tiết sản phẩm và kiểm tra trạng thái sản phẩm
-      const [product] = await db.execute(
-        `SELECT cts.id, sp.TrangThai 
-             FROM chitietsanpham cts
-             INNER JOIN sanpham sp ON cts.id_SanPham = sp.id
-             WHERE sp.id = ? AND sp.TrangThai = 1
-             LIMIT 1`,
-        [productId]
-      );
-
-      if (!product.length) {
-        throw new Error(
-          "Không tìm thấy sản phẩm hoặc sản phẩm đã bị vô hiệu hóa"
-        );
-      }
-
-      const chiTietSanPhamId = product[0].id;
-
-      // Gọi stored procedure kiểm tra tồn kho
-      const [result] = await db.execute(
-        "CALL sp_KiemTraTonKho(?, ?, @p_TonKho, @p_CoTheBan)",
-        [chiTietSanPhamId, soLuong]
-      );
-
-      // Lấy kết quả từ biến session
-      const [stockResult] = await db.execute(
-        "SELECT @p_TonKho as tonKho, @p_CoTheBan as coTheBan"
-      );
-
-      return {
-        tonKho: stockResult[0].tonKho,
-        coTheBan: stockResult[0].coTheBan === 1,
-      };
-    } catch (error) {
       throw error;
     }
   }
 
-  async updateProductStatusIfOutOfStock(productId) {
+  ///////////////////////// Colors and Sizes API methods ////////////////////////////
+
+  async getAllColors() {
     try {
+      const [colors] = await db.execute(
+        "SELECT id, Ten as Ten, MaMau FROM mausac ORDER BY id ASC"
+      );
+      return colors;
+    } catch (error) {
+      console.error("Error getting colors:", error);
+      throw new Error("Không thể lấy danh sách màu sắc");
+    }
+  }
+
+  async getAllSizes() {
+    try {
+      const [sizes] = await db.execute(
+        "SELECT id, Ten FROM kichco ORDER BY CAST(Ten AS UNSIGNED) ASC"
+      );
+      return sizes;
+    } catch (error) {
+      console.error("Error getting sizes:", error);
+      throw new Error("Không thể lấy danh sách kích cỡ");
+    }
+  }
+
+  async createColor(colorData) {
+    try {
+      const { Ten, MaMau } = colorData;
       const [result] = await db.execute(
-        `SELECT TonKho FROM chitietsanpham WHERE id_SanPham = ?`,
-        [productId]
+        "INSERT INTO mausac (Ten, MaMau) VALUES (?, ?)",
+        [Ten, MaMau]
       );
-
-      const totalStock = result.reduce((sum, item) => sum + item.TonKho, 0);
-      if (totalStock === 0) {
-        await db.execute(`UPDATE sanpham SET TrangThai = 0 WHERE id = ?`, [
-          productId,
-        ]);
-      }
+      
+      return {
+        id: result.insertId,
+        message: "Thêm màu sắc thành công"
+      };
     } catch (error) {
-      throw new Error("Lỗi khi cập nhật trạng thái sản phẩm: " + error.message);
+      console.error("Error creating color:", error);
+      throw new Error("Không thể tạo màu sắc mới");
     }
   }
 
-  // Phương thức mới: Cập nhật tồn kho sau khi bán hàng
-  async updateStockAfterSale(chiTietSanPhamId, soLuong) {
-    let connection;
+  async createSize(sizeData) {
     try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
-
-      // Bắt đầu transaction
-      await connection.beginTransaction();
-
-      // Cập nhật tồn kho
-      const [result] = await connection.execute(
-        `UPDATE chitietsanpham 
-         SET TonKho = TonKho - ? 
-         WHERE id = ? AND TonKho >= ?`,
-        [soLuong, chiTietSanPhamId, soLuong]
+      const { Ten } = sizeData;
+      const [result] = await db.execute(
+        "INSERT INTO kichco (Ten) VALUES (?)",
+        [Ten]
       );
-
-      if (result.affectedRows === 0) {
-        throw new Error("Không đủ số lượng tồn kho");
-      }
-
-      // Kiểm tra và cập nhật trạng thái sản phẩm
-      await this.updateProductStatusIfOutOfStock(chiTietSanPhamId);
-
-      // Commit transaction
-      await connection.commit();
-      return true;
+      
+      return {
+        id: result.insertId,
+        message: "Thêm kích cỡ thành công"
+      };
     } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
-      console.error("Error updating stock after sale:", error);
-      throw new Error("Lỗi khi cập nhật tồn kho: " + error.message);
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
+      console.error("Error creating size:", error);
+      throw new Error("Không thể tạo kích cỡ mới");
     }
   }
 
-  // Phương thức mới: Kiểm tra tồn kho cho nhiều sản phẩm
-  async checkMultipleProductsStock(products) {
+  async updateColor(colorId, colorData) {
     try {
-      const stockChecks = await Promise.all(
-        products.map(async (product) => {
-          const { id_ChiTietSanPham, soLuong } = product;
-          const stockInfo = await this.checkStockBeforeOrder(
-            id_ChiTietSanPham,
-            soLuong
-          );
-          return {
-            id_ChiTietSanPham,
-            soLuong,
-            ...stockInfo,
-          };
-        })
+      const { Ten, MaMau } = colorData;
+      await db.execute(
+        "UPDATE mausac SET Ten = ?, MaMau = ? WHERE id = ?",
+        [Ten, MaMau, colorId]
       );
-
-      const insufficientStock = stockChecks.filter((check) => !check.coTheBan);
-      if (insufficientStock.length > 0) {
-        throw new Error("Một số sản phẩm không đủ tồn kho");
-      }
-
-      return stockChecks;
+      
+      return {
+        message: "Cập nhật màu sắc thành công"
+      };
     } catch (error) {
-      throw new Error("Lỗi khi kiểm tra tồn kho: " + error.message);
+      console.error("Error updating color:", error);
+      throw new Error("Không thể cập nhật màu sắc");
     }
   }
 
-  // Phương thức mới: Cập nhật trạng thái sản phẩm dựa trên tồn kho
-  async updateProductStatusIfOutOfStock(chiTietSanPhamId) {
+  async updateSize(sizeId, sizeData) {
     try {
-      // Lấy thông tin sản phẩm
-      const [productInfo] = await db.execute(
-        `SELECT sp.id as id_SanPham, 
-                (SELECT SUM(TonKho) FROM chitietsanpham WHERE id_SanPham = sp.id AND TrangThai = 1) as tongTonKho
-         FROM chitietsanpham ctsp
-         JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-         WHERE ctsp.id = ?`,
-        [chiTietSanPhamId]
+      const { Ten } = sizeData;
+      await db.execute(
+        "UPDATE kichco SET Ten = ? WHERE id = ?",
+        [Ten, sizeId]
       );
-
-      if (productInfo.length > 0) {
-        const { id_SanPham, tongTonKho } = productInfo[0];
-
-        // Cập nhật trạng thái sản phẩm dựa trên tổng tồn kho
-        await db.execute(
-          `UPDATE sanpham 
-           SET TrangThai = ?, 
-               NgayCapNhat = NOW() 
-           WHERE id = ?`,
-          [tongTonKho > 0 ? 1 : 0, id_SanPham]
-        );
-      }
+      
+      return {
+        message: "Cập nhật kích cỡ thành công"
+      };
     } catch (error) {
-      throw new Error("Lỗi khi cập nhật trạng thái sản phẩm: " + error.message);
+      console.error("Error updating size:", error);
+      throw new Error("Không thể cập nhật kích cỡ");
     }
   }
 
-  // Phương thức mới: Lấy thông tin tồn kho chi tiết
-  async getProductStockInfo(chiTietSanPhamId) {
+  async deleteColor(colorId) {
     try {
-      const [stockInfo] = await db.execute(
-        `SELECT ctsp.*, sp.Ten as tenSanPham, 
-                kc.Ten as tenKichCo, ms.Ten as tenMauSac,
-                sp.TrangThai as trangThaiSanPham
-         FROM chitietsanpham ctsp
-         JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-         JOIN kichco kc ON ctsp.id_KichCo = kc.id
-         JOIN mausac ms ON ctsp.id_MauSac = ms.id
-         WHERE ctsp.id = ?`,
-        [chiTietSanPhamId]
+      // Kiểm tra xem màu sắc có được sử dụng trong sản phẩm hay không
+      const [usage] = await db.execute(
+        "SELECT COUNT(*) as count FROM chitietsanpham WHERE id_MauSac = ?",
+        [colorId]
       );
-
-      if (stockInfo.length === 0) {
-        throw new Error("Không tìm thấy thông tin sản phẩm");
+      
+      if (usage[0].count > 0) {
+        throw new Error("Không thể xóa màu sắc này vì đang được sử dụng trong sản phẩm");
       }
-
-      return stockInfo[0];
+      
+      await db.execute("DELETE FROM mausac WHERE id = ?", [colorId]);
+      
+      return {
+        message: "Xóa màu sắc thành công"
+      };
     } catch (error) {
-      throw new Error("Lỗi khi lấy thông tin tồn kho: " + error.message);
+      console.error("Error deleting color:", error);
+      throw error;
+    }
+  }
+
+  async deleteSize(sizeId) {
+    try {
+      // Kiểm tra xem kích cỡ có được sử dụng trong sản phẩm hay không
+      const [usage] = await db.execute(
+        "SELECT COUNT(*) as count FROM chitietsanpham WHERE id_KichCo = ?",
+        [sizeId]
+      );
+      
+      if (usage[0].count > 0) {
+        throw new Error("Không thể xóa kích cỡ này vì đang được sử dụng trong sản phẩm");
+      }
+      
+      await db.execute("DELETE FROM kichco WHERE id = ?", [sizeId]);
+      
+      return {
+        message: "Xóa kích cỡ thành công"
+      };
+    } catch (error) {
+      console.error("Error deleting size:", error);
+      throw error;
     }
   }
 }

@@ -34,6 +34,11 @@ export const AdminProvider = ({ children }) => {
   const API_BASE_URL =
     import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
+  // Helper function to get authentication token
+  const getToken = () => {
+    return localStorage.getItem('adminToken') || localStorage.getItem('token') || '';
+  };
+
   // Load dashboard data
   const loadDashboardData = async () => {
     try {
@@ -91,7 +96,41 @@ export const AdminProvider = ({ children }) => {
     }
   };
 
-  // Products API - Based on product.routes.js
+  // Helper function to parse product images
+  const parseProductImages = (hinhAnh) => {
+    try {
+      if (!hinhAnh || hinhAnh === "{}") return { anhChinh: null, anhPhu: [] };
+
+      const imageData =
+        typeof hinhAnh === "string" ? JSON.parse(hinhAnh) : hinhAnh;
+      return {
+        anhChinh: imageData.anhChinh || null,
+        anhPhu: imageData.anhPhu || [],
+      };
+    } catch (error) {
+      console.error("Error parsing images:", error);
+      return { anhChinh: null, anhPhu: [] };
+    }
+  };
+
+  // Helper function to parse ThongSoKyThuat
+  const parseThongSoKyThuat = (thongSo) => {
+    try {
+      if (!thongSo) return { ChatLieu: "", KieuGiay: "", XuatXu: "" };
+
+      const specs = typeof thongSo === "string" ? JSON.parse(thongSo) : thongSo;
+      return {
+        ChatLieu: specs.ChatLieu || "",
+        KieuGiay: specs.KieuGiay || "",
+        XuatXu: specs.XuatXu || "",
+      };
+    } catch (error) {
+      console.error("Error parsing specifications:", error);
+      return { ChatLieu: "", KieuGiay: "", XuatXu: "" };
+    }
+  };
+
+  // Products API - Based on product.routes.js and test data
   const getProducts = async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
     const url = queryString ? `/api/products?${queryString}` : "/api/products";
@@ -103,11 +142,56 @@ export const AdminProvider = ({ children }) => {
     const url = queryString
       ? `/api/products/admin/list?${queryString}`
       : "/api/products/admin/list";
-    return await apiCall(url);
+
+    const response = await apiCall(url);
+
+    // Process products to parse JSON fields and add computed fields
+    if (response.products) {
+      response.products = response.products.map((product) => ({
+        ...product,
+        // Parse images
+        images: parseProductImages(product.HinhAnh),
+        anhChinh: parseProductImages(product.HinhAnh).anhChinh,
+        anhPhu: parseProductImages(product.HinhAnh).anhPhu,
+
+        // Parse specifications
+        ThongSoKyThuatParsed: parseThongSoKyThuat(product.ThongSoKyThuat),
+
+        // Convert string numbers to numbers
+        Gia: parseFloat(product.Gia) || 0,
+        GiaKhuyenMai: product.GiaKhuyenMai
+          ? parseFloat(product.GiaKhuyenMai)
+          : null,
+
+        // Add computed fields
+        TenThuongHieu: product.tenThuongHieu,
+        TenDanhMuc: product.tenDanhMuc,
+        TenNhaCungCap: product.tenNhaCungCap,
+        TongSoLuong: product.soBienThe || 0,
+        SoLuongDaBan: product.SoLuongDaBan || 0,
+      }));
+    }
+
+    return response;
   };
 
   const getProductDetail = async (productId) => {
-    return await apiCall(`/api/products/${productId}`);
+    const response = await apiCall(`/api/products/${productId}`);
+
+    // Process single product
+    if (response) {
+      return {
+        ...response,
+        images: parseProductImages(response.HinhAnh),
+        ThongSoKyThuatParsed: parseThongSoKyThuat(response.ThongSoKyThuat),
+        Gia: parseFloat(response.Gia) || 0,
+        GiaKhuyenMai: response.GiaKhuyenMai
+          ? parseFloat(response.GiaKhuyenMai)
+          : null,
+      };
+    }
+
+    return response;
   };
 
   const searchProducts = async (searchParams) => {
@@ -115,31 +199,49 @@ export const AdminProvider = ({ children }) => {
     return await apiCall(`/api/products/search?${queryString}`);
   };
 
-  const createProduct = async (formData) => {
-    setLoading(true);
+  // Create product
+  const createProduct = async (productData) => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/products/admin/create`,
-        {
-          method: "POST",
-          credentials: "include",
-          body: formData, // FormData for file upload
-        }
-      );
+      console.log("Creating product with data:", productData);
+
+      const response = await fetch(`${API_BASE_URL}/api/products/admin/create`, {
+        method: "POST",
+        body: productData, // FormData object
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      console.log("Response status:", response.status);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || `HTTP error! status: ${response.status}`
-        );
+        // Try to get detailed error information
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.log("Error response data:", errorData);
+        } catch (parseError) {
+          console.log("Could not parse error response as JSON");
+          errorData = { message: `HTTP error! status: ${response.status}` };
+        }
+
+        // If we have validation errors, show them
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          const errorMessages = errorData.errors
+            .map((err) => err.msg || err.message)
+            .join(", ");
+          throw new Error(`Validation errors: ${errorMessages}`);
+        }
+
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log("Create product success:", result);
+      return result;
     } catch (error) {
       console.error("Create product error:", error);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -172,9 +274,40 @@ export const AdminProvider = ({ children }) => {
   };
 
   const deleteProduct = async (productId) => {
-    return await apiCall(`/api/products/admin/delete/${productId}`, {
-      method: "DELETE",
-    });
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/products/admin/delete/${productId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Nếu là lỗi 400 và có flag cannotDelete, đây là trường hợp đặc biệt
+        if (response.status === 400 && data.cannotDelete) {
+          const error = new Error(data.message);
+          error.response = { data };
+          throw error;
+        }
+
+        // Các lỗi khác
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Delete product error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateProductStatus = async (productId, status) => {
@@ -206,9 +339,21 @@ export const AdminProvider = ({ children }) => {
     });
   };
 
-  // Categories API
-  const getCategories = async () => {
-    return await apiCall("/api/categories");
+  // Categories API - Based on testdanhmuc.txt
+  const getCategories = async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString
+      ? `/api/categories?${queryString}`
+      : "/api/categories";
+    return await apiCall(url);
+  };
+
+  const getCategoryStats = async () => {
+    return await apiCall("/api/categories/thong-ke/all");
+  };
+
+  const getCategoryDetail = async (categoryId) => {
+    return await apiCall(`/api/categories/${categoryId}`);
   };
 
   const createCategory = async (categoryData) => {
@@ -231,12 +376,8 @@ export const AdminProvider = ({ children }) => {
     });
   };
 
-  const getCategoryStats = async () => {
-    return await apiCall("/api/categories/stats");
-  };
-
   const updateCategoryStatus = async (categoryId, status) => {
-    return await apiCall(`/api/categories/${categoryId}/status`, {
+    return await apiCall(`/api/categories/${categoryId}/trang-thai`, {
       method: "PATCH",
       body: JSON.stringify({ TrangThai: status }),
     });
@@ -287,6 +428,12 @@ export const AdminProvider = ({ children }) => {
     return await apiCall(`/api/vouchers/${voucherCode}`, {
       method: "PUT",
       body: JSON.stringify(voucherData),
+    });
+  };
+
+  const deleteVoucher = async (voucherCode) => {
+    return await apiCall(`/api/vouchers/${voucherCode}`, {
+      method: "DELETE",
     });
   };
 
@@ -405,6 +552,7 @@ export const AdminProvider = ({ children }) => {
     getVouchers,
     createVoucher,
     updateVoucher,
+    deleteVoucher,
     updateVoucherStatus,
     searchVouchers,
 

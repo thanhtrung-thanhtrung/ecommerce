@@ -1,0 +1,237 @@
+thanhtrung-thanhtrung
+bên dưới đâu các api products cả kết quả trả về curl --silent --location --request POST "http://localhost:5000/api/products/admin/create"
+--header "Content-Type: application/json"
+--header "Cookie: connect.sid=s%3AUNdUY-zoK9N9rJ0f8H9O2DfqDdNwVd5-.jayhvSakL%2BVtexALTEW77wZdYRieW30Evkv5a4XBoPs"
+--data "{
+"Ten": "Giày Converse Chuck Taylor All Star",
+"MoTa": "Giày thời trang cổ điển",
+"MoTaChiTiet": "Converse Chuck Taylor là mẫu giày được ưa chuộng bởi phong cách tối giản và đa năng...",
+"ThongSoKyThuat": {
+"ChatLieu": "Canvas, cao su",
+"KieuGiay": "Lifestyle",
+"XuatXu": "Chính hãng"
+},
+"Gia": 1700000,
+"GiaKhuyenMai": 1500000,
+"id_DanhMuc": 7,
+"id_ThuongHieu": 3,
+"id_NhaCungCap": 3,
+"bienThe": [
+{ "id_KichCo": 5, "id_MauSac": 3, "MaSanPham": "CONVERSE-RED-39", "SoLuong": 5 },
+{ "id_KichCo": 6, "id_MauSac": 3, "MaSanPham": "CONVERSE-RED-40", "SoLuong": 8 }
+]
+}"
+
+{
+"id": 149,
+"message": "Sản phẩm đã được tạo thành công"
+}
+
+curl --silent --location --request POST "http://localhost:5000/api/products/admin/create"
+--header "Cookie: connect.sid=s%3AUNdUY-zoK9N9rJ0f8H9O2DfqDdNwVd5-.jayhvSakL%2BVtexALTEW77wZdYRieW30Evkv5a4XBoPs"
+--form "Ten="Giày Thể Thao Nike Air Max 2023""
+--form "MoTa="Giày thể thao cao cấp với công nghệ đệm khí""
+--form "MoTaChiTiet="Giày thể thao Nike Air Max 2023 được thiết kế với công nghệ đệm khí tiên tiến, mang lại cảm giác thoải mái và hỗ trợ tốt cho chân khi vận động. Phần upper làm từ vải mesh thoáng khí giúp giảm thiểu mồ hôi và mùi hôi.""
+--form "ThongSoKyThuat="{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}""
+--form "Gia="2500000""
+--form "GiaKhuyenMai="2200000""
+--form "id_DanhMuc="1""
+--form "id_ThuongHieu="2""
+--form "id_NhaCungCap="1""
+--form "bienThe="[{\"id_KichCo\":1,\"id_MauSac\":1,\"MaSanPham\":\"NIKE-AM2023-DEN-39\",\"SoLuong\":10},{\"id_KichCo\":2,\"id_MauSac\":1,\"MaSanPham\":\"NIKE-AM2023-DEN-40\",\"SoLuong\":15}]""
+--form "anhChinh=@"postman-cloud:///1f04a478-6435-4b20-96ed-7ecf7750adfd""
+--form "anhPhu=@"postman-cloud:///1f04a478-6435-4b20-96ed-7ecf7750adfd""
+--form "anhPhu=@"postman-cloud:///1f04a478-6435-4b20-96ed-7ecf7750adfd""
+
+{
+"id": 150,
+"message": "Sản phẩm đã được tạo thành công"
+}
+
+curl --silent --location --request PUT "http://localhost:5000/api/products/admin/update/143"
+--header "Cookie: connect.sid=s%3AUNdUY-zoK9N9rJ0f8H9O2DfqDdNwVd5-.jayhvSakL%2BVtexALTEW77wZdYRieW30Evkv5a4XBoPs"
+--form "Ten="Giày Thể Thao Nike Air Max 2023""
+--form "MoTa="Giày thể thao cao cấp với công nghệ đệm khí""
+--form "MoTaChiTiet="Giày thể thao Nike Air Max 2023 được thiết kế với công nghệ đệm khí tiên tiến, mang lại cảm giác thoải mái và hỗ trợ tốt cho chân khi vận động. Phần upper làm từ vải mesh thoáng khí giúp giảm thiểu mồ hôi và mùi hôi.""
+--form "ThongSoKyThuat="{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}""
+--form "Gia="2500000""
+--form "GiaKhuyenMai="2200000""
+--form "id_DanhMuc="1""
+--form "id_ThuongHieu="2""
+--form "id_NhaCungCap="1""
+--form "bienThe="[{\"id_KichCo\":1,\"id_MauSac\":1,\"MaSanPham\":\"NIKE-AM2023-DEN-39\",\"SoLuong\":10},{\"id_KichCo\":2,\"id_MauSac\":1,\"MaSanPham\":\"NIKE-AM2023-DEN-40\",\"SoLuong\":15}]""
+--form "anhChinh=@"postman-cloud:///1f04a477-2663-4640-851e-82fd349a990a""
+--form "anhPhu=@"postman-cloud:///1f04a478-6435-4b20-96ed-7ecf7750adfd""
+--form "anhPhu=@"postman-cloud:///1f04a478-6435-4b20-96ed-7ecf7750adfd""
+
+{
+"id": "150",
+"message": "Sản phẩm đã được cập nhật thành công"
+}
+
+curl --silent --location --request DELETE "http://localhost:5000/api/products/admin/delete/127"
+--header "Cookie: connect.sid=s%3AUNdUY-zoK9N9rJ0f8H9O2DfqDdNwVd5-.jayhvSakL%2BVtexALTEW77wZdYRieW30Evkv5a4XBoPs"
+
+{
+"id": 150,
+"message": "Sản phẩm đã được xóa thành công"
+}
+
+curl --silent --location --request GET "http://localhost:5000/api/products/admin/list?page=1&limit=10"
+--header "Cookie: connect.sid=s%3AQTuAhDOuusnbf_BzNzRnaQe1LOGqw0iF.t2SK2jCdJXp4%2BXHX1e%2F8AsOVbJbB2%2Bh5pJNoVUHJD5E"
+{
+"products": [
+{
+"id": 150,
+"Ten": "Giày Thể Thao Nike Air Max 202ddđ",
+"MoTa": "Giày thể thao cao cấp với công nghệ đệm khí",
+"MoTaChiTiet": "Giày thể thao Nike Air Max 2023 được thiết kế với công nghệ đệm khí tiên tiến, mang lại cảm giác thoải mái và hỗ trợ tốt cho chân khi vận động. Phần upper làm từ vải mesh thoáng khí giúp giảm thiểu mồ hôi và mùi hôi.",
+"ThongSoKyThuat": "{"ChatLieu":"Vải mesh, cao su","KieuGiay":"Thể thao","XuatXu":"Chính hãng"}",
+"Gia": "2500000.00",
+"GiaKhuyenMai": "2200000.00",
+"SoLuongDaBan": 0,
+"id_DanhMuc": 1,
+"id_ThuongHieu": 2,
+"id_NhaCungCap": 1,
+"HinhAnh": "{"anhChinh":"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750310429/shoes_shop/products/m8gj1tk6gy8ekudjrwf6.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/m8gj1tk6gy8ekudjrwf6\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750310433/shoes_shop/products/cmycupeutt1uniavgsnh.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750310437/shoes_shop/products/uhc1tujth380zc307drx.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/cmycupeutt1uniavgsnh\",\"shoes_shop/products/uhc1tujth380zc307drx\"]}",
+"TrangThai": 0,
+"NgayTao": "2025-06-19T05:19:35.000Z",
+"NgayCapNhat": "2025-06-19T05:21:20.000Z",
+"tenDanhMuc": "Giày Thể Thao Cao Cấp vivvvvp",
+"tenThuongHieu": "Adidas",
+"tenNhaCungCap": "Nike Việt Nam Updated",
+"soBienThe": 2
+},
+{
+"id": 149,
+"Ten": "Giày Converse Chuck Taylor All Star",
+"MoTa": "Giày thời trang cổ điển",
+"MoTaChiTiet": "Converse Chuck Taylor là mẫu giày được ưa chuộng bởi phong cách tối giản và đa năng...",
+"ThongSoKyThuat": "{"ChatLieu":"Canvas, cao su","KieuGiay":"Lifestyle","XuatXu":"Chính hãng"}",
+"Gia": "1700000.00",
+"GiaKhuyenMai": "1500000.00",
+"SoLuongDaBan": 0,
+"id_DanhMuc": 7,
+"id_ThuongHieu": 3,
+"id_NhaCungCap": 3,
+"HinhAnh": "{}",
+"TrangThai": 1,
+"NgayTao": "2025-06-19T05:18:18.000Z",
+"NgayCapNhat": "2025-06-19T05:18:18.000Z",
+"tenDanhMuc": "Giày Lifestyle",
+"tenThuongHieu": "Puma",
+"tenNhaCungCap": "Puma Việt Nam",
+"soBienThe": 2
+},
+{
+"id": 148,
+"Ten": "Giày Thể Thao Puma RS-X",
+"MoTa": "Phong cách chunky thời thượng",
+"MoTaChiTiet": "Puma RS-X có thiết kế hầm hố và đầy cá tính, phù hợp với người yêu phong cách hiện đại",
+"ThongSoKyThuat": "{"ChatLieu":"Vải, da PU","KieuGiay":"Thể thao","XuatXu":"Chính hãng"}",
+"Gia": "2900000.00",
+"GiaKhuyenMai": "2600000.00",
+"SoLuongDaBan": 0,
+"id_DanhMuc": 3,
+"id_ThuongHieu": 5,
+"id_NhaCungCap": 1,
+"HinhAnh": "{"anhChinh":"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750081966/shoes_shop/products/mk3wowzajsrbdomcumgk.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/mk3wowzajsrbdomcumgk\"}",
+"TrangThai": 1,
+"NgayTao": "2025-06-16T13:52:48.000Z",
+"NgayCapNhat": "2025-06-16T13:52:48.000Z",
+"tenDanhMuc": "Giày Thể Thao",
+"tenThuongHieu": "Converse",
+"tenNhaCungCap": "Nike Việt Nam Updated",
+"soBienThe": 1
+},
+{
+"id": 147,
+"Ten": "Giày New Balance 574",
+"MoTa": "Thương hiệu chạy bộ biểu tượng",
+"MoTaChiTiet": "New Balance 574 nổi bật với thiết kế retro và phần đệm EVA êm ái...",
+"ThongSoKyThuat": "{"ChatLieu":"Vải mesh, da lộn","KieuGiay":"Chạy bộ","XuatXu":"Chính hãng"}",
+"Gia": "2300000.00",
+"GiaKhuyenMai": "2100000.00",
+"SoLuongDaBan": 0,
+"id_DanhMuc": 4,
+"id_ThuongHieu": 6,
+"id_NhaCungCap": 1,
+"HinhAnh": "{"anhChinh":"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750081624/shoes_shop/products/r5octfh1ltmhn71p9xya.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/r5octfh1ltmhn71p9xya\"}",
+"TrangThai": 1,
+"NgayTao": "2025-06-16T13:47:05.000Z",
+"NgayCapNhat": "2025-06-16T13:47:05.000Z",
+"tenDanhMuc": "Giày Chạy Bộ",
+"tenThuongHieu": "Vans",
+"tenNhaCungCap": "Nike Việt Nam Updated",
+"soBienThe": 2
+},
+{
+"id": 146,
+"Ten": "Giày Nike Jordan 1 Retro",
+"MoTa": "Nike Jordan 1 Retro kết hợp thiết kế cổ điển và chất liệu cao cấp, tạo nên dấu ấn riêng...",
+"MoTaChiTiet": "{\r\n "ChatLieu": "Da thật, cao su",\r\n "KieuGiay": "Bóng rổ",\r\n "XuatXu": "Chính hãng"\r\n }",
+"ThongSoKyThuat": "{"ChatLieu":"Vải mesh, cao su","KieuGiay":"Thể thao","XuatXu":"Chính hãng"}",
+"Gia": "3900000.00",
+"GiaKhuyenMai": "1.00",
+"SoLuongDaBan": 0,
+"id_DanhMuc": 6,
+"id_ThuongHieu": 2,
+"id_NhaCungCap": 2,
+"HinhAnh": "{"anhChinh":"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750081480/shoes_shop/products/tdekprjc7pxor85xvt6r.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/tdekprjc7pxor85xvt6r\"}",
+"TrangThai": 1,
+"NgayTao": "2025-06-16T13:44:41.000Z",
+"NgayCapNhat": "2025-06-16T13:44:41.000Z",
+"tenDanhMuc": "Giày Bóng Rổ",
+"tenThuongHieu": "Adidas",
+"tenNhaCungCap": "Adidas Việt Nam",
+"soBienThe": 2
+},
+{
+"id": 145,
+"Ten": "Giày Bitis Hunter X",
+"MoTa": "Giày thể thao quốc dân Việt Nam",
+"MoTaChiTiet": ""Bitis Hunter X với giá hợp lý, thiết kế trẻ trung, phù hợp học sinh, sinh viên..."",
+"ThongSoKyThuat": "{"ChatLieu":"Vải lưới, cao su","KieuGiay":"Thể thao","XuatXu":"Việt Nam"}",
+"Gia": "800000.00",
+"GiaKhuyenMai": "750000.00",
+"SoLuongDaBan": 0,
+"id_DanhMuc": 3,
+"id_ThuongHieu": 7,
+"id_NhaCungCap": 1,
+"HinhAnh": "{"anhChinh":"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750080727/shoes_shop/products/gdepwxbpyqa2mqv5pqrp.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/gdepwxbpyqa2mqv5pqrp\"}",
+"TrangThai": 1,
+"NgayTao": "2025-06-16T13:32:09.000Z",
+"NgayCapNhat": "2025-06-16T13:32:09.000Z",
+"tenDanhMuc": "Giày Thể Thao",
+"tenThuongHieu": "Reebok",
+"tenNhaCungCap": "Nike Việt Nam Updated",
+"soBienThe": 2
+},
+{
+"id": 144,
+"Ten": "Giày Thể Thao Nike Air Max 2023",
+"MoTa": "Giày thể thao cao cấp với công nghệ đệm khí",
+"MoTaChiTiet": "Giày thể thao Nike Air Max 2023 được thiết kế với công nghệ đệm khí tiên tiến, mang lại cảm giác thoải mái và hỗ trợ tốt cho chân khi vận động. Phần upper làm từ vải mesh thoáng khí giúp giảm thiểu mồ hôi và mùi hôi.",
+"ThongSoKyThuat": "{"ChatLieu":"Vải mesh, cao su","KieuGiay":"Thể thao","XuatXu":"Chính hãng"}",
+"Gia": "2500000.00",
+"GiaKhuyenMai": "2200000.00",
+"SoLuongDaBan": 0,
+"id_DanhMuc": 1,
+"id_ThuongHieu": 2,
+"id_NhaCungCap": 1,
+"HinhAnh": "{"anhChinh":"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750078220/shoes_shop/products/sxggiyyyzozm7akoozi5.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/sxggiyyyzozm7akoozi5\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750078225/shoes_shop/products/lzge6vpas622oeiuxa9h.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750078228/shoes_shop/products/cnewmljkxcqttaqmivod.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/lzge6vpas622oeiuxa9h\",\"shoes_shop/products/cnewmljkxcqttaqmivod\"]}",
+"TrangThai": 1,
+"NgayTao": "2025-06-16T12:50:31.000Z",
+"NgayCapNhat": "2025-06-16T12:50:31.000Z",
+"tenDanhMuc": "Giày Thể Thao Cao Cấp vivvvvp",
+"tenThuongHieu": "Adidas",
+"tenNhaCungCap": "Nike Việt Nam Updated",
+"soBienThe": 2
+}
+],
+"pagination": {
+"page": 1,
+"limit": 10,
+"total": 7
+}
+}
