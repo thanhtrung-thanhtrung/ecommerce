@@ -9,8 +9,16 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
+import { useAdmin } from "../contexts/AdminContext";
 
 const Suppliers = () => {
+  const {
+    getSuppliers,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+  } = useAdmin();
+
   const [suppliers, setSuppliers] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -31,20 +39,66 @@ const Suppliers = () => {
   const loadSuppliers = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/suppliers");
-      const result = await response.json();
-      if (result.success) {
-        setSuppliers(result.data || []);
-      } else {
-        setSuppliers([]);
-        toast.error("Lỗi khi tải nhà cung cấp");
-      }
+      const res = await getSuppliers();
+      setSuppliers(res?.data || []);
     } catch (error) {
-      console.error("Error loading suppliers:", error);
       toast.error("Lỗi khi tải nhà cung cấp");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingSupplier) {
+        await updateSupplier(editingSupplier.id, formData);
+        toast.success("Cập nhật nhà cung cấp thành công!");
+      } else {
+        await createSupplier(formData);
+        toast.success("Thêm nhà cung cấp thành công!");
+      }
+      setShowModal(false);
+      resetForm();
+      loadSuppliers();
+    } catch (error) {
+      toast.error(error?.message || "Lỗi khi lưu nhà cung cấp");
+    }
+  };
+
+  const handleEdit = (supplier) => {
+    setEditingSupplier(supplier);
+    setFormData({
+      Ten: supplier.Ten || "",
+      Email: supplier.Email || "",
+      SDT: supplier.SDT || "",
+      DiaChi: supplier.DiaChi || "",
+      TrangThai: supplier.TrangThai ?? 1,
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Bạn có chắc muốn xóa nhà cung cấp này?")) {
+      try {
+        await deleteSupplier(id);
+        toast.success("Xóa thành công!");
+        loadSuppliers();
+      } catch (error) {
+        toast.error(error?.message || "Lỗi khi xóa nhà cung cấp");
+      }
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      Ten: "",
+      Email: "",
+      SDT: "",
+      DiaChi: "",
+      TrangThai: 1,
+    });
+    setEditingSupplier(null);
   };
 
   const filteredSuppliers = suppliers.filter((s) =>
@@ -110,11 +164,12 @@ const Suppliers = () => {
             <thead className="bg-gray-100">
               <tr>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SĐT</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Địa chỉ</th>
-                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">	Trạng thái</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ">Tên</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ">Email</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ">SĐT</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ">Địa chỉ</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider  text-center">Trạng thái</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider  text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -131,12 +186,88 @@ const Suppliers = () => {
                       title={s.TrangThai ? "Hoạt động" : "Không hoạt động"}
                     ></span>
                   </td>
+                  <td className="px-4 py-2 text-center space-x-2">
+                    <button
+                      onClick={() => handleEdit(s)}
+                      className="text-blue-600 hover:underline"
+                    >
+                      <FiEdit2 className="inline w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(s.id)}
+                      className="text-red-600 hover:underline"
+                    >
+                      <FiTrash2 className="inline w-4 h-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {editingSupplier ? "Cập nhật nhà cung cấp" : "Thêm nhà cung cấp mới"}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Tên"
+                value={formData.Ten}
+                onChange={(e) => setFormData({ ...formData, Ten: e.target.value })}
+                className="w-full border px-3 py-2 rounded"
+                required
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={formData.Email}
+                onChange={(e) => setFormData({ ...formData, Email: e.target.value })}
+                className="w-full border px-3 py-2 rounded"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Số điện thoại"
+                value={formData.SDT}
+                onChange={(e) => setFormData({ ...formData, SDT: e.target.value })}
+                className="w-full border px-3 py-2 rounded"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Địa chỉ"
+                value={formData.DiaChi}
+                onChange={(e) => setFormData({ ...formData, DiaChi: e.target.value })}
+                className="w-full border px-3 py-2 rounded"
+                required
+              />
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 bg-gray-200 rounded"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-500 text-white rounded"
+                >
+                  {editingSupplier ? "Cập nhật" : "Thêm mới"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

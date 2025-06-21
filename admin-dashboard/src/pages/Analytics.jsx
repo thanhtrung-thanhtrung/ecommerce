@@ -12,8 +12,9 @@ import {
 import { useAdmin } from "../contexts/AdminContext";
 
 const Analytics = () => {
-  const { getAnalytics, getRevenueStats, loading } = useAdmin();
+  const { getAnalytics, getRevenueStats, getStatistics, loading } = useAdmin();
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [statisticsData, setStatisticsData] = useState(null);
   const [timeFilter, setTimeFilter] = useState("7days");
 
   // Mock data for demonstration
@@ -62,9 +63,22 @@ const Analytics = () => {
     }
   };
 
+  const loadStatistics = async () => {
+    try {
+      const stats = await getStatistics({ period: timeFilter });
+      setStatisticsData(stats);
+    } catch (error) {
+      console.error("Error loading statistics:", error);
+    }
+  };
+
   useEffect(() => {
     loadAnalytics();
   }, [timeFilter, loadAnalytics]);
+
+  useEffect(() => {
+    loadStatistics();
+  }, [timeFilter]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -77,9 +91,8 @@ const Analytics = () => {
     const isPositive = growth >= 0;
     return (
       <span
-        className={`flex items-center ${
-          isPositive ? "text-green-600" : "text-red-600"
-        }`}
+        className={`flex items-center ${isPositive ? "text-green-600" : "text-red-600"
+          }`}
       >
         <FiTrendingUp
           className={`w-4 h-4 mr-1 ${isPositive ? "" : "rotate-180"}`}
@@ -249,15 +262,14 @@ const Analytics = () => {
               <div key={index} className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                      index === 0
-                        ? "bg-yellow-500"
-                        : index === 1
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${index === 0
+                      ? "bg-yellow-500"
+                      : index === 1
                         ? "bg-gray-400"
                         : index === 2
-                        ? "bg-orange-600"
-                        : "bg-gray-300"
-                    }`}
+                          ? "bg-orange-600"
+                          : "bg-gray-300"
+                      }`}
                   >
                     {index + 1}
                   </div>
@@ -297,9 +309,8 @@ const Analytics = () => {
               return (
                 <div key={index} className="flex items-center">
                   <div
-                    className={`w-4 h-4 rounded-full ${
-                      colors[index % colors.length]
-                    } mr-3`}
+                    className={`w-4 h-4 rounded-full ${colors[index % colors.length]
+                      } mr-3`}
                   ></div>
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1">
@@ -312,9 +323,8 @@ const Analytics = () => {
                     </div>
                     <div className="bg-gray-200 rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${
-                          colors[index % colors.length]
-                        }`}
+                        className={`h-2 rounded-full ${colors[index % colors.length]
+                          }`}
                         style={{ width: `${category.PhanTram}%` }}
                       ></div>
                     </div>
