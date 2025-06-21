@@ -1,4 +1,5 @@
 const db = require("../config/database");
+const cloudinaryUtil = require("../utils/cloudinary.util");
 
 class BrandService {
   // Tạo thương hiệu mới
@@ -13,10 +14,21 @@ class BrandService {
       throw new Error("Tên thương hiệu đã tồn tại");
     }
 
+    if (brandData.Logo) {
+      const uploadResult = await cloudinaryUtil.uploadImage(brandData.Logo, "brands");
+      brandData.Logo = uploadResult.url;
+    }
+
     const [result] = await db.execute(
-      `INSERT INTO thuonghieu (Ten, MoTa, TrangThai) 
-       VALUES (?, ?, ?)`,
-      [brandData.Ten, brandData.MoTa || null, brandData.TrangThai ?? 1]
+      `INSERT INTO thuonghieu (Ten, MoTa, TrangThai, Website, Logo) 
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        brandData.Ten,
+        brandData.MoTa || null,
+        brandData.TrangThai ?? 1,
+        brandData.Website || null,
+        brandData.Logo || null,
+      ]
     );
 
     return {
@@ -38,11 +50,23 @@ class BrandService {
       throw new Error("Tên thương hiệu đã tồn tại");
     }
 
+    if (brandData.Logo) {
+      const uploadResult = await cloudinaryUtil.uploadImage(brandData.Logo, "brands");
+      brandData.Logo = uploadResult.url;
+    }
+
     const [result] = await db.execute(
       `UPDATE thuonghieu SET 
-        Ten = ?, MoTa = ?, TrangThai = ?
+        Ten = ?, MoTa = ?, TrangThai = ?, Website = ?, Logo = ?
       WHERE id = ?`,
-      [brandData.Ten, brandData.MoTa || null, brandData.TrangThai ?? 1, id]
+      [
+        brandData.Ten,
+        brandData.MoTa || null,
+        brandData.TrangThai ?? 1,
+        brandData.Website || null,
+        brandData.Logo || null,
+        id,
+      ]
     );
 
     if (result.affectedRows === 0) {

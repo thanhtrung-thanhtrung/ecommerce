@@ -131,7 +131,7 @@ const Categories = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Quản lý danh mục</h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mt-1">
             Quản lý danh mục sản phẩm ({categories.length} danh mục)
           </p>
         </div>
@@ -170,15 +170,13 @@ const Categories = () => {
         </div>
       </div>
 
-      {/* Categories Grid */}
+      {/* Categories List */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
           <div className="px-6 py-12 text-center">
             <div className="flex items-center justify-center">
               <FiRefreshCw className="w-8 h-8 animate-spin mr-3 text-blue-500" />
-              <span className="text-lg text-gray-600">
-                Đang tải danh mục...
-              </span>
+              <span className="text-lg text-gray-600">Đang tải danh mục...</span>
             </div>
           </div>
         ) : filteredCategories.length === 0 ? (
@@ -198,79 +196,57 @@ const Categories = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-4">
-            {filteredCategories.map((category) => (
-              <div
-                key={category.id}
-                className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow duration-200"
-              >
-                {/* Status and Toggle */}
-                <div className="flex items-center justify-between mb-3">
-                  <span
-                    className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      category.TrangThai
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {category.TrangThai ? "Hoạt động" : "Ẩn"}
-                  </span>
-                  <button
-                    onClick={() =>
-                      handleToggleStatus(category.id, category.TrangThai)
-                    }
-                    className={`p-1 rounded-full ${
-                      category.TrangThai
-                        ? "text-green-600 hover:bg-green-50"
-                        : "text-gray-400 hover:bg-gray-50"
-                    }`}
-                    title={category.TrangThai ? "Ẩn danh mục" : "Hiện danh mục"}
-                  >
-                    {category.TrangThai ? (
-                      <FiEye className="w-4 h-4" />
-                    ) : (
-                      <FiEyeOff className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-
-                {/* Category Icon */}
-                <div className="flex justify-center mb-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <FiTag className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
-
-                {/* Category Name */}
-                <h3 className="text-center text-lg font-semibold text-gray-900 mb-3 line-clamp-2 h-14">
-                  {category.Ten}
-                </h3>
-
-                {/* Stats */}
-                <div className="text-center text-xs text-gray-500 mb-4">
-                  ID: {category.id}
-                </div>
-
-                {/* Actions */}
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleEdit(category)}
-                    className="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded text-sm hover:bg-blue-100 transition-colors"
-                  >
-                    <FiEdit2 className="w-3 h-3 inline mr-1" />
-                    Sửa
-                  </button>
-                  <button
-                    onClick={() => handleDelete(category.id)}
-                    className="flex-1 bg-red-50 text-red-600 px-3 py-2 rounded text-sm hover:bg-red-100 transition-colors"
-                  >
-                    <FiTrash2 className="w-3 h-3 inline mr-1" />
-                    Xóa
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <table className="table-auto w-full text-left">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tên danh mục
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Trạng thái
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCategories.map((category, index) => (
+                <tr key={category.id} className="border-b">
+                  <td className="px-4 py-2 text-gray-900">{index + 1}</td>
+                  <td className="px-4 py-2 text-gray-900">{category.Ten}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={`inline-flex w-2 h-2 rounded-full ${
+                        category.TrangThai
+                          ? "bg-green-500"
+                          : "bg-red-500"
+                      }`}
+                      title={category.TrangThai ? "Hoạt động" : "Không hoạt động"}
+                    >
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleEdit(category)}
+                        className="text-blue-600 hover:underline flex items-center space-x-1"
+                      >
+                        <FiEdit2 className="w-4 h-4" />
+                      
+                      </button>
+                      <button
+                        onClick={() => handleDelete(category.id)}
+                        className="text-red-600 hover:underline flex items-center space-x-1"
+                      >
+                        <FiTrash2 className="w-4 h-4" />
+                     
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 

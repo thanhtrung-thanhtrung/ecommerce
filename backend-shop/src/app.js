@@ -3,6 +3,7 @@ const session = require("express-session");
 const cors = require("cors");
 const cookieParser = require("cookie-parser"); // Add this import
 const routes = require("./routes");
+const bodyParser = require('body-parser');
 require("dotenv").config();
 require("./config/database"); // Import database configuration
 
@@ -39,6 +40,8 @@ app.options("*", cors()); // Enable pre-flight for all routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser()); // Add cookie parser before session middleware
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
 // Cấu hình express-session (Đặt SAU express.json() và express.urlencoded())
 app.use(

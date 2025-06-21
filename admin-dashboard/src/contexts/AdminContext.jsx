@@ -389,23 +389,74 @@ export const AdminProvider = ({ children }) => {
   };
 
   const createBrand = async (brandData) => {
-    return await apiCall("/api/brands", {
-      method: "POST",
-      body: JSON.stringify(brandData),
-    });
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/brands`, {
+        method: "POST",
+        credentials: "include", // Use session cookies instead of Authorization header
+        body: brandData, // FormData object
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error creating brand");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Create brand error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateBrand = async (brandId, brandData) => {
-    return await apiCall(`/api/brands/${brandId}`, {
-      method: "PUT",
-      body: JSON.stringify(brandData),
-    });
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}`, {
+        method: "PUT",
+        credentials: "include", // Use session cookies instead of Authorization header
+        body: brandData, // FormData object
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error updating brand");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Update brand error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteBrand = async (brandId) => {
-    return await apiCall(`/api/brands/${brandId}`, {
-      method: "DELETE",
-    });
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}`, {
+        method: "DELETE",
+        credentials: "include", // Use session cookies
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error deleting brand");
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Delete brand error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getBrandStats = async () => {

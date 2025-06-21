@@ -10,7 +10,11 @@ class BrandController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const brandData = req.body;
+      const brandData = {
+        ...req.body,
+        Logo: req.file?.path || req.body.Logo || null,
+      };
+
       const newBrand = await brandService.taoThuongHieu(brandData);
 
       return res.status(201).json({
@@ -19,12 +23,10 @@ class BrandController {
         data: newBrand,
       });
     } catch (error) {
-      return res
-        .status(error.message === "Tên thương hiệu đã tồn tại" ? 400 : 500)
-        .json({
-          success: false,
-          message: error.message || "Có lỗi xảy ra khi tạo thương hiệu",
-        });
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Có lỗi xảy ra khi tạo thương hiệu",
+      });
     }
   }
 
@@ -37,7 +39,10 @@ class BrandController {
       }
 
       const { id } = req.params;
-      const brandData = req.body;
+      const brandData = {
+        ...req.body,
+        Logo: req.file?.path || req.body.Logo || null,
+      };
 
       const updatedBrand = await brandService.capNhatThuongHieu(id, brandData);
 
@@ -47,12 +52,10 @@ class BrandController {
         data: updatedBrand,
       });
     } catch (error) {
-      return res
-        .status(error.message === "Không tìm thấy thương hiệu" ? 404 : 400)
-        .json({
-          success: false,
-          message: error.message || "Có lỗi xảy ra khi cập nhật thương hiệu",
-        });
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Có lỗi xảy ra khi cập nhật thương hiệu",
+      });
     }
   }
 

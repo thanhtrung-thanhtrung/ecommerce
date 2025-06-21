@@ -11,21 +11,11 @@ import Categories from "./pages/Categories";
 import Brands from "./pages/Brands";
 import Vouchers from "./pages/Vouchers";
 import Analytics from "./pages/Analytics";
+import Suppliers from "./pages/Suppliers";
 import "./App.css";
 
 // Placeholder components for routes not yet implemented
-const Suppliers = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-gray-900 mb-4">
-      Quản lý nhà cung cấp
-    </h2>
-    <div className="bg-white rounded-lg shadow p-6">
-      <p className="text-gray-600">
-        Trang quản lý nhà cung cấp sẽ được phát triển ở đây.
-      </p>
-    </div>
-  </div>
-);
+
 
 const Settings = () => (
   <div className="p-6">

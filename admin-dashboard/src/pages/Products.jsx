@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useState, useEffect } from "react"
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiImage, FiUpload, FiRefreshCw, FiSave, FiX } from "react-icons/fi"
 import { toast } from "react-toastify"
@@ -59,6 +57,12 @@ const Products = () => {
 
   // Images
   const [selectedImages, setSelectedImages] = useState({
+    anhChinh: null,
+    anhPhu: [],
+  })
+
+  // Thêm state cho ảnh hiện có khi edit
+  const [existingImages, setExistingImages] = useState({
     anhChinh: null,
     anhPhu: [],
   })
@@ -228,13 +232,6 @@ const Products = () => {
   // Submit form
   const handleSubmit = async (e) => {
     e.preventDefault()
-
-    const errors = validateForm()
-    if (errors.length > 0) {
-      toast.error(errors.join(", "))
-      return
-    }
-
     setSubmitting(true)
 
     try {
@@ -334,16 +331,41 @@ const Products = () => {
       id_NhaCungCap: product.id_NhaCungCap?.toString() || "",
     })
 
+    // Load existing variants
     if (product.bienThe && Array.isArray(product.bienThe) && product.bienThe.length > 0) {
       setVariants(
         product.bienThe.map((bt) => ({
+          id: bt.id || null, // Thêm ID để track biến thể hiện có
           id_KichCo: bt.id_KichCo?.toString() || "",
           id_MauSac: bt.id_MauSac?.toString() || "",
           MaSanPham: bt.MaSanPham || "",
           SoLuong: bt.SoLuong || 0,
+          TenMauSac: bt.TenMauSac || "", // Để hiển thị tên
+          TenKichCo: bt.TenKichCo || "", // Để hiển thị tên
         })),
       )
+    } else {
+      setVariants([{ id_KichCo: "", id_MauSac: "", MaSanPham: "", SoLuong: 0 }])
     }
+
+    // Load existing images
+    if (product.HinhAnh) {
+      try {
+        const images = typeof product.HinhAnh === "string" ? JSON.parse(product.HinhAnh) : product.HinhAnh
+        setExistingImages({
+          anhChinh: images.anhChinh || null,
+          anhPhu: images.anhPhu || [],
+        })
+      } catch (error) {
+        console.error("Error parsing images:", error)
+        setExistingImages({ anhChinh: null, anhPhu: [] })
+      }
+    } else {
+      setExistingImages({ anhChinh: product.anhChinh || null, anhPhu: [] })
+    }
+
+    // Reset selected images
+    setSelectedImages({ anhChinh: null, anhPhu: [] })
 
     setShowModal(true)
   }
@@ -376,10 +398,39 @@ const Products = () => {
     setEditingProduct(null)
     setVariants([{ id_KichCo: "", id_MauSac: "", MaSanPham: "", SoLuong: 0 }])
     setSelectedImages({ anhChinh: null, anhPhu: [] })
+    setExistingImages({ anhChinh: null, anhPhu: [] })
   }
 
-  const handlePageChange = (newPage) => {
-    setPagination((prev) => ({ ...prev, page: newPage }))
+  // Thêm function để thay thế ảnh chính hiện có
+  const replaceMainImage = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setSelectedImages((prev) => ({ ...prev, anhChinh: file }))
+      // Xóa ảnh hiện có
+      setExistingImages((prev) => ({ ...prev, anhChinh: null }))
+    }
+  }
+
+  // Thêm function để xóa ảnh phụ hiện có
+  const removeExistingAdditionalImage = (index) => {
+    setExistingImages((prev) => ({
+      ...prev,
+      anhPhu: prev.anhPhu.filter((_, i) => i !== index),
+    }))
+  }
+
+  // Thêm function để thay thế ảnh phụ hiện có
+  const replaceAdditionalImage = (index, e) => {
+    const file = e.target.files[0]
+    if (file) {
+      // Thêm ảnh mới vào selected
+      setSelectedImages((prev) => ({
+        ...prev,
+        anhPhu: [...prev.anhPhu, file],
+      }))
+      // Xóa ảnh hiện có tại vị trí này
+      removeExistingAdditionalImage(index)
+    }
   }
 
   const filteredProducts = products.filter((product) => product.Ten?.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -391,7 +442,7 @@ const Products = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Quản lý sản phẩm</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Quản lý sản phẩm</h1>
           <p className="text-gray-600 mt-1">Tổng cộng {pagination.total} sản phẩm</p>
         </div>
         <div className="flex space-x-3">
@@ -401,14 +452,14 @@ const Products = () => {
             disabled={loading}
           >
             <FiRefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            <span>Làm mới</span>
+            <span className="hidden sm:inline">Làm mới</span>
           </button>
           <button
             onClick={handleAddNew}
             className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-600 transition-colors"
           >
             <FiPlus className="w-4 h-4" />
-            <span>Thêm sản phẩm</span>
+            <span className="hidden sm:inline">Thêm sản phẩm</span>
           </button>
         </div>
       </div>
@@ -613,392 +664,481 @@ const Products = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">
-                {editingProduct ? "Cập nhật sản phẩm" : "Thêm sản phẩm mới"}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowModal(false)
-                  resetForm()
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <FiX className="w-6 h-6" />
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {editingProduct ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}
+                </h2>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <FiX className="w-6 h-6" />
+                </button>
+              </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tên sản phẩm *</label>
-                    <input
-                      type="text"
-                      value={formData.Ten}
-                      onChange={(e) => handleInputChange("Ten", e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Ví dụ: Nike Air Max 2024"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả *</label>
-                    <textarea
-                      value={formData.MoTa}
-                      onChange={(e) => handleInputChange("MoTa", e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      rows="3"
-                      placeholder="Mô tả ngắn về sản phẩm..."
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Thông tin cơ bản */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Giá bán *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tên sản phẩm <span className="text-red-500">*</span>
+                      </label>
                       <input
-                        type="number"
-                        value={formData.Gia}
-                        onChange={(e) => handleInputChange("Gia", e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
+                        type="text"
+                        value={formData.Ten}
+                        onChange={(e) => handleInputChange("Ten", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Nhập tên sản phẩm"
                         required
                       />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Giá khuyến mãi</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Mô tả ngắn <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={formData.MoTa}
+                        onChange={(e) => handleInputChange("MoTa", e.target.value)}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Nhập mô tả ngắn"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả chi tiết</label>
+                      <textarea
+                        value={formData.MoTaChiTiet}
+                        onChange={(e) => handleInputChange("MoTaChiTiet", e.target.value)}
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Nhập mô tả chi tiết"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Giá bán <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.Gia}
+                          onChange={(e) => handleInputChange("Gia", e.target.value)}
+                          min="0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="0"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Giá khuyến mãi</label>
+                        <input
+                          type="number"
+                          value={formData.GiaKhuyenMai}
+                          onChange={(e) => handleInputChange("GiaKhuyenMai", e.target.value)}
+                          min="0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Danh mục <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.id_DanhMuc}
+                        onChange={(e) => handleInputChange("id_DanhMuc", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Chọn danh mục</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.Ten}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Thương hiệu <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.id_ThuongHieu}
+                        onChange={(e) => handleInputChange("id_ThuongHieu", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Chọn thương hiệu</option>
+                        {brands.map((brand) => (
+                          <option key={brand.id} value={brand.id}>
+                            {brand.Ten}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nhà cung cấp <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.id_NhaCungCap}
+                        onChange={(e) => handleInputChange("id_NhaCungCap", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Chọn nhà cung cấp</option>
+                        {suppliers.map((supplier) => (
+                          <option key={supplier.id} value={supplier.id}>
+                            {supplier.Ten}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Thông số kỹ thuật */}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông số kỹ thuật</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Chất liệu</label>
                       <input
-                        type="number"
-                        value={formData.GiaKhuyenMai}
-                        onChange={(e) => handleInputChange("GiaKhuyenMai", e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0"
+                        type="text"
+                        value={formData.ThongSoKyThuat.ChatLieu}
+                        onChange={(e) => handleInputChange("ThongSoKyThuat.ChatLieu", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Vải mesh, cao su..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Kiểu giày</label>
+                      <input
+                        type="text"
+                        value={formData.ThongSoKyThuat.KieuGiay}
+                        onChange={(e) => handleInputChange("ThongSoKyThuat.KieuGiay", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Thể thao, chạy bộ..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Xuất xứ</label>
+                      <input
+                        type="text"
+                        value={formData.ThongSoKyThuat.XuatXu}
+                        onChange={(e) => handleInputChange("ThongSoKyThuat.XuatXu", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Chính hãng, Việt Nam..."
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục *</label>
-                    <select
-                      value={formData.id_DanhMuc}
-                      onChange={(e) => handleInputChange("id_DanhMuc", e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
+                {/* Biến thể sản phẩm */}
+                <div className="border-t pt-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Biến thể sản phẩm {editingProduct && "(Hiện có)"}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={addVariant}
+                      className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-600 transition-colors"
                     >
-                      <option value="">Chọn danh mục</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.Ten}
-                        </option>
-                      ))}
-                    </select>
+                      <FiPlus className="w-4 h-4 inline mr-1" />
+                      Thêm biến thể
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Thương hiệu *</label>
-                    <select
-                      value={formData.id_ThuongHieu}
-                      onChange={(e) => handleInputChange("id_ThuongHieu", e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Chọn thương hiệu</option>
-                      {brands.map((brand) => (
-                        <option key={brand.id} value={brand.id}>
-                          {brand.Ten}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp *</label>
-                    <select
-                      value={formData.id_NhaCungCap}
-                      onChange={(e) => handleInputChange("id_NhaCungCap", e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Chọn nhà cung cấp</option>
-                      {suppliers.map((supplier) => (
-                        <option key={supplier.id} value={supplier.id}>
-                          {supplier.Ten}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {variants.map((variant, index) => (
+                      <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-sm font-medium text-gray-700">
+                            Biến thể #{index + 1}
+                            {variant.id && (
+                              <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                                ID: {variant.id}
+                              </span>
+                            )}
+                          </span>
+                          {variants.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeVariant(index)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <FiTrash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Kích cỡ</label>
+                            <select
+                              value={variant.id_KichCo}
+                              onChange={(e) => updateVariant(index, "id_KichCo", e.target.value)}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                            >
+                              <option value="">Chọn size</option>
+                              {sizes.map((size) => (
+                                <option key={size.id} value={size.id}>
+                                  {size.Ten}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Màu sắc</label>
+                            <select
+                              value={variant.id_MauSac}
+                              onChange={(e) => updateVariant(index, "id_MauSac", e.target.value)}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                            >
+                              <option value="">Chọn màu</option>
+                              {colors.map((color) => (
+                                <option key={color.id} value={color.id}>
+                                  {color.Ten}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Mã SP</label>
+                            <input
+                              type="text"
+                              value={variant.MaSanPham}
+                              onChange={(e) => updateVariant(index, "MaSanPham", e.target.value)}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                              placeholder="VD: NIKE-001"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Số lượng</label>
+                            <input
+                              type="number"
+                              value={variant.SoLuong}
+                              onChange={(e) => updateVariant(index, "SoLuong", e.target.value)}
+                              min="0"
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        {/* Hiển thị thông tin hiện có nếu đang edit */}
+                        {editingProduct && variant.id && (
+                          <div className="mt-2 text-xs text-gray-500 bg-blue-50 p-2 rounded">
+                            <span className="font-medium">Hiện có:</span> {variant.TenMauSac} - Size {variant.TenKichCo} - Mã: {variant.MaSanPham} - Tồn kho: {variant.SoLuong}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
 
-              {/* Technical Specifications */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Thông số kỹ thuật</label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Chất liệu</label>
-                    <input
-                      type="text"
-                      value={formData.ThongSoKyThuat.ChatLieu}
-                      onChange={(e) => handleInputChange("ThongSoKyThuat.ChatLieu", e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Da, vải, cao su..."
-                    />
+                {/* Hình ảnh sản phẩm */}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Hình ảnh sản phẩm</h3>
+
+                  {/* Ảnh chính */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ảnh chính <span className="text-red-500">*</span>
+                    </label>
+                    
+                    {/* Hiển thị ảnh chính hiện có */}
+                    {existingImages.anhChinh && (
+                      <div className="mb-3">
+                        <div className="relative inline-block">
+                          <img
+                            src={existingImages.anhChinh}
+                            alt="Ảnh chính hiện có"
+                            className="w-24 h-24 object-cover rounded-lg border-2 border-blue-200"
+                          />
+                          <div className="absolute -top-2 -right-2 space-x-1">
+                            <label className="bg-blue-500 text-white p-1 rounded-full cursor-pointer hover:bg-blue-600 transition-colors">
+                              <FiEdit2 className="w-3 h-3" />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={replaceMainImage}
+                                className="hidden"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setExistingImages(prev => ({...prev, anhChinh: null}))}
+                              className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                            >
+                              <FiTrash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Ảnh chính hiện có</p>
+                      </div>
+                    )}
+
+                    {/* Upload ảnh chính mới */}
+                    {!existingImages.anhChinh && (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+                        {selectedImages.anhChinh ? (
+                          <div className="space-y-3">
+                            <img
+                              src={URL.createObjectURL(selectedImages.anhChinh)}
+                              alt="Preview"
+                              className="w-24 h-24 object-cover rounded-lg mx-auto"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSelectedImages(prev => ({...prev, anhChinh: null}))}
+                              className="text-red-500 hover:text-red-700 text-sm"
+                            >
+                              Xóa ảnh
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="cursor-pointer">
+                            <FiUpload className="mx-auto h-12 w-12 text-gray-400" />
+                            <p className="mt-2 text-sm text-gray-600">Click để chọn ảnh chính</p>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleMainImageChange}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Ảnh phụ */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Kiểu giày</label>
-                    <select
-                      value={formData.ThongSoKyThuat.KieuGiay}
-                      onChange={(e) => handleInputChange("ThongSoKyThuat.KieuGiay", e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Chọn kiểu</option>
-                      <option value="Thể thao">Thể thao</option>
-                      <option value="Công sở">Công sở</option>
-                      <option value="Lifestyle">Lifestyle</option>
-                      <option value="Chạy bộ">Chạy bộ</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Xuất xứ</label>
-                    <input
-                      type="text"
-                      value={formData.ThongSoKyThuat.XuatXu}
-                      onChange={(e) => handleInputChange("ThongSoKyThuat.XuatXu", e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Chính hãng, Replica..."
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ảnh phụ (Tối đa 5 ảnh)</label>
+                    
+                    {/* Hiển thị ảnh phụ hiện có */}
+                    {existingImages.anhPhu.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-500 mb-2">Ảnh phụ hiện có:</p>
+                        <div className="flex flex-wrap gap-3">
+                          {existingImages.anhPhu.map((image, index) => (
+                            <div key={index} className="relative">
+                              <img
+                                src={image}
+                                alt={`Ảnh phụ ${index + 1}`}
+                                className="w-20 h-20 object-cover rounded-lg border"
+                              />
+                              <div className="absolute -top-2 -right-2 space-x-1">
+                                <label className="bg-blue-500 text-white p-1 rounded-full cursor-pointer hover:bg-blue-600 transition-colors">
+                                  <FiEdit2 className="w-3 h-3" />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => replaceAdditionalImage(index, e)}
+                                    className="hidden"
+                                  />
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => removeExistingAdditionalImage(index)}
+                                  className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                                >
+                                  <FiTrash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hiển thị ảnh phụ mới được chọn */}
+                    {selectedImages.anhPhu.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-500 mb-2">Ảnh phụ mới:</p>
+                        <div className="flex flex-wrap gap-3">
+                          {selectedImages.anhPhu.map((file, index) => (
+                            <div key={index} className="relative">
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={`Preview ${index + 1}`}
+                                className="w-20 h-20 object-cover rounded-lg border-2 border-green-200"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeAdditionalImage(index)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                              >
+                                <FiTrash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upload ảnh phụ mới */}
+                    {(existingImages.anhPhu.length + selectedImages.anhPhu.length) < 5 && (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
+                        <label className="cursor-pointer">
+                          <FiUpload className="mx-auto h-8 w-8 text-gray-400" />
+                          <p className="mt-2 text-sm text-gray-600">Click để thêm ảnh phụ</p>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleAdditionalImagesChange}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* Product Variants */}
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <label className="block text-sm font-medium text-gray-700">Biến thể sản phẩm *</label>
+                {/* Buttons */}
+                <div className="flex justify-end space-x-3 pt-6 border-t">
                   <button
                     type="button"
-                    onClick={addVariant}
-                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center space-x-1"
+                    onClick={() => setShowModal(false)}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    <FiPlus className="w-4 h-4" />
-                    <span>Thêm biến thể</span>
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {submitting ? (
+                      <>
+                        <FiRefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Đang lưu...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiSave className="w-4 h-4" />
+                        <span>{editingProduct ? "Cập nhật" : "Thêm mới"}</span>
+                      </>
+                    )}
                   </button>
                 </div>
-
-                <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {variants.map((variant, index) => (
-                    <div
-                      key={index}
-                      className="grid grid-cols-5 gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50"
-                    >
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Màu sắc</label>
-                        <select
-                          value={variant.id_MauSac}
-                          onChange={(e) => updateVariant(index, "id_MauSac", e.target.value)}
-                          className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500"
-                          required
-                        >
-                          <option value="">Chọn màu</option>
-                          {colors.map((color) => (
-                            <option key={color.id} value={color.id}>
-                              {color.Ten}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Kích cỡ</label>
-                        <select
-                          value={variant.id_KichCo}
-                          onChange={(e) => updateVariant(index, "id_KichCo", e.target.value)}
-                          className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500"
-                          required
-                        >
-                          <option value="">Chọn size</option>
-                          {sizes.map((size) => (
-                            <option key={size.id} value={size.id}>
-                              {size.Ten}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Mã SP</label>
-                        <input
-                          type="text"
-                          value={variant.MaSanPham}
-                          onChange={(e) => updateVariant(index, "MaSanPham", e.target.value)}
-                          className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500"
-                          placeholder="Mã sản phẩm"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Số lượng</label>
-                        <input
-                          type="number"
-                          value={variant.SoLuong}
-                          onChange={(e) => updateVariant(index, "SoLuong", Number.parseInt(e.target.value) || 0)}
-                          className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500"
-                          min="0"
-                          placeholder="0"
-                        />
-                      </div>
-
-                      <div className="flex items-end">
-                        {variants.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeVariant(index)}
-                            className="w-full text-red-600 hover:text-red-800 text-xs py-1 flex items-center justify-center"
-                            title="Xóa biến thể"
-                          >
-                            <FiTrash2 className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Images */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ảnh chính *</label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleMainImageChange}
-                      className="hidden"
-                      id="main-image-upload"
-                    />
-                    <label htmlFor="main-image-upload" className="cursor-pointer">
-                      <div className="text-center">
-                        {selectedImages.anhChinh ? (
-                          <div className="space-y-2">
-                            <img
-                              src={URL.createObjectURL(selectedImages.anhChinh) || "/placeholder.svg"}
-                              alt="Preview"
-                              className="w-32 h-32 object-cover mx-auto rounded-lg"
-                            />
-                            <p className="text-sm text-green-600">Đã chọn ảnh chính</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <FiUpload className="mx-auto h-12 w-12 text-gray-400" />
-                            <p className="text-sm text-gray-600">Click để chọn ảnh chính</p>
-                            <p className="text-xs text-gray-500">PNG, JPG, GIF tối đa 10MB</p>
-                          </div>
-                        )}
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ảnh phụ</label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleAdditionalImagesChange}
-                      className="hidden"
-                      id="additional-images-upload"
-                    />
-                    <label htmlFor="additional-images-upload" className="cursor-pointer">
-                      <div className="text-center">
-                        {selectedImages.anhPhu.length > 0 ? (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-3 gap-2">
-                              {selectedImages.anhPhu.slice(0, 3).map((file, index) => (
-                                <div key={index} className="relative">
-                                  <img
-                                    src={URL.createObjectURL(file) || "/placeholder.svg"}
-                                    alt={`Preview ${index + 1}`}
-                                    className="w-16 h-16 object-cover rounded"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeAdditionalImage(index)}
-                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                            <p className="text-sm text-green-600">Đã chọn {selectedImages.anhPhu.length} ảnh phụ</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <FiUpload className="mx-auto h-12 w-12 text-gray-400" />
-                            <p className="text-sm text-gray-600">Click để chọn ảnh phụ</p>
-                            <p className="text-xs text-gray-500">Có thể chọn nhiều ảnh</p>
-                          </div>
-                        )}
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Detailed Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả chi tiết</label>
-                <textarea
-                  value={formData.MoTaChiTiet}
-                  onChange={(e) => handleInputChange("MoTaChiTiet", e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows="4"
-                  placeholder="Mô tả chi tiết về sản phẩm..."
-                />
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex justify-end space-x-4 pt-6 border-t">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false)
-                    resetForm()
-                  }}
-                  className="px-6 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center space-x-2"
-                >
-                  {submitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Đang lưu...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiSave className="w-4 h-4" />
-                      <span>{editingProduct ? "Cập nhật" : "Thêm sản phẩm"}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       )}

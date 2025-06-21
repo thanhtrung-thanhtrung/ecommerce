@@ -19,6 +19,21 @@ const brandValidator = [
     .optional()
     .isIn([0, 1])
     .withMessage("Trạng thái không hợp lệ"),
+
+  body("Website")
+    .optional()
+    .isURL()
+    .withMessage("Website không hợp lệ"),
+
+  body("Logo")
+    .optional()
+    .custom((value, { req }) => {
+      if (req.file && !req.file.mimetype.startsWith("image/")) {
+        throw new Error("Logo phải là một file hình ảnh hợp lệ");
+      }
+      return true;
+    })
+    .withMessage("Logo phải là một chuỗi URL hợp lệ hoặc file hình ảnh"),
 ];
 
 // Validator cho cập nhật trạng thái
@@ -49,8 +64,18 @@ const searchValidator = [
     .withMessage("Trạng thái không hợp lệ"),
 ];
 
+// Validator cho xóa thương hiệu
+const deleteBrandValidator = [
+  param("id")
+    .notEmpty()
+    .withMessage("ID không được để trống")
+    .isInt()
+    .withMessage("ID không hợp lệ"),
+];
+
 module.exports = {
   brandValidator,
   updateStatusValidator,
   searchValidator,
+  deleteBrandValidator,
 };

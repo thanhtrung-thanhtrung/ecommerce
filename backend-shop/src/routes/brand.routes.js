@@ -5,6 +5,20 @@ const {
   updateStatusValidator,
   searchValidator,
 } = require("../validators/brand.validator");
+const multer = require("multer");
+
+// Configure multer for file uploads
+const upload = multer({
+  dest: "uploads/brands/",
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"));
+    }
+  },
+});
 
 const router = express.Router();
 
@@ -18,10 +32,20 @@ router.get("/thong-ke/all", brandController.thongKeThuongHieu);
 router.get("/:id", brandController.layChiTietThuongHieu);
 
 // Tạo thương hiệu mới
-router.post("/", brandValidator, brandController.taoThuongHieu);
+router.post(
+  "/",
+  upload.single("Logo"),
+  brandValidator,
+  brandController.taoThuongHieu
+);
 
 // Cập nhật thương hiệu
-router.put("/:id", brandValidator, brandController.capNhatThuongHieu);
+router.put(
+  "/:id",
+  upload.single("Logo"),
+  brandValidator,
+  brandController.capNhatThuongHieu
+);
 
 // Xóa thương hiệu
 router.delete("/:id", brandController.xoaThuongHieu);
