@@ -11,7 +11,12 @@ import Categories from "./pages/Categories";
 import Brands from "./pages/Brands";
 import Vouchers from "./pages/Vouchers";
 import Analytics from "./pages/Analytics";
-import Suppliers from "./pages/Suppliers";
+import Suppliers from "./pages/suppliers";
+import Payments from "./pages/Payments";
+import Shippings from "./pages/Shippings";
+import Wishlists from "./pages/Wishlists";
+import Inventorys from "./pages/Inventorys";
+
 import "./App.css";
 
 // Placeholder components for routes not yet implemented
@@ -30,13 +35,14 @@ const Settings = () => (
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <Header />
 
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/products" element={<Products />} />
@@ -46,6 +52,10 @@ function App() {
             <Route path="/vouchers" element={<Vouchers />} />
             <Route path="/suppliers" element={<Suppliers />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/shippings" element={<Shippings />} />
+            <Route path="/wishlists" element={<Wishlists />} />
+            <Route path="/inventorys" element={<Inventorys />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
