@@ -542,9 +542,11 @@ export const AdminProvider = ({ children }) => {
 
   const getRevenueStats = async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const url = queryString ? `/api/revenue?${queryString}` : "/api/revenue";
+    const url = queryString ? `/api/revenue/stats?${queryString}` : "/api/revenue/stats";
     return await apiCall(url);
+    console.log("Revenue stats:", revenueResponse);
   };
+
 
   // Orders API (assuming similar structure)
   const getOrders = async (params = {}) => {
@@ -663,6 +665,44 @@ export const AdminProvider = ({ children }) => {
     });
   };
 
+  // Payments API
+  const getPaymentMethods = async () => {
+    return await apiCall("/api/payments/methods");
+  };
+
+  const getPaymentMethodsAdmin = async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `/api/payments/admin?${queryString}` : "/api/payments/admin";
+    return await apiCall(url);
+  };
+
+  const createPaymentMethod = async (paymentData) => {
+    return await apiCall("/api/payments/admin", {
+      method: "POST",
+      body: JSON.stringify(paymentData),
+    });
+  };
+
+  const updatePaymentMethod = async (methodId, paymentData) => {
+    return await apiCall(`/api/payments/admin/${methodId}`, {
+      method: "PUT",
+      body: JSON.stringify(paymentData),
+    });
+  };
+
+  const updatePaymentStatus = async (methodId, status) => {
+    return await apiCall(`/api/payments/admin/${methodId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ TrangThai: status }),
+    });
+  };
+
+  const deletePaymentMethod = async (methodId) => {
+    return await apiCall(`/api/payments/admin/${methodId}`, {
+      method: "DELETE",
+    });
+  };
+
   const value = {
     loading,
     sidebarOpen,
@@ -740,11 +780,18 @@ export const AdminProvider = ({ children }) => {
 
     // Shipping Methods
     getShippingMethods,
-
     createShippingMethod,
     updateShippingMethod,
     updateShippingStatus,
     deleteShippingMethod,
+
+    // Payments
+    getPaymentMethods,
+    getPaymentMethodsAdmin,
+    createPaymentMethod,
+    updatePaymentMethod,
+    updatePaymentStatus,
+    deletePaymentMethod,
   };
 
   return (

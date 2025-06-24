@@ -3,6 +3,7 @@
 
 const db = require("../config/database");
 const InventoryService = require("./inventory.service");
+const emailService = require("./email.service");
 
 class OrderService {
   async createOrder(userId, orderData, sessionId = null) {
@@ -175,6 +176,28 @@ class OrderService {
 
       await connection.commit();
       connection.release();
+
+      // 🎯 GỬI EMAIL XÁC NHẬN ĐẶT HÀNG THÀNH CÔNG
+      try {
+        // Lấy thông tin đơn hàng để gửi email
+        const orderForEmail = await this.getOrderDetail(orderId);
+
+        console.log(
+          `📧 Gửi email xác nhận đặt hàng #${orderId} đến ${orderForEmail.EmailNguoiNhan}`
+        );
+
+        await emailService.sendOrderConfirmation(orderForEmail);
+
+        console.log(
+          `✅ Đã gửi email xác nhận thành công cho đơn hàng #${orderId}`
+        );
+      } catch (emailError) {
+        // Log lỗi email nhưng không ảnh hưởng đến việc tạo đơn hàng
+        console.error(
+          `❌ Lỗi gửi email xác nhận cho đơn hàng #${orderId}:`,
+          emailError.message
+        );
+      }
 
       // 10. Trả lại chi tiết đơn hàng
       return { id: orderId, TongThanhToan, message: "Đặt hàng thành công" };
@@ -658,9 +681,17 @@ class OrderService {
         throw new Error("Trạng thái không hợp lệ");
       }
 
-      // Check if order exists
+      // Check if order exists and get full order details for email
       const [orders] = await connection.execute(
-        "SELECT * FROM donhang WHERE id = ?",
+        `SELECT dh.*, 
+                httt.Ten as tenHinhThucThanhToan, 
+                htvc.Ten as tenHinhThucVanChuyen,
+                IFNULL(mgg.Ma, '') as maGiamGiaText
+         FROM donhang dh
+         LEFT JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
+         LEFT JOIN hinhthucvanchuyen htvc ON dh.id_VanChuyen = htvc.id
+         LEFT JOIN magiamgia mgg ON dh.MaGiamGia = mgg.Ma
+         WHERE dh.id = ?`,
         [orderId]
       );
 
@@ -669,6 +700,26 @@ class OrderService {
       }
 
       const order = orders[0];
+      const oldStatus = order.TrangThai;
+
+      // Get order details for email
+      const [orderDetails] = await connection.execute(
+        `SELECT ctdh.*, ctsp.id_SanPham, sp.Ten as tenSanPham, sp.HinhAnh,
+                kc.Ten as tenKichCo, ms.Ten as tenMauSac
+         FROM chitietdonhang ctdh
+         JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
+         JOIN sanpham sp ON ctsp.id_SanPham = sp.id
+         JOIN kichco kc ON ctsp.id_KichCo = kc.id
+         JOIN mausac ms ON ctsp.id_MauSac = ms.id
+         WHERE ctdh.id_DonHang = ?`,
+        [orderId]
+      );
+
+      // Prepare order data for email
+      const orderDataForEmail = {
+        ...order,
+        chiTiet: orderDetails,
+      };
 
       // Update order status
       await connection.execute(
@@ -684,7 +735,7 @@ class OrderService {
       );
 
       // If cancelling order, restore inventory
-      if (status === "cancelled" && order.TrangThai !== 6) {
+      if (status === "cancelled" && oldStatus !== 6) {
         const [orderItems] = await connection.execute(
           "SELECT * FROM chitietdonhang WHERE id_DonHang = ?",
           [orderId]
@@ -708,6 +759,46 @@ class OrderService {
 
       await connection.commit();
       connection.release();
+
+      // 🎯 GỬI EMAIL TỰ ĐỘNG KHI CẬP NHẬT TRẠNG THÁI
+      // Chỉ gửi email nếu trạng thái thực sự thay đổi và có email khách hàng
+      if (oldStatus !== dbStatus && order.EmailNguoiNhan) {
+        try {
+          console.log(
+            `📧 Đang gửi email thông báo trạng thái đơn hàng #${orderId} từ ${oldStatus} -> ${dbStatus} đến ${order.EmailNguoiNhan}`
+          );
+
+          await emailService.sendOrderStatusUpdate(
+            orderDataForEmail,
+            status,
+            note
+          );
+
+          console.log(`✅ Đã gửi email thành công cho đơn hàng #${orderId}`);
+        } catch (emailError) {
+          // Log lỗi email nhưng không throw để không ảnh hưởng đến việc cập nhật đơn hàng
+          console.error(
+            `❌ Lỗi gửi email cho đơn hàng #${orderId}:`,
+            emailError.message
+          );
+
+          // Có thể lưu log vào database để theo dõi
+          try {
+            await db.execute(
+              `INSERT INTO email_logs (order_id, email_type, recipient, status, error_message, created_at) 
+               VALUES (?, ?, ?, 'failed', ?, NOW())`,
+              [
+                orderId,
+                "order_status_update",
+                order.EmailNguoiNhan,
+                emailError.message,
+              ]
+            );
+          } catch (logError) {
+            console.error("Lỗi ghi log email:", logError.message);
+          }
+        }
+      }
 
       // Return updated order detail
       return await this.getOrderDetailAdmin(orderId);

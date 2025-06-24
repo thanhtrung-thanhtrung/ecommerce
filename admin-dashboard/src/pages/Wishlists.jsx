@@ -32,6 +32,7 @@ const WishlistsStatistics = () => {
     return <div className="p-6 text-red-500">Không thể tải dữ liệu thống kê.</div>;
   }
 
+  const { thongKeTongQuan, topSanPhamYeuThich } = stats;
 
   return (
     <div className="p-6 space-y-6">

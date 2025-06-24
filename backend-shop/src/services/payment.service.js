@@ -97,6 +97,7 @@ class PaymentService {
 
     if (filters.tuKhoa) {
       query += " AND (Ten LIKE ? OR MoTa LIKE ?)";
+
       const searchTerm = `%${filters.tuKhoa}%`;
       params.push(searchTerm, searchTerm);
     }
