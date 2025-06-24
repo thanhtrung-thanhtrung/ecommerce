@@ -16,11 +16,11 @@ import Payments from "./pages/Payments";
 import Shippings from "./pages/Shippings";
 import Wishlists from "./pages/Wishlists";
 import Inventorys from "./pages/Inventorys";
+import ImportReceipts from "./pages/ImportReceipts";
 
 import "./App.css";
 
 // Placeholder components for routes not yet implemented
-
 
 const Settings = () => (
   <div className="p-6">
@@ -39,7 +39,7 @@ function App() {
       <Sidebar />
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-48">
         <Header />
 
         <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
@@ -56,6 +56,7 @@ function App() {
             <Route path="/shippings" element={<Shippings />} />
             <Route path="/wishlists" element={<Wishlists />} />
             <Route path="/inventorys" element={<Inventorys />} />
+            <Route path="/import-receipts" element={<ImportReceipts />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>

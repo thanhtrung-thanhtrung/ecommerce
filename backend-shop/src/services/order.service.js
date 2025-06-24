@@ -421,6 +421,366 @@ class OrderService {
       },
     };
   }
+
+  // ===== ADMIN METHODS =====
+
+  // Get all orders for admin with filtering and pagination
+  async getOrdersAdmin(params = {}) {
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      date,
+      search,
+      startDate,
+      endDate,
+    } = params;
+
+    const offset = (page - 1) * limit;
+    let whereClause = "WHERE 1=1";
+    let queryParams = [];
+
+    // Status filter
+    if (status) {
+      const statusMap = {
+        pending: 1,
+        confirmed: 2,
+        processing: 3,
+        shipping: 4,
+        delivered: 5,
+        cancelled: 6,
+      };
+      if (statusMap[status]) {
+        whereClause += " AND dh.TrangThai = ?";
+        queryParams.push(statusMap[status]);
+      }
+    }
+
+    // Date filter
+    if (date) {
+      whereClause += " AND DATE(dh.NgayDatHang) = ?";
+      queryParams.push(date);
+    }
+
+    // Date range filter
+    if (startDate && endDate) {
+      whereClause += " AND DATE(dh.NgayDatHang) BETWEEN ? AND ?";
+      queryParams.push(startDate, endDate);
+    }
+
+    // Search filter (by order ID, customer name, email, phone)
+    if (search) {
+      whereClause += ` AND (
+        dh.id LIKE ? OR 
+        dh.TenNguoiNhan LIKE ? OR 
+        dh.EmailNguoiNhan LIKE ? OR 
+        dh.SDTNguoiNhan LIKE ?
+      )`;
+      const searchTerm = `%${search}%`;
+      queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    // Get orders with pagination
+    const ordersQuery = `
+      SELECT 
+        dh.*,
+        httt.Ten as paymentMethod,
+        htvc.Ten as shippingMethod,
+        CASE dh.TrangThai
+          WHEN 1 THEN 'pending'
+          WHEN 2 THEN 'confirmed' 
+          WHEN 3 THEN 'processing'
+          WHEN 4 THEN 'shipping'
+          WHEN 5 THEN 'delivered'
+          WHEN 6 THEN 'cancelled'
+          ELSE 'pending'
+        END as status
+      FROM donhang dh
+      LEFT JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
+      LEFT JOIN hinhthucvanchuyen htvc ON dh.id_VanChuyen = htvc.id
+      ${whereClause}
+      ORDER BY dh.NgayDatHang DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [orders] = await db.execute(ordersQuery, [
+      ...queryParams,
+      limit,
+      offset,
+    ]);
+
+    // Transform orders for frontend
+    const transformedOrders = orders.map((order) => ({
+      id: order.id,
+      customerName: order.TenNguoiNhan,
+      customerEmail: order.EmailNguoiNhan,
+      customerPhone: order.SDTNguoiNhan,
+      total: order.TongThanhToan,
+      status: order.status,
+      createdAt: order.NgayDatHang,
+      paymentMethod: order.paymentMethod,
+      shippingMethod: order.shippingMethod,
+      shippingAddress: order.DiaChiNhan,
+      note: order.GhiChu,
+      discount: order.GiamGia,
+      shippingFee: order.PhiVanChuyen,
+      subtotal: order.TongTienHang,
+    }));
+
+    // Get total count for pagination
+    const countQuery = `SELECT COUNT(*) as total FROM donhang dh ${whereClause}`;
+    const [countResult] = await db.execute(countQuery, queryParams);
+    const total = countResult[0].total;
+
+    return {
+      orders: transformedOrders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // Get order detail for admin
+  async getOrderDetailAdmin(orderId) {
+    const [orders] = await db.execute(
+      `SELECT 
+        dh.*,
+        httt.Ten as paymentMethod,
+        htvc.Ten as shippingMethod,
+        CASE dh.TrangThai
+          WHEN 1 THEN 'pending'
+          WHEN 2 THEN 'confirmed' 
+          WHEN 3 THEN 'processing'
+          WHEN 4 THEN 'shipping'
+          WHEN 5 THEN 'delivered'
+          WHEN 6 THEN 'cancelled'
+          ELSE 'pending'
+        END as status
+       FROM donhang dh
+       LEFT JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
+       LEFT JOIN hinhthucvanchuyen htvc ON dh.id_VanChuyen = htvc.id
+       WHERE dh.id = ?`,
+      [orderId]
+    );
+
+    if (orders.length === 0) {
+      throw new Error("Đơn hàng không tồn tại");
+    }
+
+    const order = orders[0];
+
+    // Get order items
+    const [orderItems] = await db.execute(
+      `SELECT 
+        ctdh.*,
+        sp.Ten as name,
+        sp.HinhAnh,
+        kc.Ten as size,
+        ms.Ten as color,
+        CONCAT(kc.Ten, ' / ', ms.Ten) as variant
+       FROM chitietdonhang ctdh
+       JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
+       JOIN sanpham sp ON ctsp.id_SanPham = sp.id
+       JOIN kichco kc ON ctsp.id_KichCo = kc.id
+       JOIN mausac ms ON ctsp.id_MauSac = ms.id
+       WHERE ctdh.id_DonHang = ?`,
+      [orderId]
+    );
+
+    // Parse product images
+    const items = orderItems.map((item) => {
+      let image = null;
+      try {
+        if (item.HinhAnh) {
+          const imageData = JSON.parse(item.HinhAnh);
+          image = imageData.anhChinh || null;
+        }
+      } catch (error) {
+        console.error("Error parsing product image:", error);
+      }
+
+      return {
+        id: item.id,
+        name: item.name,
+        image: image,
+        variant: item.variant,
+        size: item.size,
+        color: item.color,
+        quantity: item.SoLuong,
+        price: item.GiaBan,
+        total: item.ThanhTien,
+      };
+    });
+
+    // Transform order for frontend
+    return {
+      id: order.id,
+      customerName: order.TenNguoiNhan,
+      customerEmail: order.EmailNguoiNhan,
+      customerPhone: order.SDTNguoiNhan,
+      shippingAddress: order.DiaChiNhan,
+      paymentMethod: order.paymentMethod,
+      shippingMethod: order.shippingMethod,
+      status: order.status,
+      createdAt: order.NgayDatHang,
+      subtotal: order.TongTienHang,
+      discount: order.GiamGia,
+      shippingFee: order.PhiVanChuyen,
+      total: order.TongThanhToan,
+      note: order.GhiChu,
+      voucherCode: order.MaGiamGia,
+      items: items,
+    };
+  }
+
+  // Update order status by admin
+  async updateOrderStatusAdmin(orderId, status, note = null) {
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Map frontend status to database status
+      const statusMap = {
+        pending: 1,
+        confirmed: 2,
+        processing: 3,
+        shipping: 4,
+        delivered: 5,
+        cancelled: 6,
+      };
+
+      const dbStatus = statusMap[status];
+      if (!dbStatus) {
+        throw new Error("Trạng thái không hợp lệ");
+      }
+
+      // Check if order exists
+      const [orders] = await connection.execute(
+        "SELECT * FROM donhang WHERE id = ?",
+        [orderId]
+      );
+
+      if (orders.length === 0) {
+        throw new Error("Đơn hàng không tồn tại");
+      }
+
+      const order = orders[0];
+
+      // Update order status
+      await connection.execute(
+        `UPDATE donhang 
+         SET TrangThai = ?, 
+             GhiChu = CASE 
+               WHEN ? IS NOT NULL THEN CONCAT(IFNULL(GhiChu, ''), '\n[Admin] ', ?)
+               ELSE GhiChu 
+             END,
+             NgayCapNhat = NOW()
+         WHERE id = ?`,
+        [dbStatus, note, note, orderId]
+      );
+
+      // If cancelling order, restore inventory
+      if (status === "cancelled" && order.TrangThai !== 6) {
+        const [orderItems] = await connection.execute(
+          "SELECT * FROM chitietdonhang WHERE id_DonHang = ?",
+          [orderId]
+        );
+
+        for (const item of orderItems) {
+          await connection.execute(
+            "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
+            [item.SoLuong, item.id_ChiTietSanPham]
+          );
+        }
+
+        // Restore voucher usage if applicable
+        if (order.MaGiamGia) {
+          await connection.execute(
+            "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
+            [order.MaGiamGia]
+          );
+        }
+      }
+
+      await connection.commit();
+      connection.release();
+
+      // Return updated order detail
+      return await this.getOrderDetailAdmin(orderId);
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
+  }
+
+  // Get order statistics for admin dashboard
+  async getOrderStats(period = "week") {
+    try {
+      // Get total orders count
+      const [totalOrders] = await db.execute(
+        "SELECT COUNT(*) as total FROM donhang"
+      );
+
+      // Get orders by status
+      const [statusStats] = await db.execute(`
+        SELECT 
+          TrangThai,
+          COUNT(*) as count,
+          CASE TrangThai
+            WHEN 1 THEN 'pending'
+            WHEN 2 THEN 'confirmed' 
+            WHEN 3 THEN 'processing'
+            WHEN 4 THEN 'shipping'
+            WHEN 5 THEN 'delivered'
+            WHEN 6 THEN 'cancelled'
+            ELSE 'unknown'
+          END as status
+        FROM donhang 
+        GROUP BY TrangThai
+      `);
+
+      // Get revenue stats
+      const [revenueStats] = await db.execute(`
+        SELECT 
+          SUM(TongThanhToan) as totalRevenue,
+          AVG(TongThanhToan) as averageOrderValue,
+          COUNT(*) as totalOrders
+        FROM donhang 
+        WHERE TrangThai = 5
+      `);
+
+      // Get recent orders trend (last 7 days)
+      const [trendStats] = await db.execute(`
+        SELECT 
+          DATE(NgayDatHang) as date,
+          COUNT(*) as orders,
+          SUM(TongThanhToan) as revenue
+        FROM donhang 
+        WHERE NgayDatHang >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY DATE(NgayDatHang)
+        ORDER BY date ASC
+      `);
+
+      return {
+        totalOrders: totalOrders[0].total,
+        statusBreakdown: statusStats,
+        revenue: {
+          total: revenueStats[0].totalRevenue || 0,
+          average: revenueStats[0].averageOrderValue || 0,
+          completedOrders: revenueStats[0].totalOrders || 0,
+        },
+        trend: trendStats,
+      };
+    } catch (error) {
+      console.error("Error getting order stats:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new OrderService();

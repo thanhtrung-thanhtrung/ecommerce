@@ -140,6 +140,87 @@ class OrderController {
       res.status(400).json({ message: error.message });
     }
   }
+
+  // ===== ADMIN METHODS =====
+  // Get all orders for admin with filtering and pagination
+  async getOrdersAdmin(req, res) {
+    try {
+      const {
+        page = 1,
+        limit = 20,
+        status,
+        date,
+        search,
+        startDate,
+        endDate,
+      } = req.query;
+
+      const orders = await orderService.getOrdersAdmin({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        status,
+        date,
+        search,
+        startDate,
+        endDate,
+      });
+
+      res.json(orders);
+    } catch (error) {
+      console.error("Error getting admin orders:", error);
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  // Get order detail for admin
+  async getOrderDetailAdmin(req, res) {
+    try {
+      const { orderId } = req.params;
+      const order = await orderService.getOrderDetailAdmin(orderId);
+      res.json(order);
+    } catch (error) {
+      console.error("Error getting admin order detail:", error);
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  // Update order status by admin
+  async updateOrderStatusAdmin(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { orderId } = req.params;
+      const { status, note } = req.body;
+
+      const order = await orderService.updateOrderStatusAdmin(
+        orderId,
+        status,
+        note
+      );
+      res.json({
+        message: "Cập nhật trạng thái đơn hàng thành công",
+        order,
+      });
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  // Get order statistics for admin dashboard
+  async getOrderStats(req, res) {
+    try {
+      const { period = "week" } = req.query;
+      const stats = await orderService.getOrderStats(period);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting order stats:", error);
+      res.status(400).json({ message: error.message });
+    }
+  }
 }
 
 module.exports = new OrderController();

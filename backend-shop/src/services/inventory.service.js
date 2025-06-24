@@ -100,7 +100,7 @@ class InventoryService {
         whereClause += " AND cts.TonKho <= 10 AND cts.TonKho > 0";
       } else if (!tatCa) {
         // Mặc định: chỉ lấy sản phẩm còn hàng (> 0)
-        whereClause += " AND cts.TonKho > 0";
+        whereClause += " AND cts.TonKho >= 0";
       }
       // Nếu tatCa = true thì không thêm filter nào về tồn kho
 

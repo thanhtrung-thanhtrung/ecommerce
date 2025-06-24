@@ -1,10 +1,66 @@
 const db = require("../config/database");
 
 class ShippingService {
-  async getShippingMethods() {
+  // Lấy danh sách phương thức vận chuyển với phân trang và tìm kiếm
+  async   getShippingMethods(page = 1, limit = 10, search = "", status = null) {
+    try {
+      const offset = (page - 1) * limit;
+      let query = "SELECT * FROM hinhthucvanchuyen WHERE 1=1";
+      let countQuery =
+        "SELECT COUNT(*) as total FROM hinhthucvanchuyen WHERE 1=1";
+      const params = [];
+      const countParams = [];
+
+      // Thêm điều kiện tìm kiếm
+      if (search) {
+        query += " AND (Ten LIKE ? OR MoTa LIKE ?)";
+        countQuery += " AND (Ten LIKE ? OR MoTa LIKE ?)";
+        const searchParam = `%${search}%`;
+        params.push(searchParam, searchParam);
+        countParams.push(searchParam, searchParam);
+      }
+
+      // Thêm điều kiện trạng thái
+      if (status !== null) {
+        query += " AND TrangThai = ?";
+        countQuery += " AND TrangThai = ?";
+        params.push(status);
+        countParams.push(status);
+      }
+
+      // Thêm sắp xếp và phân trang
+      query += " ORDER BY id DESC LIMIT ? OFFSET ?";
+      params.push(limit, offset);
+
+      const [shippingMethods] = await db.execute(query, params);
+      const [countResult] = await db.execute(countQuery, countParams);
+
+      const total = countResult[0].total;
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        data: shippingMethods,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems: total,
+          itemsPerPage: limit,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      };
+    } catch (error) {
+      throw new Error(
+        "Có lỗi khi lấy danh sách phương thức vận chuyển: " + error.message
+      );
+    }
+  }
+
+  // Lấy tất cả phương thức vận chuyển đang hoạt động (cho dropdown)
+  async getAllActiveShippingMethods() {
     try {
       const [shippingMethods] = await db.execute(
-        "SELECT * FROM hinhthucvanchuyen WHERE TrangThai = 1"
+        "SELECT * FROM hinhthucvanchuyen WHERE TrangThai = 1 ORDER BY id DESC"
       );
       return shippingMethods;
     } catch (error) {
@@ -17,7 +73,7 @@ class ShippingService {
   async getShippingMethodById(id) {
     try {
       const [shippingMethod] = await db.execute(
-        "SELECT * FROM hinhthucvanchuyen WHERE id = ? AND TrangThai = 1",
+        "SELECT * FROM hinhthucvanchuyen WHERE id = ?",
         [id]
       );
 
@@ -29,6 +85,134 @@ class ShippingService {
     } catch (error) {
       throw new Error(
         "Có lỗi khi lấy phương thức vận chuyển: " + error.message
+      );
+    }
+  }
+
+  // Tạo mới phương thức vận chuyển
+  async createShippingMethod(shippingData) {
+    try {
+      const {
+        Ten,
+        MoTa,
+        PhiVanChuyen,
+        ThoiGianDuKien,
+        TrangThai = 1,
+      } = shippingData;
+
+      // Kiểm tra tên đã tồn tại
+      const [existing] = await db.execute(
+        "SELECT id FROM hinhthucvanchuyen WHERE Ten = ? AND TrangThai = 1",
+        [Ten]
+      );
+
+      if (existing.length > 0) {
+        throw new Error("Tên phương thức vận chuyển đã tồn tại");
+      }
+
+      const [result] = await db.execute(
+        `INSERT INTO hinhthucvanchuyen (Ten, MoTa, PhiVanChuyen, ThoiGianDuKien, TrangThai) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [Ten, MoTa || null, PhiVanChuyen, ThoiGianDuKien || null, TrangThai]
+      );
+
+      const newShippingMethod = await this.getShippingMethodById(
+        result.insertId
+      );
+      return newShippingMethod;
+    } catch (error) {
+      throw new Error(
+        "Có lỗi khi tạo phương thức vận chuyển: " + error.message
+      );
+    }
+  }
+
+  // Cập nhật phương thức vận chuyển
+  async updateShippingMethod(id, updateData) {
+    try {
+      // Kiểm tra phương thức vận chuyển có tồn tại
+      await this.getShippingMethodById(id);
+
+      // Kiểm tra tên trùng lặp (nếu có cập nhật tên)
+      if (updateData.Ten) {
+        const [existing] = await db.execute(
+          "SELECT id FROM hinhthucvanchuyen WHERE Ten = ? AND id != ? AND TrangThai = 1",
+          [updateData.Ten, id]
+        );
+
+        if (existing.length > 0) {
+          throw new Error("Tên phương thức vận chuyển đã tồn tại");
+        }
+      }
+
+      // Tạo câu query update động
+      const updateFields = [];
+      const values = [];
+
+      Object.keys(updateData).forEach((key) => {
+        if (updateData[key] !== undefined) {
+          updateFields.push(`${key} = ?`);
+          values.push(updateData[key]);
+        }
+      });
+
+      if (updateFields.length === 0) {
+        throw new Error("Không có dữ liệu để cập nhật");
+      }
+
+      values.push(id);
+
+      await db.execute(
+        `UPDATE hinhthucvanchuyen SET ${updateFields.join(", ")} WHERE id = ?`,
+        values
+      );
+
+      const updatedShippingMethod = await this.getShippingMethodById(id);
+      return updatedShippingMethod;
+    } catch (error) {
+      throw new Error(
+        "Có lỗi khi cập nhật phương thức vận chuyển: " + error.message
+      );
+    }
+  }
+
+  // Xóa cứng phương thức vận chuyển (hard delete)
+  async hardDeleteShippingMethod(id) {
+    try {
+      // Kiểm tra phương thức vận chuyển có tồn tại (bao gồm cả đã bị xóa mềm)
+      const [shippingMethod] = await db.execute(
+        "SELECT * FROM hinhthucvanchuyen WHERE id = ?",
+        [id]
+      );
+
+      if (shippingMethod.length === 0) {
+        throw new Error("Phương thức vận chuyển không tồn tại");
+      }
+
+      const method = shippingMethod[0];
+
+      // Kiểm tra có đơn hàng nào sử dụng không (bao gồm cả đơn hàng đã hoàn thành)
+      const [orders] = await db.execute(
+        "SELECT COUNT(*) as count FROM donhang WHERE id_VanChuyen = ?",
+        [id]
+      );
+
+      if (orders[0].count > 0) {
+        throw new Error(
+          "Không thể xóa vĩnh viễn phương thức vận chuyển đã được sử dụng trong đơn hàng. Chỉ có thể vô hiệu hóa."
+        );
+      }
+
+      // Xóa vĩnh viễn khỏi database
+      await db.execute("DELETE FROM hinhthucvanchuyen WHERE id = ?", [id]);
+
+      return {
+        message: "Xóa vĩnh viễn phương thức vận chuyển thành công",
+        deletedMethod: method,
+      };
+    } catch (error) {
+      throw new Error(
+        "Có lỗi khi xóa vĩnh viễn phương thức vận chuyển: " + error.message
       );
     }
   }

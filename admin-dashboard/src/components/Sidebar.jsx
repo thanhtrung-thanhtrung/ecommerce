@@ -32,7 +32,8 @@ const Sidebar = () => {
     { id: "categories", label: "Danh mục", icon: FiLayers, path: "/categories" },
     { id: "brands", label: "Thương hiệu", icon: FiAward, path: "/brands" },
     { id: "suppliers", label: "Nhà cung cấp", icon: FiTruck, path: "/suppliers" },
-    { id: "inventorys", label: "Kho hàng", icon: FiArchive, path: "/inventorys" },
+    { id: "inventorys", label: "Tồn kho", icon: FiArchive, path: "/inventorys" },
+    { id: "import-receipts", label: "Phiếu nhập kho", icon: FiPackage, path: "/import-receipts" },
     { id: "vouchers", label: "Giảm giá", icon: FiPercent, path: "/vouchers" },
     { id: "payments", label: "Thanh toán", icon: FiCreditCard, path: "/payments" },
     { id: "shippings", label: "Vận chuyển", icon: FiTruck, path: "/shippings" },
@@ -60,7 +61,7 @@ const Sidebar = () => {
       {/* Sidebar - clean design */}
       <aside
         className={`
-          fixed top-0 left-0 z-50 h-full w-64 bg-slate-800 text-white
+          fixed top-0 left-0 z-50 h-full w-48 bg-slate-800 text-white
           transform transition-transform duration-200
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0 border-r border-slate-700 flex flex-col

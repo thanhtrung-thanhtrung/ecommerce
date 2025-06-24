@@ -1,4 +1,4 @@
-const { body } = require("express-validator");
+const { body, param } = require("express-validator");
 
 const createOrderValidator = [
   // Các trường bắt buộc cho guest order
@@ -55,8 +55,29 @@ const guestOrderTrackingValidator = [
   body("email").isEmail().withMessage("Email không hợp lệ").normalizeEmail(),
 ];
 
+// Admin validators
+const updateOrderStatusValidator = [
+  param("orderId").isInt({ min: 1 }).withMessage("ID đơn hàng không hợp lệ"),
+  body("status")
+    .isIn([
+      "pending",
+      "confirmed",
+      "processing",
+      "shipping",
+      "delivered",
+      "cancelled",
+    ])
+    .withMessage("Trạng thái đơn hàng không hợp lệ"),
+  body("note")
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage("Ghi chú không được vượt quá 500 ký tự"),
+];
+
 module.exports = {
   createOrderValidator,
   cancelOrderValidator,
   guestOrderTrackingValidator,
+  updateOrderStatusValidator,
 };

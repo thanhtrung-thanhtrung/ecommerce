@@ -502,6 +502,12 @@ export const AdminProvider = ({ children }) => {
 
   // Suppliers API
   const getSuppliers = async () => {
+    // Lấy danh sách nhà cung cấp hoạt động cho dropdown
+    return await apiCall("/api/suppliers/hoat-dong");
+  };
+
+  const getSuppliersAll = async () => {
+    // Lấy tất cả nhà cung cấp cho trang quản lý
     return await apiCall("/api/suppliers");
   };
 
@@ -543,24 +549,30 @@ export const AdminProvider = ({ children }) => {
   // Orders API (assuming similar structure)
   const getOrders = async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
-    const url = queryString ? `/api/orders?${queryString}` : "/api/orders";
+    const url = queryString ? `/api/orders/admin?${queryString}` : "/api/orders/admin";
     return await apiCall(url);
   };
 
   const updateOrderStatus = async (orderId, status) => {
-    return await apiCall(`/api/orders/${orderId}/status`, {
+    return await apiCall(`/api/orders/admin/${orderId}/status`, {
       method: "PATCH",
-      body: JSON.stringify({ TrangThai: status }),
+      body: JSON.stringify({ status }),
     });
   };
 
   const getOrderDetail = async (orderId) => {
-    return await apiCall(`/api/orders/${orderId}`);
+    return await apiCall(`/api/orders/admin/${orderId}`);
+  };
+
+  const getOrderStats = async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `/api/orders/admin/stats/overview?${queryString}` : "/api/orders/admin/stats/overview";
+    return await apiCall(url);
   };
 
   // Wishlists API
   const getWishlists = async () => {
-    return await apiCall("/api/wishlists");
+    return await apiCall("/api/wishlists/statistics");
   };
 
   // Inventory API
@@ -600,6 +612,10 @@ export const AdminProvider = ({ children }) => {
     return await apiCall(url);
   };
 
+  const getImportReceiptDetail = async (receiptId) => {
+    return await apiCall(`/api/inventory/admin/phieu-nhap/${receiptId}`);
+  };
+
   const updateInventory = async (productId, variantId, quantity) => {
     return await apiCall(`/api/inventory/update`, {
       method: "POST",
@@ -615,6 +631,36 @@ export const AdminProvider = ({ children }) => {
     const queryString = new URLSearchParams(params).toString();
     const url = queryString ? `/api/inventory/history?${queryString}` : "/api/inventory/history";
     return await apiCall(url);
+  };
+  const getShippingMethods = async (params = {}) => {
+    return await apiCall("/api/shipping")
+  }
+  const getShippingMethodById = async (methodId) => {
+    return await apiCall(`/api/shipping/${methodId}`);
+  }
+  const createShippingMethod = async (methodData) => {
+    return await apiCall("/api/shipping", {
+      method: "POST",
+      body: JSON.stringify(methodData),
+    });
+  }
+  const updateShippingMethod = async (methodId, methodData) => {
+    return await apiCall(`/api/shipping/${methodId}`, {
+      method: "PUT",
+      body: JSON.stringify(methodData),
+    });
+  }
+  const updateShippingStatus = async (methodId, status) => {
+    return await apiCall(`/api/shipping/${methodId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ TrangThai: status }),
+    });
+
+  }
+  const deleteShippingMethod = async (methodId) => {
+    return await apiCall(`/api/shipping/${methodId}`, {
+      method: "DELETE",
+    });
   };
 
   const value = {
@@ -663,6 +709,7 @@ export const AdminProvider = ({ children }) => {
 
     // Suppliers
     getSuppliers,
+    getSuppliersAll,
     createSupplier,
     updateSupplier,
     deleteSupplier,
@@ -675,6 +722,7 @@ export const AdminProvider = ({ children }) => {
     getOrders,
     updateOrderStatus,
     getOrderDetail,
+    getOrderStats,
 
     // Wishlists
     getWishlists,
@@ -686,8 +734,17 @@ export const AdminProvider = ({ children }) => {
     createImportReceipt,
     updateImportReceipt,
     getImportReceipts,
+    getImportReceiptDetail,
     updateInventory,
     getInventoryHistory,
+
+    // Shipping Methods
+    getShippingMethods,
+
+    createShippingMethod,
+    updateShippingMethod,
+    updateShippingStatus,
+    deleteShippingMethod,
   };
 
   return (

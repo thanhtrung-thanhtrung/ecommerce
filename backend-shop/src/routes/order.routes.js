@@ -4,9 +4,28 @@ const orderController = require("../controllers/order.controller");
 const {
   createOrderValidator,
   cancelOrderValidator,
+  updateOrderStatusValidator,
 } = require("../validators/order.validator");
 const { verifyToken, optionalAuth } = require("../middlewares/auth.middleware");
 
+// ===== ADMIN ROUTES =====
+// Admin route to get all orders with filtering and pagination
+router.get("/admin", orderController.getOrdersAdmin);
+
+// Admin route to get order detail
+router.get("/admin/:orderId", orderController.getOrderDetailAdmin);
+
+// Admin route to update order status
+router.patch(
+  "/admin/:orderId/status",
+  updateOrderStatusValidator,
+  orderController.updateOrderStatusAdmin
+);
+
+// Admin route to get order statistics
+router.get("/admin/stats/overview", orderController.getOrderStats);
+
+// ===== CUSTOMER ROUTES =====
 // Route xem lịch sử đơn hàng (yêu cầu đăng nhập)
 router.get("/", verifyToken, orderController.getOrderHistory);
 
