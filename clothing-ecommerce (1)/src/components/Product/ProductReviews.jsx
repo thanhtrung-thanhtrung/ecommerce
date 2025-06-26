@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSelector } from "react-redux"
+import { useShop } from "../../contexts/ShopContext"
 import { Star, ThumbsUp, Flag } from "lucide-react"
 import { formatRelativeTime } from "../../utils/helpers"
 
 const ProductReviews = ({ productId }) => {
-  const { isAuthenticated } = useSelector((state) => state.auth)
+  const { isAuthenticated } = useShop()
   const [reviews, setReviews] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [userReview, setUserReview] = useState(null)
@@ -101,9 +101,8 @@ const ProductReviews = ({ productId }) => {
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
                     key={star}
-                    className={`h-5 w-5 ${
-                      star <= Math.round(averageRating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
-                    }`}
+                    className={`h-5 w-5 ${star <= Math.round(averageRating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
+                      }`}
                   />
                 ))}
               </div>
@@ -205,9 +204,8 @@ const ProductReviews = ({ productId }) => {
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Star
                           key={star}
-                          className={`h-4 w-4 ${
-                            star <= review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
-                          }`}
+                          className={`h-4 w-4 ${star <= review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
+                            }`}
                         />
                       ))}
                       <span className="ml-2 text-xs text-gray-500">{formatRelativeTime(review.date)}</span>

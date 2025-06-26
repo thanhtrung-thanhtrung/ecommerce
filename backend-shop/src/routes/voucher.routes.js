@@ -20,10 +20,10 @@ router.patch(
   VoucherController.capNhatTrangThai
 );
 
-// Tìm kiếm voucher
+// Tìm kiếm voucher (chỉ cho admin)
 router.get("/", searchVoucherValidator, VoucherController.timKiemVoucher);
 
-// Kiểm tra và áp dụng voucher
-router.post("/:maVoucher/apply", VoucherController.kiemTraVoucher);
+// Áp dụng voucher - route chính cho frontend
+router.post("/:maVoucher/apply", VoucherController.applyVoucher);
 
 module.exports = router;

@@ -54,14 +54,30 @@ class VoucherController {
     }
   }
 
-  async kiemTraVoucher(req, res, next) {
+  async applyVoucher(req, res, next) {
     try {
       const { maVoucher } = req.params;
-      const { tongTien } = req.body;
-      const result = await VoucherService.kiemTraVoucher(maVoucher, tongTien);
-      res.status(200).json(result);
+      const { tongTien, id_nguoidung } = req.body;
+
+      // Lấy id_nguoidung từ token hoặc body (cho guest)
+      const userId = req.user?.id || id_nguoidung || null;
+
+      const result = await VoucherService.applyVoucher(
+        maVoucher,
+        tongTien,
+        userId
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Áp dụng mã giảm giá thành công",
+        data: result,
+      });
     } catch (error) {
-      next(error);
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 }

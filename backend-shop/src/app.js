@@ -3,7 +3,7 @@ const session = require("express-session");
 const cors = require("cors");
 const cookieParser = require("cookie-parser"); // Add this import
 const routes = require("./routes");
-const bodyParser = require('body-parser');
+const bodyParser = require("body-parser");
 require("dotenv").config();
 require("./config/database"); // Import database configuration
 
@@ -27,6 +27,7 @@ app.use(
       "Accept",
       "Authorization",
       "Cookie",
+      "X-Session-ID", // Add this for guest cart functionality
     ], // Allowed headers
     exposedHeaders: ["Set-Cookie"], // Headers that client can access
     optionsSuccessStatus: 200, // Some legacy browsers choke on 204
@@ -40,8 +41,8 @@ app.options("*", cors()); // Enable pre-flight for all routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser()); // Add cookie parser before session middleware
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ limit: "10mb", extended: true }));
 
 // Cấu hình express-session (Đặt SAU express.json() và express.urlencoded())
 app.use(
@@ -57,6 +58,20 @@ app.use(
     },
   })
 );
+
+// Ensure session middleware is correctly configured
+app.use((req, res, next) => {
+  console.log("Session ID:", req.sessionID); // Debugging session ID
+  console.log("Session Data:", req.session); // Debugging session data
+  next();
+});
+
+// Debugging middleware for session
+app.use((req, res, next) => {
+  console.log("Session Middleware - req.sessionID:", req.sessionID);
+  console.log("Session Middleware - req.session:", req.session);
+  next();
+});
 
 // Routes
 app.use("/api", routes);

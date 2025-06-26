@@ -1,9 +1,13 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "../../lib/utils";
 
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  // Helper function to combine classes (thay thế cho cn từ lib/utils)
+  const cn = (...classes) => {
+    return classes.filter(Boolean).join(" ");
+  };
+
   const pages = [];
   const maxPagesToShow = 5;
 
@@ -44,7 +48,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
             className={cn(
               "flex items-center justify-center w-10 h-10 rounded-md border border-gray-300 hover:bg-gray-100",
               currentPage === 1 &&
-                "bg-primary-600 text-white hover:bg-primary-700 border-primary-600"
+              "bg-primary-600 text-white hover:bg-primary-700 border-primary-600"
             )}
           >
             1
@@ -78,7 +82,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
             className={cn(
               "flex items-center justify-center w-10 h-10 rounded-md border border-gray-300 hover:bg-gray-100",
               currentPage === totalPages &&
-                "bg-primary-600 text-white hover:bg-primary-700 border-primary-600"
+              "bg-primary-600 text-white hover:bg-primary-700 border-primary-600"
             )}
           >
             {totalPages}

@@ -2,23 +2,28 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
 import { Search, X, TrendingUp, Clock, Star } from "lucide-react";
-import { logoutUser } from "../../store/slices/authSlice";
-import { toggleMobileMenu, closeMobileMenu } from "../../store/slices/uiSlice";
-import {
-  getSearchSuggestions,
-  clearSearchSuggestions,
-  setSearchQuery,
-} from "../../store/slices/productSlice";
+import { useShop } from "../../contexts/ShopContext";
+import { useCartContext } from "../../contexts/CartContext";
 
 const Header = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
-  const { totalItems } = useSelector((state) => state.cart);
-  const { isMobileMenuOpen } = useSelector((state) => state.ui);
-  const { searchSuggestions } = useSelector((state) => state.products);
+  const {
+    user,
+    isAuthenticated,
+    isMobileMenuOpen,
+    searchSuggestions,
+    categories,
+    brands,
+    logoutUser,
+    getSearchSuggestions,
+    clearSearchSuggestions,
+    toggleMobileMenu,
+    closeMobileMenu,
+  } = useShop();
+
+  // Use CartContext for cart-related data
+  const { totalItems } = useCartContext();
 
   const [searchQuery, setLocalSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -46,18 +51,18 @@ const Header = () => {
   useEffect(() => {
     if (searchQuery.trim().length > 2) {
       const timeoutId = setTimeout(() => {
-        dispatch(getSearchSuggestions(searchQuery.trim()));
+        getSearchSuggestions(searchQuery.trim());
         setShowSuggestions(true);
       }, 300);
 
       return () => clearTimeout(timeoutId);
     } else {
-      dispatch(clearSearchSuggestions());
+      clearSearchSuggestions();
       if (isSearchFocused) {
         setShowSuggestions(true); // Show history and popular searches when focused
       }
     }
-  }, [searchQuery, dispatch, isSearchFocused]);
+  }, [searchQuery, getSearchSuggestions, clearSearchSuggestions, isSearchFocused]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -95,7 +100,7 @@ const Header = () => {
   };
 
   const handleLogout = () => {
-    dispatch(logoutUser());
+    logoutUser();
     navigate("/");
   };
 
@@ -105,12 +110,11 @@ const Header = () => {
 
     if (searchTerm) {
       saveToSearchHistory(searchTerm);
-      dispatch(setSearchQuery(searchTerm));
       navigate(`/products?search=${encodeURIComponent(searchTerm)}`);
       setLocalSearchQuery("");
       setShowSuggestions(false);
       setIsSearchFocused(false);
-      dispatch(clearSearchSuggestions());
+      clearSearchSuggestions();
     }
   };
 
@@ -128,15 +132,15 @@ const Header = () => {
     setLocalSearchQuery("");
     setShowSuggestions(false);
     setIsSearchFocused(false);
-    dispatch(clearSearchSuggestions());
+    clearSearchSuggestions();
   };
 
   const handleMobileMenuToggle = () => {
-    dispatch(toggleMobileMenu());
+    toggleMobileMenu();
   };
 
   const handleLinkClick = () => {
-    dispatch(closeMobileMenu());
+    closeMobileMenu();
   };
 
   return (
@@ -173,11 +177,10 @@ const Header = () => {
             <form onSubmit={handleSearch} className="w-full">
               <div className="relative" ref={searchRef}>
                 <div
-                  className={`relative rounded-lg border-2 transition-all duration-200 ${
-                    isSearchFocused
-                      ? "border-primary-500 shadow-lg"
-                      : "border-gray-300"
-                  }`}
+                  className={`relative rounded-lg border-2 transition-all duration-200 ${isSearchFocused
+                    ? "border-primary-500 shadow-lg"
+                    : "border-gray-300"
+                    }`}
                 >
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
@@ -301,12 +304,85 @@ const Header = () => {
 
           {/* Navigation - Desktop */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Link
-              to="/products"
-              className="text-gray-700 hover:text-primary-600 font-medium"
-            >
-              Sản phẩm
-            </Link>
+            {/* Categories Dropdown */}
+            <div className="relative group">
+              <Link
+                to="/products"
+                className="flex items-center space-x-1 text-gray-700 hover:text-primary-600 font-medium"
+              >
+                <span>Sản phẩm</span>
+                <span className="text-xs">▼</span>
+              </Link>
+              <div className="absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-200">
+                <div className="py-2">
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b">
+                    Danh mục sản phẩm
+                  </div>
+                  <Link
+                    to="/products"
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-600"
+                  >
+                    Tất cả sản phẩm
+                  </Link>
+                  {categories.slice(0, 8).map((category) => (
+                    <Link
+                      key={category.id}
+                      to={`/products?category=${category.id}`}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-600"
+                    >
+                      {category.Ten}
+                    </Link>
+                  ))}
+                  {categories.length > 8 && (
+                    <Link
+                      to="/products"
+                      className="block px-4 py-2 text-xs text-primary-600 hover:bg-gray-100 border-t"
+                    >
+                      Xem tất cả danh mục →
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Brands Dropdown */}
+            <div className="relative group">
+              <button className="flex items-center space-x-1 text-gray-700 hover:text-primary-600 font-medium">
+                <span>Thương hiệu</span>
+                <span className="text-xs">▼</span>
+              </button>
+              <div className="absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-gray-200">
+                <div className="py-2">
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b">
+                    Thương hiệu
+                  </div>
+                  {brands.slice(0, 8).map((brand) => (
+                    <Link
+                      key={brand.id}
+                      to={`/products?brand=${brand.id}`}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-600 flex items-center space-x-2"
+                    >
+                      {brand.Logo && (
+                        <img
+                          src={brand.Logo}
+                          alt={brand.Ten}
+                          className="w-4 h-4 object-contain"
+                        />
+                      )}
+                      <span>{brand.Ten}</span>
+                    </Link>
+                  ))}
+                  {brands.length > 8 && (
+                    <Link
+                      to="/products"
+                      className="block px-4 py-2 text-xs text-primary-600 hover:bg-gray-100 border-t"
+                    >
+                      Xem tất cả thương hiệu →
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
@@ -342,7 +418,7 @@ const Header = () => {
                         Thông tin cá nhân
                       </Link>
                       <Link
-                        to="/orders"
+                        to="/user/orders"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         Đơn hàng của tôi
@@ -416,11 +492,10 @@ const Header = () => {
           <form onSubmit={handleSearch}>
             <div className="relative" ref={searchRef}>
               <div
-                className={`relative rounded-lg border-2 transition-all duration-200 ${
-                  isSearchFocused
-                    ? "border-primary-500 shadow-lg"
-                    : "border-gray-300"
-                }`}
+                className={`relative rounded-lg border-2 transition-all duration-200 ${isSearchFocused
+                  ? "border-primary-500 shadow-lg"
+                  : "border-gray-300"
+                  }`}
               >
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
@@ -519,78 +594,113 @@ const Header = () => {
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white border-t">
           <nav className="container mx-auto px-4 py-4 space-y-4">
-            <Link
-              to="/products"
-              onClick={handleLinkClick}
-              className="block text-gray-700 hover:text-primary-600 font-medium"
-            >
-              Sản phẩm
-            </Link>
+            {/* Categories section for mobile */}
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-2">Danh mục</div>
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  to="/products"
+                  onClick={handleLinkClick}
+                  className="block text-gray-700 hover:text-primary-600 text-sm py-1"
+                >
+                  Tất cả sản phẩm
+                </Link>
+                {categories.slice(0, 6).map((category) => (
+                  <Link
+                    key={category.id}
+                    to={`/products?category=${category.id}`}
+                    onClick={handleLinkClick}
+                    className="block text-gray-700 hover:text-primary-600 text-sm py-1"
+                  >
+                    {category.Ten}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="text-sm font-semibold text-gray-600 mb-2">Thương hiệu</div>
+              <div className="grid grid-cols-2 gap-2">
+                {brands.slice(0, 6).map((brand) => (
+                  <Link
+                    key={brand.id}
+                    to={`/products?brand=${brand.id}`}
+                    onClick={handleLinkClick}
+                    className="block text-gray-700 hover:text-primary-600 text-sm py-1"
+                  >
+                    {brand.Ten}
+                  </Link>
+                ))}
+              </div>
+            </div>
 
             {isAuthenticated ? (
-              <>
-                <Link
-                  to="/profile"
-                  onClick={handleLinkClick}
-                  className="block text-gray-700 hover:text-primary-600"
-                >
-                  Thông tin cá nhân
-                </Link>
-                <Link
-                  to="/orders"
-                  onClick={handleLinkClick}
-                  className="block text-gray-700 hover:text-primary-600"
-                >
-                  Đơn hàng của tôi
-                </Link>
-                <Link
-                  to="/wishlist"
-                  onClick={handleLinkClick}
-                  className="block text-gray-700 hover:text-primary-600"
-                >
-                  Danh sách yêu thích
-                </Link>
-                <Link
-                  to="/cart"
-                  onClick={handleLinkClick}
-                  className="block text-gray-700 hover:text-primary-600"
-                >
-                  Giỏ hàng ({totalItems})
-                </Link>
-                <button
-                  onClick={() => {
-                    handleLogout();
-                    handleLinkClick();
-                  }}
-                  className="block w-full text-left text-gray-700 hover:text-primary-600"
-                >
-                  Đăng xuất
-                </button>
-              </>
+              <div className="border-t pt-4">
+                <div className="text-sm font-semibold text-gray-600 mb-2">
+                  Tài khoản của tôi
+                </div>
+                <div className="space-y-2">
+                  <Link
+                    to="/profile"
+                    onClick={handleLinkClick}
+                    className="block text-gray-700 hover:text-primary-600 text-sm"
+                  >
+                    Thông tin cá nhân
+                  </Link>
+                  <Link
+                    to="/user/orders"
+                    onClick={handleLinkClick}
+                    className="block text-gray-700 hover:text-primary-600 text-sm"
+                  >
+                    Đơn hàng của tôi
+                  </Link>
+                  <Link
+                    to="/wishlist"
+                    onClick={handleLinkClick}
+                    className="block text-gray-700 hover:text-primary-600 text-sm"
+                  >
+                    Danh sách yêu thích
+                  </Link>
+                  <Link
+                    to="/cart"
+                    onClick={handleLinkClick}
+                    className="block text-gray-700 hover:text-primary-600 text-sm"
+                  >
+                    Giỏ hàng ({totalItems})
+                  </Link>
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      handleLinkClick();
+                    }}
+                    className="block w-full text-left text-gray-700 hover:text-primary-600 text-sm"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
             ) : (
-              <>
-                <Link
-                  to="/cart"
-                  onClick={handleLinkClick}
-                  className="block text-gray-700 hover:text-primary-600"
-                >
-                  Giỏ hàng ({totalItems})
-                </Link>
-                <Link
-                  to="/login"
-                  onClick={handleLinkClick}
-                  className="block text-gray-700 hover:text-primary-600"
-                >
-                  Đăng nhập
-                </Link>
-                <Link
-                  to="/register"
-                  onClick={handleLinkClick}
-                  className="block btn-primary text-center"
-                >
-                  Đăng ký
-                </Link>
-              </>
+              <div className="border-t pt-4">
+                <div className="text-sm font-semibold text-gray-600 mb-2">
+                  Tài khoản
+                </div>
+                <div className="space-y-2">
+                  <Link
+                    to="/login"
+                    onClick={handleLinkClick}
+                    className="block text-gray-700 hover:text-primary-600 text-sm"
+                  >
+                    Đăng nhập
+                  </Link>
+                  <Link
+                    to="/register"
+                    onClick={handleLinkClick}
+                    className="block btn-primary text-center text-sm"
+                  >
+                    Đăng ký
+                  </Link>
+                </div>
+              </div>
             )}
           </nav>
         </div>

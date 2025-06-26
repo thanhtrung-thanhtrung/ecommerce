@@ -1,33 +1,30 @@
 import { useEffect, useState, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import {
-  fetchProducts,
-  searchProducts,
-  setFilters,
-  setCurrentPage,
-  setSearchQuery,
-} from "../store/slices/productSlice";
+import { useShop } from "../contexts/ShopContext";
 import ProductGrid from "../components/Product/ProductGrid";
 import ProductFilters from "../components/Product/ProductFilters";
 import ProductSort from "../components/Product/ProductSort";
 import Pagination from "../components/Common/Pagination";
+import LoadingSpinner from "../components/Common/LoadingSpinner"
 
 const ITEMS_PER_PAGE = 8;
 
 const ProductsPage = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     products,
-    isLoading,
-    isSearching,
+    loading,
     totalProducts,
     currentPage,
     totalPages,
     filters,
-  } = useSelector((state) => state.products);
+    fetchProducts,
+    searchProducts,
+    setFilters: updateFilters,
+    setCurrentPage,
+    setSearchQuery,
+  } = useShop();
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -94,18 +91,16 @@ const ProductsPage = () => {
 
   // Hàm tải dữ liệu sản phẩm chung cho cả tìm kiếm và lọc
   const loadProducts = useCallback(
-    (urlFilters, page = 1) => {
+    async (urlFilters, page = 1) => {
       const searchTerm = urlFilters.search;
 
-      dispatch(
-        setFilters({
-          ...urlFilters,
-          page: page,
-        })
-      );
+      updateFilters({
+        ...urlFilters,
+        page: page,
+      });
 
       if (page !== currentPage) {
-        dispatch(setCurrentPage(page));
+        setCurrentPage(page);
       }
 
       // Sử dụng API tìm kiếm nếu có tiêu chí tìm kiếm/lọc
@@ -116,27 +111,23 @@ const ProductsPage = () => {
         urlFilters.minPrice ||
         urlFilters.maxPrice
       ) {
-        dispatch(setSearchQuery(searchTerm || ""));
+        setSearchQuery(searchTerm || "");
         const searchData = formatSearchData(urlFilters, searchTerm);
-        return dispatch(
-          searchProducts({
-            searchData,
-            page: page,
-            limit: ITEMS_PER_PAGE,
-          })
-        );
+        return await searchProducts({
+          searchData,
+          page: page,
+          limit: ITEMS_PER_PAGE,
+        });
       }
 
       // Nếu không có tiêu chí tìm kiếm, tải tất cả sản phẩm
-      return dispatch(
-        fetchProducts({
-          page: page,
-          limit: ITEMS_PER_PAGE,
-          sortBy: urlFilters.sortBy,
-        })
-      );
+      return await fetchProducts({
+        page: page,
+        limit: ITEMS_PER_PAGE,
+        sortBy: urlFilters.sortBy,
+      });
     },
-    [dispatch, formatSearchData, currentPage]
+    [updateFilters, formatSearchData, currentPage, setCurrentPage, setSearchQuery, searchProducts, fetchProducts]
   );
 
   // Load dữ liệu khi component mount và URL thay đổi
@@ -214,9 +205,8 @@ const ProductsPage = () => {
         <div className="lg:grid lg:grid-cols-4 lg:gap-8">
           {/* Filters Sidebar */}
           <div
-            className={`lg:col-span-1 ${
-              showFilters ? "block" : "hidden lg:block"
-            }`}
+            className={`lg:col-span-1 ${showFilters ? "block" : "hidden lg:block"
+              }`}
           >
             <div className="sticky top-8">
               <ProductFilters
@@ -228,9 +218,9 @@ const ProductsPage = () => {
 
           {/* Products Grid */}
           <div className="lg:col-span-3">
-            {isLoading || isSearching ? (
+            {loading ? (
               <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+                <LoadingSpinner size="lg" />
               </div>
             ) : (
               <>

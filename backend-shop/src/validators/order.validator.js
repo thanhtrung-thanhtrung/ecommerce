@@ -22,6 +22,7 @@ const createOrderValidator = [
     .withMessage("Email không hợp lệ")
     .normalizeEmail(),
 
+  // Fix field name to match frontend
   body("id_ThanhToan")
     .isInt({ min: 1 })
     .withMessage("Hình thức thanh toán không hợp lệ"),
@@ -30,6 +31,7 @@ const createOrderValidator = [
     .isInt({ min: 1 })
     .withMessage("Hình thức vận chuyển không hợp lệ"),
 
+  // Optional fields
   body("MaGiamGia")
     .optional({ nullable: true, checkFalsy: false })
     .custom((value) => {
@@ -41,17 +43,35 @@ const createOrderValidator = [
     }),
 
   body("ghiChu").optional().trim(),
+
+  // Additional fields that might be sent from frontend
+  body("tongTien").optional().isNumeric().withMessage("Tổng tiền không hợp lệ"),
+
+  body("tongTienSauGiam")
+    .optional()
+    .isNumeric()
+    .withMessage("Tổng tiền sau giảm không hợp lệ"),
+
+  body("phiVanChuyen")
+    .optional()
+    .isNumeric()
+    .withMessage("Phí vận chuyển không hợp lệ"),
+
+  body("sessionId")
+    .optional()
+    .isString()
+    .withMessage("Session ID không hợp lệ"),
 ];
 
 const cancelOrderValidator = [
-  body("lyDo")
+  body("lyDoHuy")
     .notEmpty()
     .withMessage("Lý do hủy đơn không được để trống")
     .trim(),
 ];
 
 const guestOrderTrackingValidator = [
-  body("orderId").isInt().withMessage("ID đơn hàng không hợp lệ"),
+  param("maDonHang").isInt().withMessage("ID đơn hàng không hợp lệ"),
   body("email").isEmail().withMessage("Email không hợp lệ").normalizeEmail(),
 ];
 

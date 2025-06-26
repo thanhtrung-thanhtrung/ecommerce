@@ -1,16 +1,15 @@
-
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
-import { useDispatch, useSelector } from "react-redux"
 import { Formik, Form, Field, ErrorMessage } from "formik"
 import * as Yup from "yup"
-import { loginUser, clearError } from "../../store/slices/authSlice"
+import { useShop } from "../../contexts/ShopContext"
+import LoadingSpinner from "../../components/Common/LoadingSpinner"
 
 const LoginPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const dispatch = useDispatch()
-  const { isLoading, error, isAuthenticated } = useSelector((state) => state.auth)
+  const { loginUser, loading, isAuthenticated } = useShop()
+  const [error, setError] = useState("")
 
   const from = location.state?.from?.pathname || "/"
 
@@ -20,17 +19,21 @@ const LoginPage = () => {
     }
   }, [isAuthenticated, navigate, from])
 
-  useEffect(() => {
-    dispatch(clearError())
-  }, [dispatch])
-
   const validationSchema = Yup.object({
     email: Yup.string().email("Email không hợp lệ").required("Vui lòng nhập email"),
-    matKhau: Yup.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").required("Vui lòng nhập mật khẩu"),
+    MatKhau: Yup.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").required("Vui lòng nhập mật khẩu"),
   })
 
-  const handleSubmit = (values) => {
-    dispatch(loginUser(values))
+  const handleSubmit = async (values, { setSubmitting }) => {
+    try {
+      setError("")
+      await loginUser(values)
+      // Navigation will be handled by useEffect when isAuthenticated changes
+    } catch (err) {
+      setError(err.message || "Đăng nhập thất bại")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -51,7 +54,7 @@ const LoginPage = () => {
           </p>
         </div>
 
-        <Formik initialValues={{ email: "", matKhau: "" }} validationSchema={validationSchema} onSubmit={handleSubmit}>
+        <Formik initialValues={{ email: "", MatKhau: "" }} validationSchema={validationSchema} onSubmit={handleSubmit}>
           {({ isSubmitting }) => (
             <Form className="mt-8 space-y-6">
               {error && (
@@ -75,18 +78,18 @@ const LoginPage = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="matKhau" className="form-label">
+                  <label htmlFor="MatKhau" className="form-label">
                     Mật khẩu
                   </label>
                   <Field
-                    id="matKhau"
-                    name="matKhau"
+                    id="MatKhau"
+                    name="MatKhau"
                     type="password"
                     autoComplete="current-password"
                     className="form-input"
                     placeholder="Nhập mật khẩu"
                   />
-                  <ErrorMessage name="matKhau" component="div" className="form-error" />
+                  <ErrorMessage name="MatKhau" component="div" className="form-error" />
                 </div>
               </div>
 
@@ -113,10 +116,10 @@ const LoginPage = () => {
               <div>
                 <button
                   type="submit"
-                  disabled={isSubmitting || isLoading}
+                  disabled={isSubmitting || loading}
                   className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? <div className="spinner w-5 h-5"></div> : "Đăng nhập"}
+                  {loading ? <LoadingSpinner size="sm" /> : "Đăng nhập"}
                 </button>
               </div>
 

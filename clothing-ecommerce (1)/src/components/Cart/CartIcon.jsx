@@ -4,7 +4,7 @@ import { useCartContext } from '../../contexts/CartContext';
 import { Button } from '../ui/button';
 
 const CartIcon = ({ onClick, className = '' }) => {
-  const { cartCount, loading } = useCartContext();
+  const { totalItems, loading } = useCartContext();
 
   return (
     <Button
@@ -15,9 +15,9 @@ const CartIcon = ({ onClick, className = '' }) => {
       disabled={loading}
     >
       <ShoppingBag className="h-6 w-6" />
-      {cartCount > 0 && (
+      {totalItems > 0 && (
         <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
-          {cartCount > 99 ? '99+' : cartCount}
+          {totalItems > 99 ? '99+' : totalItems}
         </span>
       )}
     </Button>

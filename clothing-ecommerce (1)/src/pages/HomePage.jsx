@@ -1,65 +1,55 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import { fetchProducts } from "../store/slices/productSlice";
+import { useShop } from "../contexts/ShopContext";
+import { formatCurrency } from "../utils/helpers";
 
 const HomePage = () => {
-  const dispatch = useDispatch();
-  const { products, isLoading } = useSelector((state) => state.products);
+  const { products, loading, fetchProducts, categories, brands } = useShop();
 
   useEffect(() => {
     // Fetch featured products
-    dispatch(fetchProducts({ page: 1, limit: 10 })); // KHÔNG có featured
-  }, [dispatch]);
+    fetchProducts({ page: 1, limit: 10 });
+  }, [fetchProducts]);
 
-  // Helper function to parse and get main image from HinhAnh JSON
-  const getProductImage = (hinhAnh) => {
+  // Helper function để parse hình ảnh từ JSON
+  const getProductImage = (product) => {
     try {
-      if (typeof hinhAnh === "string") {
-        const imageData = JSON.parse(hinhAnh);
+      // Ưu tiên sử dụng images đã được parse từ ShopContext
+      if (product.images && product.images.anhChinh) {
+        return product.images.anhChinh;
+      }
+
+      // Fallback: parse trực tiếp từ HinhAnh nếu chưa được process
+      if (typeof product.HinhAnh === "string" && product.HinhAnh !== "{}") {
+        const imageData = JSON.parse(product.HinhAnh);
         return imageData.anhChinh || "/placeholder.svg?height=300&width=300";
       }
-      return hinhAnh || "/placeholder.svg?height=300&width=300";
+
+      // Fallback: kiểm tra anhChinh đã được parse sẵn
+      if (product.anhChinh) {
+        return product.anhChinh;
+      }
+
+      return "/placeholder.svg?height=300&width=300";
     } catch (error) {
+      console.error("Error parsing product image:", error);
       return "/placeholder.svg?height=300&width=300";
     }
   };
 
-  const categories = [
-    {
-      id: 1,
-      name: "Giày Nam",
-      image: "/placeholder.svg?height=300&width=400",
-      link: "/products?category=nam",
-    },
-    {
-      id: 2,
-      name: "Giày Nữ",
-      image: "/placeholder.svg?height=300&width=400",
-      link: "/products?category=nu",
-    },
-    {
-      id: 3,
-      name: "Giày Thể Thao",
-      image: "/placeholder.svg?height=300&width=400",
-      link: "/products?category=the-thao",
-    },
-    {
-      id: 4,
-      name: "Giày Chạy Bộ",
-      image: "/placeholder.svg?height=300&width=400",
-      link: "/products?category=chay-bo",
-    },
-  ];
+  // Use real categories from API instead of hardcoded ones
+  const displayCategories = categories.slice(0, 4).map((category) => ({
+    id: category.id,
+    name: category.Ten,
+    image: "/placeholder.svg?height=300&width=400", // Use placeholder until we have category images
+    link: `/products?category=${category.id}`,
+  }));
 
-  const brands = [
-    { name: "Nike", logo: "/placeholder.svg?height=80&width=120" },
-    { name: "Adidas", logo: "/placeholder.svg?height=80&width=120" },
-    { name: "Puma", logo: "/placeholder.svg?height=80&width=120" },
-    { name: "New Balance", logo: "/placeholder.svg?height=80&width=120" },
-    { name: "Converse", logo: "/placeholder.svg?height=80&width=120" },
-    { name: "Vans", logo: "/placeholder.svg?height=80&width=120" },
-  ];
+  // Use real brands from API instead of hardcoded ones
+  const displayBrands = brands.slice(0, 6).map((brand) => ({
+    name: brand.Ten,
+    logo: brand.Logo || "/placeholder.svg?height=80&width=120",
+  }));
 
   return (
     <div className="min-h-screen">
@@ -103,7 +93,7 @@ const HomePage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {categories.map((category) => (
+            {displayCategories.map((category) => (
               <Link
                 key={category.id}
                 to={category.link}
@@ -139,7 +129,7 @@ const HomePage = () => {
             </p>
           </div>
 
-          {isLoading ? (
+          {loading ? (
             <div className="flex justify-center">
               <div className="spinner"></div>
             </div>
@@ -150,7 +140,7 @@ const HomePage = () => {
                   <Link to={`/products/${product.id}`}>
                     <div className="aspect-w-1 aspect-h-1 mb-4">
                       <img
-                        src={getProductImage(product.HinhAnh)}
+                        src={getProductImage(product)}
                         alt={product.Ten}
                         className="w-full h-64 object-cover rounded-lg"
                       />
@@ -164,14 +154,14 @@ const HomePage = () => {
                       </p>
                       <div className="flex items-center gap-2">
                         <span className="text-lg font-bold text-red-600">
-                          {(
+                          {formatCurrency(
                             product.GiaKhuyenMai || product.Gia
-                          )?.toLocaleString("vi-VN")}{" "}
+                          )}{" "}
                           đ
                         </span>
                         {product.GiaKhuyenMai && (
                           <span className="text-sm text-gray-500 line-through">
-                            {product.Gia?.toLocaleString("vi-VN")} đ
+                            {formatCurrency(product.Gia)} đ
                           </span>
                         )}
                       </div>
@@ -203,7 +193,7 @@ const HomePage = () => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
-            {brands.map((brand, index) => (
+            {displayBrands.map((brand, index) => (
               <div
                 key={index}
                 className="flex items-center justify-center p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"

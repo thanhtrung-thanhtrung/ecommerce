@@ -24,11 +24,20 @@ class CartController {
       }
 
       const cart = await cartService.getCart(userId, sessionId);
-      res.json(cart);
+
+      // Return standardized response format
+      res.json({
+        success: true,
+        data: cart,
+        message: "Lấy giỏ hàng thành công",
+      });
     } catch (error) {
       // Xử lý lỗi nghiệp vụ từ service
       if (error.message) {
-        return res.status(400).json({ message: error.message });
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
       }
       next(error); // Chuyển lỗi không xác định xuống middleware xử lý lỗi chung
     }
@@ -131,17 +140,23 @@ class CartController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const userId = req.user?.id || null;
+      // Lấy sessionId từ cookie, session, header (không lấy từ body)
       let sessionId =
-        req.cookies?.sessionId || req.session?.id || req.sessionIdFromHeader;
+        req.cookies?.sessionId ||
+        req.session?.id ||
+        req.sessionIdFromHeader ||
+        req.headers["x-session-id"];
 
-      // Kiểm tra header X-Session-ID nếu không có cookie
+      // Ensure sessionId is created for guests
       if (!userId && !sessionId) {
-        sessionId = req.headers["x-session-id"] || uuidv4();
-        // Set the sessionId as a cookie
+        sessionId = uuidv4();
         res.cookie("sessionId", sessionId, {
           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
           httpOnly: true,
@@ -149,26 +164,37 @@ class CartController {
         });
       }
 
-      const { id_ChiTietSanPham, soLuong } = req.body;
+      // Lấy đúng tên trường từ body
+      const { id_ChiTietSanPham, SoLuong } = req.body;
 
-      if (!id_ChiTietSanPham || !soLuong) {
-        return res
-          .status(400)
-          .json({ message: "Thiếu thông tin sản phẩm hoặc số lượng." });
+      // Debugging logs
+      console.log("🔍 Debug - sessionId:", sessionId);
+      console.log("🔍 Debug - Adding to cart:", { id_ChiTietSanPham, SoLuong });
+
+      if (!id_ChiTietSanPham || !SoLuong) {
+        return res.status(400).json({
+          success: false,
+          message: "Thiếu thông tin sản phẩm hoặc số lượng.",
+        });
       }
 
       const cart = await cartService.addToCart(
-        { id_ChiTietSanPham, soLuong },
+        { id_ChiTietSanPham, SoLuong },
         userId,
         sessionId
       );
-      res.status(200).json(cart);
+
+      res.status(200).json({
+        success: true,
+        data: cart,
+        message: "Thêm vào giỏ hàng thành công",
+      });
     } catch (error) {
-      // Xử lý lỗi nghiệp vụ từ service
-      if (error.message) {
-        return res.status(400).json({ message: error.message });
-      }
-      next(error);
+      console.error("Lỗi khi thêm vào giỏ hàng:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Lỗi khi thêm vào giỏ hàng",
+      });
     }
   }
 
@@ -176,11 +202,14 @@ class CartController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          errors: errors.array(),
+        });
       }
 
       const { maGioHang } = req.params;
-      const { soLuong } = req.body;
+      const { SoLuong } = req.body;
       const userId = req.user?.id || null;
 
       // Kiểm tra tất cả vị trí có thể chứa sessionId
@@ -190,14 +219,16 @@ class CartController {
         sessionId = req.headers["x-session-id"];
       }
 
-      if (!maGioHang || !soLuong) {
-        return res
-          .status(400)
-          .json({ message: "Thiếu mã giỏ hàng hoặc số lượng." });
+      if (!maGioHang || !SoLuong) {
+        return res.status(400).json({
+          success: false,
+          message: "Thiếu mã giỏ hàng hoặc số lượng.",
+        });
       }
 
       if (!userId && !sessionId) {
         return res.status(400).json({
+          success: false,
           message:
             "Không tìm thấy thông tin người dùng hoặc session để cập nhật giỏ hàng.",
         });
@@ -205,15 +236,23 @@ class CartController {
 
       const cart = await cartService.updateCart(
         maGioHang,
-        soLuong,
+        SoLuong,
         userId,
         sessionId
       );
-      res.json(cart);
+
+      res.json({
+        success: true,
+        data: cart,
+        message: "Cập nhật giỏ hàng thành công",
+      });
     } catch (error) {
       // Xử lý lỗi nghiệp vụ từ service
       if (error.message) {
-        return res.status(400).json({ message: error.message });
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
       }
       next(error);
     }
@@ -232,11 +271,15 @@ class CartController {
       }
 
       if (!maGioHang) {
-        return res.status(400).json({ message: "Thiếu mã giỏ hàng." });
+        return res.status(400).json({
+          success: false,
+          message: "Thiếu mã giỏ hàng.",
+        });
       }
 
       if (!userId && !sessionId) {
         return res.status(400).json({
+          success: false,
           message:
             "Không tìm thấy thông tin người dùng hoặc session để xóa sản phẩm khỏi giỏ hàng.",
         });
@@ -247,11 +290,19 @@ class CartController {
         userId,
         sessionId
       );
-      res.json(cart);
+
+      res.json({
+        success: true,
+        data: cart,
+        message: "Xóa sản phẩm khỏi giỏ hàng thành công",
+      });
     } catch (error) {
       // Xử lý lỗi nghiệp vụ từ service
       if (error.message) {
-        return res.status(400).json({ message: error.message });
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
       }
       next(error);
     }
@@ -270,17 +321,25 @@ class CartController {
 
       if (!userId && !sessionId) {
         return res.status(400).json({
+          success: false,
           message:
             "Không tìm thấy thông tin người dùng hoặc session để xóa giỏ hàng.",
         });
       }
 
       await cartService.clearCart(userId, sessionId);
-      res.json({ message: "Đã xóa giỏ hàng" });
+
+      res.json({
+        success: true,
+        message: "Đã xóa giỏ hàng",
+      });
     } catch (error) {
       // Xử lý lỗi nghiệp vụ từ service
       if (error.message) {
-        return res.status(400).json({ message: error.message });
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
       }
       next(error);
     }

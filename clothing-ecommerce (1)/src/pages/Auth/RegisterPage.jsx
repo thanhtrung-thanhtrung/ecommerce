@@ -1,25 +1,19 @@
-
 import { useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { useDispatch, useSelector } from "react-redux"
 import { Formik, Form, Field, ErrorMessage } from "formik"
 import * as Yup from "yup"
-import { registerUser, clearError } from "../../store/slices/authSlice"
+import { useShop } from "../../contexts/ShopContext"
+import { toast } from "react-toastify"
 
 const RegisterPage = () => {
   const navigate = useNavigate()
-  const dispatch = useDispatch()
-  const { isLoading, error, isAuthenticated } = useSelector((state) => state.auth)
+  const { registerUser, loading, isAuthenticated } = useShop()
 
   useEffect(() => {
     if (isAuthenticated) {
       navigate("/")
     }
   }, [isAuthenticated, navigate])
-
-  useEffect(() => {
-    dispatch(clearError())
-  }, [dispatch])
 
   const validationSchema = Yup.object({
     hoTen: Yup.string().min(2, "Họ tên phải có ít nhất 2 ký tự").required("Vui lòng nhập họ tên"),
@@ -35,9 +29,15 @@ const RegisterPage = () => {
     dongYDieuKhoan: Yup.boolean().oneOf([true], "Vui lòng đồng ý với điều khoản sử dụng"),
   })
 
-  const handleSubmit = (values) => {
-    const { xacNhanMatKhau, dongYDieuKhoan, ...userData } = values
-    dispatch(registerUser(userData))
+  const handleSubmit = async (values) => {
+    try {
+      const { xacNhanMatKhau, dongYDieuKhoan, ...userData } = values
+      await registerUser(userData)
+      toast.success("Đăng ký thành công!")
+      navigate("/login")
+    } catch (error) {
+      toast.error(error.message || "Đăng ký thất bại. Vui lòng thử lại.")
+    }
   }
 
   return (
@@ -73,10 +73,6 @@ const RegisterPage = () => {
         >
           {({ isSubmitting }) => (
             <Form className="mt-8 space-y-6">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{error}</div>
-              )}
-
               <div className="space-y-4">
                 <div>
                   <label htmlFor="hoTen" className="form-label">
@@ -168,10 +164,10 @@ const RegisterPage = () => {
               <div>
                 <button
                   type="submit"
-                  disabled={isSubmitting || isLoading}
+                  disabled={isSubmitting || loading}
                   className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? <div className="spinner w-5 h-5"></div> : "Đăng ký"}
+                  {loading ? <div className="spinner w-5 h-5"></div> : "Đăng ký"}
                 </button>
               </div>
 

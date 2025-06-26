@@ -1,57 +1,102 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchProductById,
-  clearCurrentProduct,
-} from "../store/slices/productSlice";
-import { addToCart } from "../store/slices/cartSlice";
-import {
-  addToWishlist,
-  removeFromWishlist,
-} from "../store/slices/wishlistSlice";
+import { useShop } from "../contexts/ShopContext";
+import { useCartContext } from "../contexts/CartContext";
 import ProductImageGallery from "../components/Product/ProductImageGallery";
 import ProductReviews from "../components/Product/ProductReviews";
 import RelatedProducts from "../components/Product/RelatedProducts";
+import LoadingSpinner from "../components/Common/LoadingSpinner"
 import { formatCurrency } from "../utils/helpers";
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
 
-  const { currentProduct, isLoading, error } = useSelector(
-    (state) => state.products
-  );
-  const { isAuthenticated } = useSelector((state) => state.auth);
-  const { items: wishlistItems } = useSelector((state) => state.wishlist);
+  const {
+    currentProduct,
+    loading,
+    error,
+    isAuthenticated,
+    wishlist,
+    fetchProductById,
+    clearCurrentProduct,
+    addToWishlist,
+    removeFromWishlist,
+  } = useShop();
+
+  // Use CartContext for cart operations
+  const { addToCart } = useCartContext();
 
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState("description");
 
-  const isInWishlist = wishlistItems.some(
+  const isInWishlist = wishlist.some(
     (item) => item.id === Number.parseInt(id)
   );
 
-  // Helper function to parse and get images from HinhAnh JSON
-  const getProductImages = (hinhAnh) => {
-    try {
-      if (typeof hinhAnh === "string") {
+  // Function to get product images based on available data
+  const getProductImages = (hinhAnh, currentProduct) => {
+    let images = [];
+
+    // Try to parse HinhAnh first
+    if (hinhAnh && typeof hinhAnh === 'string' && hinhAnh.trim() !== '' && hinhAnh !== '{}') {
+      try {
         const imageData = JSON.parse(hinhAnh);
-        const images = [imageData.anhChinh];
-        if (imageData.anhPhu && Array.isArray(imageData.anhPhu)) {
-          images.push(...imageData.anhPhu);
+
+        // Add main image
+        if (imageData.anhChinh && imageData.anhChinh.trim() !== '') {
+          images.push(imageData.anhChinh);
         }
-        return images;
+
+        // Add additional images
+        if (imageData.anhPhu && Array.isArray(imageData.anhPhu)) {
+          const validAdditionalImages = imageData.anhPhu.filter(img => img && img.trim() !== '');
+          images.push(...validAdditionalImages);
+        }
+
+        // Add any other images (like anh1, anh2, etc.)
+        Object.keys(imageData).forEach(key => {
+          if (key.startsWith('anh') && key !== 'anhChinh' && key !== 'anhPhu' && !key.includes('public_id')) {
+            if (imageData[key] && imageData[key].trim() !== '' && !images.includes(imageData[key])) {
+              images.push(imageData[key]);
+            }
+          }
+        });
+
+        const filteredImages = images.filter(img => img && img.trim() !== '');
+
+        if (filteredImages.length > 0) {
+          return filteredImages;
+        }
+      } catch (error) {
+        console.error('❌ Error parsing HinhAnh JSON:', error);
       }
-      return [];
-    } catch (error) {
-      return [];
     }
+
+    // Try to use already parsed images from currentProduct
+    if (currentProduct && currentProduct.images) {
+      if (Array.isArray(currentProduct.images)) {
+        images = currentProduct.images.filter(img => img && img.trim() !== '');
+      } else if (typeof currentProduct.images === 'object') {
+        // Handle object structure similar to above
+        if (currentProduct.images.anhChinh) {
+          images.push(currentProduct.images.anhChinh);
+        }
+        if (currentProduct.images.anhPhu && Array.isArray(currentProduct.images.anhPhu)) {
+          images.push(...currentProduct.images.anhPhu);
+        }
+      }
+
+      const filteredImages = images.filter(img => img && img.trim() !== '');
+      if (filteredImages.length > 0) {
+        return filteredImages;
+      }
+    }
+
+    // Fallback to placeholder if no images found
+    return ["/placeholder.jpg"];
   };
 
   // Helper function to parse technical specifications
@@ -77,13 +122,13 @@ const ProductDetailPage = () => {
 
   useEffect(() => {
     if (id) {
-      dispatch(fetchProductById(id));
+      fetchProductById(id);
     }
 
     return () => {
-      dispatch(clearCurrentProduct());
+      clearCurrentProduct();
     };
-  }, [dispatch, id]);
+  }, [id, fetchProductById, clearCurrentProduct]);
 
   useEffect(() => {
     if (currentProduct && currentProduct.bienThe?.length > 0) {
@@ -99,7 +144,7 @@ const ProductDetailPage = () => {
     }
   }, [currentProduct]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!selectedSize || !selectedColor) {
       alert("Vui lòng chọn size và màu sắc");
       return;
@@ -115,13 +160,17 @@ const ProductDetailPage = () => {
       return;
     }
 
-    // Sử dụng đúng cấu trúc dữ liệu theo backend
-    const cartItem = {
-      id_ChiTietSanPham: selectedVariant.id,
-      soLuong: quantity,
-    };
+    try {
+      // Sử dụng đúng cấu trúc dữ liệu theo backend
+      const cartItem = {
+        id_ChiTietSanPham: selectedVariant.id,
+        soLuong: quantity,
+      };
 
-    dispatch(addToCart(cartItem));
+      await addToCart(cartItem);
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+    }
   };
 
   const handleWishlistToggle = () => {
@@ -131,22 +180,22 @@ const ProductDetailPage = () => {
     }
 
     if (isInWishlist) {
-      dispatch(removeFromWishlist(currentProduct.id));
+      removeFromWishlist(currentProduct.id);
     } else {
-      dispatch(addToWishlist(currentProduct.id));
+      addToWishlist(currentProduct.id);
     }
   };
 
-  const handleBuyNow = () => {
-    handleAddToCart();
+  const handleBuyNow = async () => {
+    await handleAddToCart();
     navigate("/cart");
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="container mx-auto px-4 py-12">
         <div className="flex justify-center">
-          <div className="spinner"></div>
+          <LoadingSpinner size="lg" />
         </div>
       </div>
     );
@@ -224,7 +273,7 @@ const ProductDetailPage = () => {
                     ((Number(currentProduct.Gia) -
                       Number(currentProduct.GiaKhuyenMai)) /
                       Number(currentProduct.Gia)) *
-                      100
+                    100
                   )}
                   %
                 </span>
@@ -252,11 +301,10 @@ const ProductDetailPage = () => {
                   <button
                     key={size}
                     onClick={() => setSelectedSize(size)}
-                    className={`px-4 py-2 border rounded-lg font-medium transition-colors ${
-                      selectedSize === size
-                        ? "border-primary-600 bg-primary-600 text-white"
-                        : "border-gray-300 text-gray-700 hover:border-primary-600"
-                    }`}
+                    className={`px-4 py-2 border rounded-lg font-medium transition-colors ${selectedSize === size
+                      ? "border-primary-600 bg-primary-600 text-white"
+                      : "border-gray-300 text-gray-700 hover:border-primary-600"
+                      }`}
                   >
                     {size}
                   </button>
@@ -274,11 +322,10 @@ const ProductDetailPage = () => {
                   <button
                     key={color}
                     onClick={() => setSelectedColor(color)}
-                    className={`px-4 py-2 border rounded-lg font-medium transition-colors ${
-                      selectedColor === color
-                        ? "border-primary-600 bg-primary-600 text-white"
-                        : "border-gray-300 text-gray-700 hover:border-primary-600"
-                    }`}
+                    className={`px-4 py-2 border rounded-lg font-medium transition-colors ${selectedColor === color
+                      ? "border-primary-600 bg-primary-600 text-white"
+                      : "border-gray-300 text-gray-700 hover:border-primary-600"
+                      }`}
                   >
                     {color}
                   </button>
@@ -317,11 +364,10 @@ const ProductDetailPage = () => {
             </button>
             <button
               onClick={handleWishlistToggle}
-              className={`px-4 py-2 border rounded-lg transition-colors ${
-                isInWishlist
-                  ? "border-red-500 bg-red-50 text-red-600"
-                  : "border-gray-300 text-gray-700 hover:border-red-500 hover:text-red-600"
-              }`}
+              className={`px-4 py-2 border rounded-lg transition-colors ${isInWishlist
+                ? "border-red-500 bg-red-50 text-red-600"
+                : "border-gray-300 text-gray-700 hover:border-red-500 hover:text-red-600"
+                }`}
             >
               {isInWishlist ? "❤️" : "🤍"}
             </button>
@@ -361,11 +407,10 @@ const ProductDetailPage = () => {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab
-                    ? "border-primary-600 text-primary-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab
+                  ? "border-primary-600 text-primary-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
               >
                 {tab === "description" && "Mô tả"}
                 {tab === "specifications" && "Thông số"}

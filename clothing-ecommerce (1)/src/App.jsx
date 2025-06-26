@@ -1,13 +1,14 @@
 import { Routes, Route } from "react-router-dom";
-import { useSelector } from "react-redux";
-import { Toaster } from "react-hot-toast";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 // Context
+import { ShopProvider } from "./contexts/ShopContext";
 import { CartProvider } from "./contexts/CartContext";
+import { CheckoutProvider } from "./contexts/CheckoutContext";
 
 // Layout Components
-import Header from "./components/Layout/Header";
-import Footer from "./components/Layout/Footer";
+import { Header, Footer } from "./components/Layout";
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -24,90 +25,82 @@ import ProfilePage from "./pages/User/ProfilePage";
 import OrdersPage from "./pages/User/OrdersPage";
 import WishlistPage from "./pages/User/WishlistPage";
 
-// Protected Route Component
-import ProtectedRoute from "./components/Common/ProtectedRoute";
+// Common Components
+import { ProtectedRoute, LoadingSpinner } from "./components/Common";
 
 function App() {
-  const { isLoading } = useSelector((state) => state.ui);
-
   return (
-    <CartProvider>
-      <div className="min-h-screen flex flex-col">
-        <Header />
+    <ShopProvider>
+      <CartProvider>
+        <CheckoutProvider>
+          <div className="min-h-screen flex flex-col">
+            <Header />
 
-        <main className="flex-1">
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/products" element={<ProductsPage />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route
-              path="/order-success/:orderId"
-              element={<OrderSuccessPage />}
-            />
-            <Route path="/track-order" element={<TrackOrderPage />} />
+            <main className="flex-1">
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<HomePage />} />
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/products/:id" element={<ProductDetailPage />} />
+                <Route path="/cart" element={<CartPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
+                <Route
+                  path="/order-success/:orderId"
+                  element={<OrderSuccessPage />}
+                />
+                <Route path="/track-order" element={<TrackOrderPage />} />
 
-            {/* Protected Routes */}
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/user/orders"
-              element={
-                <ProtectedRoute>
-                  <OrdersPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/wishlist"
-              element={
-                <ProtectedRoute>
-                  <WishlistPage />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </main>
+                {/* Protected Routes */}
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/user/orders"
+                  element={
+                    <ProtectedRoute>
+                      <OrdersPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/wishlist"
+                  element={
+                    <ProtectedRoute>
+                      <WishlistPage />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </main>
 
-        <Footer />
+            <Footer />
 
-        {/* Global Loading Spinner */}
-        {isLoading && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="spinner"></div>
+            {/* Toast Container */}
+            <ToastContainer
+              position="top-right"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop={false}
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+              toastClassName="text-sm"
+            />
           </div>
-        )}
-
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: "#363636",
-              color: "#fff",
-            },
-            success: {
-              duration: 3000,
-              theme: {
-                primary: "green",
-                secondary: "black",
-              },
-            },
-          }}
-        />
-      </div>
-    </CartProvider>
+        </CheckoutProvider>
+      </CartProvider>
+    </ShopProvider>
   );
 }
 

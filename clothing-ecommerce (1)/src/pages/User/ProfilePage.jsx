@@ -1,20 +1,13 @@
 import { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
-import { getUserProfile } from "../../store/slices/authSlice";
-import userAPI from "../../services/userAPI";
+import { useShop } from "../../contexts/ShopContext";
 import { toast } from "react-toastify";
 
 const ProfilePage = () => {
-  const dispatch = useDispatch();
-  const { user, isLoading } = useSelector((state) => state.auth);
+  const { user, loading, updateProfile, changePassword } = useShop();
   const [activeTab, setActiveTab] = useState("profile");
   const [isUpdating, setIsUpdating] = useState(false);
-
-  useEffect(() => {
-    dispatch(getUserProfile());
-  }, [dispatch]);
 
   const profileValidationSchema = Yup.object({
     hoTen: Yup.string()
@@ -41,9 +34,8 @@ const ProfilePage = () => {
   const handleUpdateProfile = async (values) => {
     setIsUpdating(true);
     try {
-      await userAPI.updateProfile(values);
+      await updateProfile(values);
       toast.success("Cập nhật thông tin thành công!");
-      dispatch(getUserProfile());
     } catch (error) {
       toast.error(error.response?.data?.message || "Cập nhật thất bại");
     } finally {
@@ -54,7 +46,7 @@ const ProfilePage = () => {
   const handleChangePassword = async (values, { resetForm }) => {
     setIsUpdating(true);
     try {
-      await userAPI.changePassword(values);
+      await changePassword(values);
       toast.success("Đổi mật khẩu thành công!");
       resetForm();
     } catch (error) {
@@ -64,7 +56,7 @@ const ProfilePage = () => {
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="container mx-auto px-4 py-12">
         <div className="flex justify-center">
@@ -95,31 +87,28 @@ const ProfilePage = () => {
             <nav className="space-y-2">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === "profile"
+                className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeTab === "profile"
                     ? "bg-primary-100 text-primary-600"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 Thông tin cá nhân
               </button>
               <button
                 onClick={() => setActiveTab("password")}
-                className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === "password"
+                className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeTab === "password"
                     ? "bg-primary-100 text-primary-600"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 Đổi mật khẩu
               </button>
               <button
                 onClick={() => setActiveTab("addresses")}
-                className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === "addresses"
+                className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeTab === "addresses"
                     ? "bg-primary-100 text-primary-600"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 Địa chỉ giao hàng
               </button>

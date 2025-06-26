@@ -12,7 +12,7 @@ const cartAPI = {
     await cartAPI.ensureSessionId();
     return api.post("/cart", {
       id_ChiTietSanPham: item.id_ChiTietSanPham,
-      soLuong: item.soLuong || 1, // Giữ nhất quán theo format backend yêu cầu
+      soLuong: item.soLuong || 1,
     });
   },
 

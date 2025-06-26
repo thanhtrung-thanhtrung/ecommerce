@@ -1,0 +1,10 @@
+{
+  "name": "check-backend",
+  "version": "1.0.0",
+  "description": "Script to check and start backend server",
+  "scripts": {
+    "check-backend": "node check-backend.js",
+    "start-backend": "cd ../backend-shop && npm start",
+    "dev-backend": "cd ../backend-shop && npm run dev"
+  }
+}

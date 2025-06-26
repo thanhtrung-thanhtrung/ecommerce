@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { X, ChevronDown, ChevronUp, Search } from "lucide-react";
-import { fetchCategories, fetchBrands } from "../../store/slices/productSlice";
+import { useShop } from "../../contexts/ShopContext";
 
 const ProductFilters = ({ filters, onFilterChange }) => {
-  const dispatch = useDispatch();
-  const { categories, brands } = useSelector((state) => state.products);
+  const { categories, brands, fetchCategories, fetchBrands, loading } = useShop();
+  const [localLoading, setLocalLoading] = useState(false);
 
   // Initialize with proper default values to prevent controlled/uncontrolled errors
   const [localFilters, setLocalFilters] = useState({
@@ -31,11 +30,26 @@ const ProductFilters = ({ filters, onFilterChange }) => {
 
   const INITIAL_DISPLAY_COUNT = 5;
 
+  // Load categories and brands if not loaded
   useEffect(() => {
-    // Fetch categories and brands from API
-    dispatch(fetchCategories());
-    dispatch(fetchBrands());
-  }, [dispatch]);
+    const loadData = async () => {
+      if (categories.length === 0 || brands.length === 0) {
+        setLocalLoading(true);
+        try {
+          await Promise.all([
+            categories.length === 0 ? fetchCategories() : Promise.resolve(),
+            brands.length === 0 ? fetchBrands() : Promise.resolve(),
+          ]);
+        } catch (error) {
+          console.error("Error loading filter data:", error);
+        } finally {
+          setLocalLoading(false);
+        }
+      }
+    };
+
+    loadData();
+  }, [categories.length, brands.length, fetchCategories, fetchBrands]);
 
   useEffect(() => {
     // Update local filters when props change, ensuring all values are strings
@@ -207,12 +221,10 @@ const ProductFilters = ({ filters, onFilterChange }) => {
                   className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                 >
                   {showAllCategories
-                    ? `Ẩn bớt (${
-                        filteredCategories.length - INITIAL_DISPLAY_COUNT
-                      } mục)`
-                    : `Xem thêm ${
-                        filteredCategories.length - INITIAL_DISPLAY_COUNT
-                      } danh mục`}
+                    ? `Ẩn bớt (${filteredCategories.length - INITIAL_DISPLAY_COUNT
+                    } mục)`
+                    : `Xem thêm ${filteredCategories.length - INITIAL_DISPLAY_COUNT
+                    } danh mục`}
                 </button>
               )}
           </div>
@@ -289,12 +301,10 @@ const ProductFilters = ({ filters, onFilterChange }) => {
                 className="text-sm text-primary-600 hover:text-primary-700 font-medium"
               >
                 {showAllBrands
-                  ? `Ẩn bớt (${
-                      filteredBrands.length - INITIAL_DISPLAY_COUNT
-                    } mục)`
-                  : `Xem thêm ${
-                      filteredBrands.length - INITIAL_DISPLAY_COUNT
-                    } thương hiệu`}
+                  ? `Ẩn bớt (${filteredBrands.length - INITIAL_DISPLAY_COUNT
+                  } mục)`
+                  : `Xem thêm ${filteredBrands.length - INITIAL_DISPLAY_COUNT
+                  } thương hiệu`}
               </button>
             )}
           </div>

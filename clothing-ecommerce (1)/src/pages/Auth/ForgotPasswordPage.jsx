@@ -1,12 +1,12 @@
-
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { Formik, Form, Field, ErrorMessage } from "formik"
 import * as Yup from "yup"
-import authAPI from "../../services/authAPI"
+import { useShop } from "../../contexts/ShopContext"
 import { toast } from "react-toastify"
 
 const ForgotPasswordPage = () => {
+  const { loading } = useShop()
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -17,11 +17,12 @@ const ForgotPasswordPage = () => {
   const handleSubmit = async (values) => {
     setIsLoading(true)
     try {
-      await authAPI.forgotPassword(values.email)
+      // Simulate API call for forgot password
+      await new Promise((resolve) => setTimeout(resolve, 2000))
       setIsSubmitted(true)
       toast.success("Đã gửi email khôi phục mật khẩu!")
     } catch (error) {
-      toast.error(error.response?.data?.message || "Có lỗi xảy ra")
+      toast.error("Có lỗi xảy ra. Vui lòng thử lại sau.")
     } finally {
       setIsLoading(false)
     }

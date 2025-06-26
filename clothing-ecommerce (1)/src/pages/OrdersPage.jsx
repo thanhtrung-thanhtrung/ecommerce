@@ -1,0 +1,3 @@
+import React, { useEffect, useState } from 'react';
+import { useShop } from '../contexts/ShopContext';
+// ...existing imports...

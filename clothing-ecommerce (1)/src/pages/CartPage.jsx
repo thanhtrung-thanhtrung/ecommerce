@@ -1,40 +1,58 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchCart,
-  updateCartItem,
-  removeFromCart,
-  clearCart,
-} from "../store/slices/cartSlice";
+import { ShoppingBag, ArrowLeft } from "lucide-react";
+import { useCartContext } from "../contexts/CartContext";
 import CartItem from "../components/Cart/CartItem";
 import CartSummary from "../components/Cart/CartSummary";
+import VoucherInput from "../components/Cart/VoucherInput";
+import LoadingSpinner from "../components/Common/LoadingSpinner";
 
 const CartPage = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { items, totalItems, totalAmount, isLoading } = useSelector(
-    (state) => state.cart
-  );
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const {
+    cartItems,
+    loading,
+    cartSubtotal,
+    finalTotal,
+    totalItems,
+    appliedVoucher,
+    voucherDiscount,
+    updateCartItem,
+    removeFromCart,
+    clearCart,
+    fetchCart,
+    validateVoucher,
+    removeVoucher,
+  } = useCartContext();
 
   useEffect(() => {
-    // Luôn fetch cart (backend sẽ xử lý user hoặc session)
-    dispatch(fetchCart());
-  }, [dispatch]);
+    // Fetch cart when component mounts
+    fetchCart();
+  }, [fetchCart]);
 
-  const handleUpdateQuantity = (itemId, newQuantity) => {
-    if (newQuantity < 1) return;
-    dispatch(updateCartItem({ id: itemId, quantity: newQuantity }));
+  const handleUpdateQuantity = async (cartId, newQuantity) => {
+    try {
+      await updateCartItem(cartId, newQuantity);
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+    }
   };
 
-  const handleRemoveItem = (itemId) => {
-    dispatch(removeFromCart(itemId));
+  const handleRemoveItem = async (cartId) => {
+    try {
+      await removeFromCart(cartId);
+    } catch (error) {
+      console.error("Error removing item:", error);
+    }
   };
 
-  const handleClearCart = () => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ giỏ hàng?")) {
-      dispatch(clearCart());
+  const handleClearCart = async () => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa tất cả sản phẩm khỏi giỏ hàng?")) {
+      try {
+        await clearCart();
+      } catch (error) {
+        console.error("Error clearing cart:", error);
+      }
     }
   };
 
@@ -42,75 +60,109 @@ const CartPage = () => {
     navigate("/checkout");
   };
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex justify-center">
-          <div className="spinner"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!items || items.length === 0) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="text-center">
-          <div className="text-6xl mb-6">🛒</div>
-          <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-            Giỏ hàng trống
-          </h2>
-          <p className="text-gray-600 mb-8">
-            Hãy thêm sản phẩm vào giỏ hàng để tiếp tục mua sắm
-          </p>
-          <Link
-            to="/products"
-            className="inline-block bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            Tiếp tục mua sắm
-          </Link>
-        </div>
-      </div>
-    );
+  if (loading && cartItems.length === 0) {
+    return <LoadingSpinner />;
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">
-          Giỏ hàng ({totalItems} sản phẩm)
-        </h1>
-        <button
-          onClick={handleClearCart}
-          className="text-red-600 hover:text-red-800 font-medium"
-        >
-          Xóa tất cả
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Cart Items */}
-        <div className="lg:col-span-2">
-          <div className="space-y-4">
-            {items.map((item) => (
-              <CartItem
-                key={item.id}
-                item={item}
-                onUpdateQuantity={handleUpdateQuantity}
-                onRemove={handleRemoveItem}
-              />
-            ))}
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Giỏ hàng</h1>
+              <p className="text-sm text-gray-600">
+                {totalItems > 0 ? `${totalItems} sản phẩm` : "Giỏ hàng trống"}
+              </p>
+            </div>
           </div>
+
+          {cartItems.length > 0 && (
+            <button
+              onClick={handleClearCart}
+              disabled={loading}
+              className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
+            >
+              Xóa tất cả
+            </button>
+          )}
         </div>
 
-        {/* Cart Summary */}
-        <div className="lg:col-span-1">
-          <CartSummary
-            items={items}
-            totalAmount={totalAmount}
-            onCheckout={handleCheckout}
-          />
-        </div>
+        {cartItems.length === 0 ? (
+          /* Empty Cart State */
+          <div className="text-center py-16">
+            <ShoppingBag className="h-24 w-24 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Giỏ hàng của bạn đang trống
+            </h2>
+            <p className="text-gray-600 mb-8">
+              Hãy thêm sản phẩm vào giỏ hàng để tiếp tục mua sắm
+            </p>
+            <Link
+              to="/products"
+              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 transition-colors"
+            >
+              Tiếp tục mua sắm
+            </Link>
+          </div>
+        ) : (
+          /* Cart Content */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Cart Items */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-200">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Sản phẩm trong giỏ hàng ({totalItems})
+                  </h2>
+                </div>
+
+                <div className="divide-y divide-gray-200">
+                  {cartItems.map((item) => (
+                    <div key={`${item.id}-${item.id_ChiTietSanPham}`} className="p-6">
+                      <CartItem
+                        item={item}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onRemove={handleRemoveItem}
+                        loading={loading}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Voucher Input */}
+              <div className="mt-6">
+                <VoucherInput
+                  onApplyVoucher={validateVoucher}
+                  onRemoveVoucher={removeVoucher}
+                  appliedVoucher={appliedVoucher}
+                  loading={loading}
+                />
+              </div>
+            </div>
+
+            {/* Cart Summary */}
+            <div className="lg:col-span-1">
+              <CartSummary
+                items={cartItems}
+                subtotal={cartSubtotal}
+                discount={voucherDiscount}
+                finalTotal={finalTotal}
+                appliedVoucher={appliedVoucher}
+                onCheckout={handleCheckout}
+                loading={loading}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -6,34 +6,69 @@ const InventoryService = require("./inventory.service");
 const emailService = require("./email.service");
 
 class OrderService {
-  async createOrder(userId, orderData, sessionId = null) {
+  async createOrder(orderData, userId = null, sessionId = null) {
     const connection = await db.getConnection();
 
     try {
       await connection.beginTransaction();
 
-      // Frontend gửi format: { hoTen, email, diaChiGiao, soDienThoai, ... }
+      // Frontend gửi format với field names đúng
       const {
         hoTen,
         email,
         diaChiGiao,
         soDienThoai,
-        id_ThanhToan,
+        id_ThanhToan, // ✅ Fixed: match database field name
         id_VanChuyen,
         MaGiamGia,
         ghiChu,
+        tongTien,
+        tongTienSauGiam,
+        phiVanChuyen,
+        sessionId: frontendSessionId, // In case sessionId is sent in body
       } = orderData;
+
+      // Use sessionId from parameter or from body
+      const finalSessionId = sessionId || frontendSessionId;
 
       // Validate required fields
       if (!hoTen || !email || !diaChiGiao || !soDienThoai) {
         throw new Error("Thiếu thông tin bắt buộc");
       }
 
+      // Cải thiện validation cho payment và shipping methods
+      const paymentMethodId = parseInt(id_ThanhToan);
+      const shippingMethodId = parseInt(id_VanChuyen);
+
+      if (!id_ThanhToan || isNaN(paymentMethodId) || paymentMethodId <= 0) {
+        throw new Error(
+          "Thiếu thông tin phương thức thanh toán hoặc không hợp lệ"
+        );
+      }
+
+      if (!id_VanChuyen || isNaN(shippingMethodId) || shippingMethodId <= 0) {
+        throw new Error(
+          "Thiếu thông tin phương thức vận chuyển hoặc không hợp lệ"
+        );
+      }
+
+      // Kiểm tra xem phương thức thanh toán có tồn tại không
+      const [paymentMethod] = await connection.execute(
+        "SELECT id FROM hinhthucthanhtoan WHERE id = ? AND TrangThai = 1",
+        [paymentMethodId]
+      );
+      if (paymentMethod.length === 0) {
+        throw new Error(
+          "Phương thức thanh toán không tồn tại hoặc đã bị vô hiệu hóa"
+        );
+      }
+
       // 1. Lấy giỏ hàng
       let cartQuery, cartParams;
+      // Đảm bảo truy vấn giỏ hàng xử lý đúng cho cả khách vãng lai và người dùng đã đăng nhập
       if (userId) {
         cartQuery = `
-          SELECT gh.*, ctsp.id_SanPham, sp.Gia
+          SELECT gh.*, ctsp.id_SanPham, sp.Gia, sp.GiaKhuyenMai
           FROM giohang gh
           JOIN chitietsanpham ctsp ON gh.id_ChiTietSanPham = ctsp.id
           JOIN sanpham sp ON ctsp.id_SanPham = sp.id
@@ -41,18 +76,29 @@ class OrderService {
         cartParams = [userId];
       } else if (sessionId) {
         cartQuery = `
-          SELECT gh.*, ctsp.id_SanPham, sp.Gia
+          SELECT gh.*, ctsp.id_SanPham, sp.Gia, sp.GiaKhuyenMai
           FROM giohang gh
           JOIN chitietsanpham ctsp ON gh.id_ChiTietSanPham = ctsp.id
           JOIN sanpham sp ON ctsp.id_SanPham = sp.id
           WHERE gh.session_id = ? AND gh.id_NguoiDung IS NULL`;
         cartParams = [sessionId];
       } else {
-        throw new Error("Không tìm thấy thông tin người dùng hoặc session");
+        throw new Error("Thiếu thông tin người dùng hoặc session");
       }
 
+      // Debugging logs to verify session and cart query
+      console.log("🔍 Debug - sessionId:", sessionId);
+      console.log("🔍 Debug - userId:", userId);
+
       const [cartItems] = await connection.execute(cartQuery, cartParams);
-      if (cartItems.length === 0) throw new Error("Giỏ hàng trống");
+
+      // Debug log kết quả giỏ hàng
+      console.log("🔍 Debug - cartItems count:", cartItems.length);
+      console.log("🔍 Debug - cartItems:", cartItems);
+
+      if (cartItems.length === 0) {
+        throw new Error("Giỏ hàng trống");
+      }
 
       // 2. Kiểm tra tồn kho của tất cả sản phẩm trong giỏ hàng
       for (const item of cartItems) {
@@ -70,11 +116,11 @@ class OrderService {
         }
       }
 
-      // 3. Tính tổng tiền
-      let TongTienHang = cartItems.reduce(
-        (sum, item) => sum + item.Gia * item.SoLuong,
-        0
-      );
+      // 3. Tính tổng tiền (ưu tiên GiaKhuyenMai theo nghiệp vụ web bán giày)
+      let TongTienHang = cartItems.reduce((sum, item) => {
+        const finalPrice = item.GiaKhuyenMai || item.Gia;
+        return sum + finalPrice * item.SoLuong;
+      }, 0);
 
       // 4. Áp dụng mã giảm giá (nếu có)
       let GiamGia = 0;
@@ -115,7 +161,7 @@ class OrderService {
       // 6. Tính tổng thanh toán
       const TongThanhToan = TongTienHang - GiamGia + PhiVanChuyen;
 
-      // 7. Tạo đơn hàng
+      // 7. Tạo đơn hàng với field name đúng
       const [orderResult] = await connection.execute(
         `INSERT INTO donhang (
           id_NguoiMua, NgayDatHang, TongTienHang, GiamGia, PhiVanChuyen, 
@@ -132,17 +178,20 @@ class OrderService {
           soDienThoai,
           hoTen,
           email,
-          id_ThanhToan,
+          id_ThanhToan, // ✅ Use correct field name from database
           id_VanChuyen,
           MaGiamGia || null,
           ghiChu || null,
-          userId ? null : sessionId,
+          userId ? null : finalSessionId,
         ]
       );
       const orderId = orderResult.insertId;
 
       // 8. Lưu chi tiết đơn hàng và cập nhật tồn kho
       for (const item of cartItems) {
+        // Use correct price (prioritize GiaKhuyenMai)
+        const finalPrice = item.GiaKhuyenMai || item.Gia;
+
         await connection.execute(
           `INSERT INTO chitietdonhang (id_DonHang, id_ChiTietSanPham, SoLuong, GiaBan, ThanhTien)
            VALUES (?, ?, ?, ?, ?)`,
@@ -150,8 +199,8 @@ class OrderService {
             orderId,
             item.id_ChiTietSanPham,
             item.SoLuong,
-            item.Gia,
-            item.Gia * item.SoLuong,
+            finalPrice,
+            finalPrice * item.SoLuong,
           ]
         );
 
@@ -167,10 +216,10 @@ class OrderService {
         await connection.execute(`DELETE FROM giohang WHERE id_NguoiDung = ?`, [
           userId,
         ]);
-      } else if (sessionId) {
+      } else if (finalSessionId) {
         await connection.execute(
           `DELETE FROM giohang WHERE session_id = ? AND id_NguoiDung IS NULL`,
-          [sessionId]
+          [finalSessionId]
         );
       }
 
@@ -182,15 +231,7 @@ class OrderService {
         // Lấy thông tin đơn hàng để gửi email
         const orderForEmail = await this.getOrderDetail(orderId);
 
-        console.log(
-          `📧 Gửi email xác nhận đặt hàng #${orderId} đến ${orderForEmail.EmailNguoiNhan}`
-        );
-
         await emailService.sendOrderConfirmation(orderForEmail);
-
-        console.log(
-          `✅ Đã gửi email xác nhận thành công cho đơn hàng #${orderId}`
-        );
       } catch (emailError) {
         // Log lỗi email nhưng không ảnh hưởng đến việc tạo đơn hàng
         console.error(
@@ -764,17 +805,11 @@ class OrderService {
       // Chỉ gửi email nếu trạng thái thực sự thay đổi và có email khách hàng
       if (oldStatus !== dbStatus && order.EmailNguoiNhan) {
         try {
-          console.log(
-            `📧 Đang gửi email thông báo trạng thái đơn hàng #${orderId} từ ${oldStatus} -> ${dbStatus} đến ${order.EmailNguoiNhan}`
-          );
-
           await emailService.sendOrderStatusUpdate(
             orderDataForEmail,
             status,
             note
           );
-
-          console.log(`✅ Đã gửi email thành công cho đơn hàng #${orderId}`);
         } catch (emailError) {
           // Log lỗi email nhưng không throw để không ảnh hưởng đến việc cập nhật đơn hàng
           console.error(

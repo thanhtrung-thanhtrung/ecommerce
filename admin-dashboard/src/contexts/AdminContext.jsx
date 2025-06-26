@@ -147,29 +147,34 @@ export const AdminProvider = ({ children }) => {
 
     // Process products to parse JSON fields and add computed fields
     if (response.products) {
-      response.products = response.products.map((product) => ({
-        ...product,
-        // Parse images
-        images: parseProductImages(product.HinhAnh),
-        anhChinh: parseProductImages(product.HinhAnh).anhChinh,
-        anhPhu: parseProductImages(product.HinhAnh).anhPhu,
+      response.products = response.products.map((product) => {
+        // Parse images properly
+        const parsedImages = parseProductImages(product.HinhAnh);
 
-        // Parse specifications
-        ThongSoKyThuatParsed: parseThongSoKyThuat(product.ThongSoKyThuat),
+        return {
+          ...product,
+          // Parse images
+          images: parsedImages,
+          anhChinh: parsedImages.anhChinh,
+          anhPhu: parsedImages.anhPhu,
 
-        // Convert string numbers to numbers
-        Gia: parseFloat(product.Gia) || 0,
-        GiaKhuyenMai: product.GiaKhuyenMai
-          ? parseFloat(product.GiaKhuyenMai)
-          : null,
+          // Parse specifications
+          ThongSoKyThuatParsed: parseThongSoKyThuat(product.ThongSoKyThuat),
 
-        // Add computed fields
-        TenThuongHieu: product.tenThuongHieu,
-        TenDanhMuc: product.tenDanhMuc,
-        TenNhaCungCap: product.tenNhaCungCap,
-        TongSoLuong: product.soBienThe || 0,
-        SoLuongDaBan: product.SoLuongDaBan || 0,
-      }));
+          // Convert string numbers to numbers
+          Gia: parseFloat(product.Gia) || 0,
+          GiaKhuyenMai: product.GiaKhuyenMai
+            ? parseFloat(product.GiaKhuyenMai)
+            : null,
+
+          // Add computed fields
+          TenThuongHieu: product.tenThuongHieu,
+          TenDanhMuc: product.tenDanhMuc,
+          TenNhaCungCap: product.tenNhaCungCap,
+          TongSoLuong: product.soBienThe || 0,
+          SoLuongDaBan: product.SoLuongDaBan || 0,
+        };
+      });
     }
 
     return response;
@@ -202,46 +207,37 @@ export const AdminProvider = ({ children }) => {
   // Create product
   const createProduct = async (productData) => {
     try {
-      console.log("Creating product with data:", productData);
+      setLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/api/products/admin/create`, {
-        method: "POST",
-        body: productData, // FormData object
+      const response = await fetch(`${API_BASE_URL}/products`, {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(productData),
       });
 
-      console.log("Response status:", response.status);
-
       if (!response.ok) {
-        // Try to get detailed error information
-        let errorData;
+        let errorMessage = 'Có lỗi xảy ra khi tạo sản phẩm';
         try {
-          errorData = await response.json();
-          console.log("Error response data:", errorData);
-        } catch (parseError) {
-          console.log("Could not parse error response as JSON");
-          errorData = { message: `HTTP error! status: ${response.status}` };
+          const errorData = await response.json();
+        } catch {
         }
-
-        // If we have validation errors, show them
-        if (errorData.errors && Array.isArray(errorData.errors)) {
-          const errorMessages = errorData.errors
-            .map((err) => err.msg || err.message)
-            .join(", ");
-          throw new Error(`Validation errors: ${errorMessages}`);
-        }
-
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
-      console.log("Create product success:", result);
+
+      // Refresh products list
+      await fetchProducts();
+
       return result;
     } catch (error) {
-      console.error("Create product error:", error);
+      console.error('Create product error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -544,7 +540,6 @@ export const AdminProvider = ({ children }) => {
     const queryString = new URLSearchParams(params).toString();
     const url = queryString ? `/api/revenue/stats?${queryString}` : "/api/revenue/stats";
     return await apiCall(url);
-    console.log("Revenue stats:", revenueResponse);
   };
 
 
