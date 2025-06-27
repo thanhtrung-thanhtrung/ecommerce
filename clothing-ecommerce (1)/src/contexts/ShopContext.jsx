@@ -453,11 +453,11 @@ export const ShopProvider = ({ children }) => {
     // Wishlist functions
     const addToWishlist = useCallback(async (productId) => {
         try {
-            if (isAuthenticated) {
-                if (!productId) throw new Error("Thiếu productId");
+            if (!productId) throw new Error("Thiếu productId");
+            if (isAuthenticated && user?.id) {
                 const response = await apiCall("/api/users/wishlist", {
                     method: "POST",
-                    body: JSON.stringify({ productId }), // chỉ gửi productId
+                    body: JSON.stringify({ userId: user.id, id_SanPham: productId }),
                 });
                 if (response.success) {
                     const wishlistResponse = await apiCall("/api/users/wishlist");
@@ -467,17 +467,19 @@ export const ShopProvider = ({ children }) => {
                     toast.success("Đã thêm vào danh sách yêu thích!");
                     return response;
                 }
-            } else {
+            } else if (!isAuthenticated) {
                 const newWishlist = [...wishlist, { id: productId }];
                 setWishlist(newWishlist);
                 localStorage.setItem("wishlist", JSON.stringify(newWishlist));
                 toast.success("Đã thêm vào danh sách yêu thích!");
+            } else {
+                throw new Error("Người dùng chưa đăng nhập hoặc không hợp lệ");
             }
         } catch (error) {
             toast.error(error.message || "Lỗi khi thêm vào danh sách yêu thích");
             throw error;
         }
-    }, [apiCall, isAuthenticated, wishlist]);
+    }, [apiCall, isAuthenticated, user, wishlist]);
 
     const removeFromWishlist = useCallback(async (productId) => {
         try {
@@ -509,9 +511,18 @@ export const ShopProvider = ({ children }) => {
         try {
             if (isAuthenticated) {
                 const response = await apiCall("/api/users/wishlist");
-                if (response.success) {
+
+                // API trả về trực tiếp array, không phải object {success, data}
+                if (Array.isArray(response)) {
+                    setWishlist(response);
+                    return { success: true, data: response };
+                } else if (response && response.success) {
+                    // Nếu API trả về format {success, data}
                     setWishlist(response.data || []);
                     return response;
+                } else {
+                    setWishlist([]);
+                    return { success: false, data: [] };
                 }
             } else {
                 const savedWishlist = localStorage.getItem("wishlist");
@@ -526,6 +537,7 @@ export const ShopProvider = ({ children }) => {
                     }
                 }
             }
+            setWishlist([]);
             return { success: true, data: [] };
         } catch (error) {
             setWishlist([]);
