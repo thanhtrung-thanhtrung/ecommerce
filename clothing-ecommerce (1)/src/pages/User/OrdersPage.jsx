@@ -1,107 +1,91 @@
-import { useEffect, useState } from "react"
-import { Link } from "react-router-dom"
-import { useShop } from "../../contexts/ShopContext"
-import OrderCard from "../../components/Order/OrderCard"
-import OrderFilters from "../../components/Order/OrderFilters"
-import Pagination from "../../components/Common/Pagination"
-import LoadingSpinner from "../../components/Common/LoadingSpinner"
+import React, { useEffect } from "react"
+import { useShop } from "../../contexts/ShopContext";
+
+const statusMap = {
+  1: "Chờ xác nhận",
+  2: "Đã xác nhận",
+  3: "Đang xử lý",
+  4: "Đang giao",
+  5: "Đã giao",
+  6: "Đã hủy",
+}
 
 const OrdersPage = () => {
-  const {
-    orders,
-    loading,
-    totalOrders,
-    currentPage,
-    totalPages,
-    orderStatuses,
-    fetchUserOrders,
-    cancelOrder,
-    setCurrentPage,
-  } = useShop()
-
-  const [statusFilter, setStatusFilter] = useState("")
+  const { orders, loading, error, fetchUserOrders } = useShop()
 
   useEffect(() => {
-    fetchUserOrders({ page: currentPage, status: statusFilter })
-  }, [fetchUserOrders, currentPage, statusFilter])
-
-  const handlePageChange = (page) => {
-    setCurrentPage(page)
-  }
-
-  const handleStatusFilter = (status) => {
-    setStatusFilter(status)
-    setCurrentPage(1)
-  }
-
-  const handleCancelOrder = (orderId) => {
-    if (window.confirm("Bạn có chắc chắn muốn hủy đơn hàng này?")) {
-      cancelOrder(orderId)
-    }
-  }
-
-  if (loading) {
-    return <LoadingSpinner />
-  }
+    fetchUserOrders()
+  }, [fetchUserOrders])
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Đơn hàng của tôi ({totalOrders})
-        </h1>
-      </div>
-
-      <OrderFilters
-        statuses={orderStatuses}
-        currentStatus={statusFilter}
-        onStatusChange={handleStatusFilter}
-      />
-
-      {orders.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-24 h-24 mx-auto mb-4 text-gray-300">
-            {/* Package icon */}
-            <svg fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2L2 7v10c0 5.55 3.84 9.74 9 11 5.16-1.26 9-5.45 9-11V7l-10-5z" />
-            </svg>
-          </div>
-          <h3 className="text-xl font-medium text-gray-900 mb-2">
-            Chưa có đơn hàng nào
-          </h3>
-          <p className="text-gray-500 mb-8">
-            Hãy mua sắm ngay để tạo đơn hàng đầu tiên của bạn
-          </p>
-          <Link
-            to="/products"
-            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          >
-            Mua sắm ngay
-          </Link>
-        </div>
-      ) : (
-        <>
-          <div className="space-y-6">
-            {orders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onCancel={handleCancelOrder}
-              />
-            ))}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="mt-8">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
+    <div style={{ maxWidth: 700, margin: "40px auto", padding: 20 }}>
+      <h2 style={{ fontSize: 24, fontWeight: 600, marginBottom: 24 }}>
+        Đơn hàng của tôi
+      </h2>
+      {loading && <p>Đang tải...</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      {!loading && orders.length === 0 && <p>Không có đơn hàng nào.</p>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        {orders.map((order) => (
+          <div key={order.id} style={{ border: "1px solid #eee", borderRadius: 8, padding: 16 }}>
+            <div style={{ marginBottom: 8 }}>
+              <b>Mã đơn:</b> {order.MaDonHang || order.id}
+              <span style={{ float: "right", color: "#0070f3", fontWeight: 500 }}>
+                {statusMap[order.TrangThai] || "-"}
+              </span>
             </div>
-          )}
-        </>
-      )}
+            <div><b>Ngày đặt:</b> {order.NgayDatHang ? new Date(order.NgayDatHang).toLocaleString() : "-"}</div>
+            <div><b>Người nhận:</b> {order.TenNguoiNhan}</div>
+            <div><b>Địa chỉ:</b> {order.DiaChiNhan}</div>
+            <div><b>SDT:</b> {order.SDTNguoiNhan}</div>
+            <div><b>Email:</b> {order.EmailNguoiNhan}</div>
+            <div><b>Thanh toán:</b> {order.tenHinhThucThanhToan}</div>
+            <div><b>Vận chuyển:</b> {order.tenHinhThucVanChuyen}</div>
+            <div><b>Tổng tiền:</b> {Number(order.TongThanhToan).toLocaleString()} đ</div>
+            <div><b>Ghi chú:</b> {order.GhiChu || "-"}</div>
+            <div style={{ marginTop: 12 }}>
+              <b>Chi tiết sản phẩm:</b>
+              <ul style={{ paddingLeft: 20, margin: 0 }}>
+                {order.chiTiet?.map((item) => {
+                  let img = null
+                  try {
+                    const imgObj = JSON.parse(item.HinhAnh)
+                    img = imgObj.anhChinh
+                  } catch { }
+                  return (
+                    <li
+                      key={item.id}
+                      style={{
+                        marginBottom: 8,
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      {img && (
+                        <img
+                          src={img}
+                          alt="sp"
+                          style={{
+                            width: 48,
+                            height: 48,
+                            objectFit: "cover",
+                            borderRadius: 4,
+                            marginRight: 12,
+                          }}
+                        />
+                      )}
+                      <div>
+                        <div><b>{item.tenSanPham}</b></div>
+                        <div>SL: {item.SoLuong} | Giá: {Number(item.GiaBan).toLocaleString()} đ</div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

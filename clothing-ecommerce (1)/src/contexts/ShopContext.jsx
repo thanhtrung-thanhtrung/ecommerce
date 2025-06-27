@@ -115,12 +115,11 @@ export const ShopProvider = ({ children }) => {
                 body: JSON.stringify(credentials),
             });
 
-            if (response.success) {
+            // Sửa logic kiểm tra thành công: chỉ cần có token và user là thành công
+            if (response.token && response.user) {
                 setUser(response.user);
                 setIsAuthenticated(true);
-                if (response.token) {
-                    localStorage.setItem("token", response.token);
-                }
+                localStorage.setItem("token", response.token);
                 localStorage.setItem("user", JSON.stringify(response.user));
                 toast.success("Đăng nhập thành công!");
                 return response;
@@ -143,7 +142,8 @@ export const ShopProvider = ({ children }) => {
                 body: JSON.stringify(userData),
             });
 
-            if (response.success) {
+            // Sửa logic: thành công nếu có userId hoặc message chứa 'thành công'
+            if (response.userId || (response.message && response.message.toLowerCase().includes("thành công"))) {
                 toast.success("Đăng ký thành công!");
                 return response;
             } else {
@@ -454,12 +454,13 @@ export const ShopProvider = ({ children }) => {
     const addToWishlist = useCallback(async (productId) => {
         try {
             if (isAuthenticated) {
-                const response = await apiCall("/api/wishlists", {
+                if (!productId) throw new Error("Thiếu productId");
+                const response = await apiCall("/api/users/wishlist", {
                     method: "POST",
-                    body: JSON.stringify({ productId }),
+                    body: JSON.stringify({ productId }), // chỉ gửi productId
                 });
                 if (response.success) {
-                    const wishlistResponse = await apiCall("/api/wishlists");
+                    const wishlistResponse = await apiCall("/api/users/wishlist");
                     if (wishlistResponse.success) {
                         setWishlist(wishlistResponse.data || []);
                     }
@@ -473,7 +474,7 @@ export const ShopProvider = ({ children }) => {
                 toast.success("Đã thêm vào danh sách yêu thích!");
             }
         } catch (error) {
-            toast.error("Lỗi khi thêm vào danh sách yêu thích");
+            toast.error(error.message || "Lỗi khi thêm vào danh sách yêu thích");
             throw error;
         }
     }, [apiCall, isAuthenticated, wishlist]);
@@ -481,11 +482,11 @@ export const ShopProvider = ({ children }) => {
     const removeFromWishlist = useCallback(async (productId) => {
         try {
             if (isAuthenticated) {
-                const response = await apiCall(`/api/wishlists/${productId}`, {
+                const response = await apiCall(`/api/users/wishlist/${productId}`, {
                     method: "DELETE",
                 });
                 if (response.success) {
-                    const wishlistResponse = await apiCall("/api/wishlists");
+                    const wishlistResponse = await apiCall("/api/users/wishlist");
                     if (wishlistResponse.success) {
                         setWishlist(wishlistResponse.data || []);
                     }
@@ -507,7 +508,7 @@ export const ShopProvider = ({ children }) => {
     const fetchWishlist = useCallback(async () => {
         try {
             if (isAuthenticated) {
-                const response = await apiCall("/api/wishlists");
+                const response = await apiCall("/api/users/wishlist");
                 if (response.success) {
                     setWishlist(response.data || []);
                     return response;
@@ -520,7 +521,6 @@ export const ShopProvider = ({ children }) => {
                         setWishlist(wishlistData);
                         return { success: true, data: wishlistData };
                     } catch (error) {
-                        console.error("Error parsing wishlist from localStorage:", error);
                         localStorage.removeItem("wishlist");
                         setWishlist([]);
                     }
@@ -528,11 +528,142 @@ export const ShopProvider = ({ children }) => {
             }
             return { success: true, data: [] };
         } catch (error) {
-            console.error("Error fetching wishlist:", error);
             setWishlist([]);
             return { success: false, data: [] };
         }
     }, [apiCall, isAuthenticated]);
+
+    // ================= USER PROFILE & ACCOUNT =================
+    const getProfile = useCallback(async () => {
+        try {
+            setLoading(true);
+            const response = await apiCall("/api/users/profile");
+            if (response && response.id) {
+                setUser(response);
+                setIsAuthenticated(true);
+                localStorage.setItem("user", JSON.stringify(response));
+            }
+            return response;
+        } catch (error) {
+            setUser(null);
+            setIsAuthenticated(false);
+            localStorage.removeItem("user");
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [apiCall]);
+
+    const updateProfile = useCallback(async (profileData) => {
+        try {
+            setLoading(true);
+            const response = await apiCall("/api/users/profile", {
+                method: "PUT",
+                body: JSON.stringify(profileData),
+            });
+            if (response && response.id) {
+                setUser(response);
+                localStorage.setItem("user", JSON.stringify(response));
+            }
+            return response;
+        } catch (error) {
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [apiCall]);
+
+    const changePassword = useCallback(async (values) => {
+        try {
+            setLoading(true);
+            const response = await apiCall("/api/users/change-password", {
+                method: "PUT",
+                body: JSON.stringify(values),
+            });
+            return response;
+        } catch (error) {
+            // Nếu lỗi dạng { errors: [...] } thì ném lại nguyên object để Formik xử lý field error
+            if (error && error.message && error.message.includes('HTTP error!') && error.errors) {
+                throw error;
+            }
+            // Nếu response có body dạng JSON với errors
+            try {
+                const errorData = JSON.parse(error.message);
+                if (errorData && errorData.errors) throw errorData;
+            } catch { }
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [apiCall]);
+
+    // ================= ORDER HISTORY =================
+    const fetchUserOrders = useCallback(async (params = {}) => {
+        try {
+            setLoading(true)
+            setError("")
+            const query = new URLSearchParams(params).toString()
+            const res = await apiCall(`/api/users/order-history${query ? `?${query}` : ""}`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+                credentials: "include",
+            })
+
+            if (res && Array.isArray(res.orders)) {
+                setOrders(res.orders)
+            } else if (Array.isArray(res)) {
+                setOrders(res)
+            } else {
+                setOrders([])
+            }
+
+            return res
+        } catch (err) {
+            setOrders([])
+            setError("Lỗi khi tải đơn hàng")
+            console.error(err)
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
+
+    // ================= WISHLIST =================
+    const clearWishlist = useCallback(async () => {
+        try {
+            setLoading(true);
+            const response = await apiCall("/api/users/wishlist", {
+                method: "DELETE",
+            });
+            if (response && response.success) {
+                setWishlist([]);
+            }
+            return response;
+        } catch (error) {
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [apiCall]);
+
+    // ================= CANCEL ORDER =================
+    const cancelOrder = useCallback(async (orderId, reason = "Khách hàng yêu cầu hủy") => {
+        try {
+            setLoading(true);
+            const response = await apiCall(`/api/users/orders/${orderId}/cancel`, {
+                method: "POST",
+                body: JSON.stringify({ lyDoHuy: reason }),
+            });
+            return response;
+        } catch (error) {
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [apiCall]);
 
     // UI functions
     const toggleMobileMenu = useCallback(() => {
@@ -631,6 +762,16 @@ export const ShopProvider = ({ children }) => {
         removeFromWishlist,
         fetchWishlist,
         wishlistItems: wishlist, // Alias for compatibility
+
+        // User profile/account
+        getProfile,
+        updateProfile,
+        changePassword,
+        // Orders
+        fetchUserOrders,
+        cancelOrder,
+        // Wishlist
+        clearWishlist,
 
         // UI functions
         toggleMobileMenu,

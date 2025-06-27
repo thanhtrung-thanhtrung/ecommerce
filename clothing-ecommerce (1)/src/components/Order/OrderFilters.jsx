@@ -1,9 +1,9 @@
 "use client";
 
-const OrderFilters = ({ orderStatuses, selectedStatus, onStatusChange }) => {
+const OrderFilters = ({ orderStatuses = {}, selectedStatus, onStatusChange }) => {
   const statusOptions = [
     { value: "", label: "Tất cả đơn hàng" },
-    ...Object.entries(orderStatuses).map(([key, value]) => ({
+    ...Object.entries(orderStatuses || {}).map(([key, value]) => ({
       value: key,
       label: value,
     })),

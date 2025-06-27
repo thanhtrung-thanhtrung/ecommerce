@@ -5,7 +5,7 @@ import { useShop } from "../../contexts/ShopContext";
 import { toast } from "react-toastify";
 
 const ProfilePage = () => {
-  const { user, loading, updateProfile, changePassword } = useShop();
+  const { user, loading, updateProfile, changePassword, getProfile } = useShop();
   const [activeTab, setActiveTab] = useState("profile");
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -14,7 +14,7 @@ const ProfilePage = () => {
       .min(2, "Họ tên phải có ít nhất 2 ký tự")
       .required("Vui lòng nhập họ tên"),
     soDienThoai: Yup.string()
-      .matches(/^[0-9]{10,11}$/, "Số điện thoại không hợp lệ")
+      .matches(/^0\d{9}$/, "Số điện thoại Việt Nam phải bắt đầu bằng 0 và có đúng 10 số")
       .required("Vui lòng nhập số điện thoại"),
     diaChi: Yup.string()
       .min(10, "Địa chỉ phải có ít nhất 10 ký tự")
@@ -36,25 +36,40 @@ const ProfilePage = () => {
     try {
       await updateProfile(values);
       toast.success("Cập nhật thông tin thành công!");
+      await getProfile();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Cập nhật thất bại");
+      toast.error(error?.message || "Cập nhật thất bại");
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const handleChangePassword = async (values, { resetForm }) => {
+  const handleChangePassword = async (values, { resetForm, setErrors }) => {
     setIsUpdating(true);
     try {
       await changePassword(values);
       toast.success("Đổi mật khẩu thành công!");
       resetForm();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Đổi mật khẩu thất bại");
+      // Nếu API trả về lỗi dạng { errors: [ { path, msg } ] }
+      if (error && error.errors && Array.isArray(error.errors)) {
+        const fieldErrors = {};
+        error.errors.forEach((err) => {
+          if (err.path && err.msg) fieldErrors[err.path] = err.msg;
+        });
+        setErrors(fieldErrors);
+      } else {
+        toast.error(error?.message || "Đổi mật khẩu thất bại");
+      }
     } finally {
       setIsUpdating(false);
     }
   };
+
+  useEffect(() => {
+    getProfile();
+    // eslint-disable-next-line
+  }, []);
 
   if (loading) {
     return (
@@ -88,8 +103,8 @@ const ProfilePage = () => {
               <button
                 onClick={() => setActiveTab("profile")}
                 className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeTab === "profile"
-                    ? "bg-primary-100 text-primary-600"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-primary-100 text-primary-600"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
               >
                 Thông tin cá nhân
@@ -97,8 +112,8 @@ const ProfilePage = () => {
               <button
                 onClick={() => setActiveTab("password")}
                 className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeTab === "password"
-                    ? "bg-primary-100 text-primary-600"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-primary-100 text-primary-600"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
               >
                 Đổi mật khẩu
@@ -106,8 +121,8 @@ const ProfilePage = () => {
               <button
                 onClick={() => setActiveTab("addresses")}
                 className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${activeTab === "addresses"
-                    ? "bg-primary-100 text-primary-600"
-                    : "text-gray-700 hover:bg-gray-100"
+                  ? "bg-primary-100 text-primary-600"
+                  : "text-gray-700 hover:bg-gray-100"
                   }`}
               >
                 Địa chỉ giao hàng

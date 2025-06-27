@@ -1,8 +1,70 @@
-import { useEffect } from "react"
-import { Link } from "react-router-dom"
-import { useShop } from "../../contexts/ShopContext"
-import WishlistItem from "../../components/Wishlist/WishlistItem"
-import LoadingSpinner from "../../components/Common/LoadingSpinner"
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useShop } from "../../contexts/ShopContext";
+import { } from "../../contexts/CartContext";
+import LoadingSpinner from "../../components/Common/LoadingSpinner";
+
+// WishlistItem inline component
+const WishlistItem = ({ item, onRemove }) => {
+  let imageUrl = "/placeholder.svg?height=60&width=60";
+  try {
+    if (item.HinhAnh) {
+      const imgObj = typeof item.HinhAnh === "string" ? JSON.parse(item.HinhAnh) : item.HinhAnh;
+      if (imgObj.anhChinh) imageUrl = imgObj.anhChinh;
+    }
+  } catch { }
+  const handleAddToCart = () => {
+    window.location.href = `/products/${item.id_SanPham || item.id}`;
+  };
+
+  return (
+    <li style={{
+      display: 'flex', alignItems: 'center', borderBottom: '1px solid #eee', padding: 8, background: '#fff',
+      marginBottom: 2
+    }}>
+      <img
+        src={imageUrl}
+        alt={item.tenSanPham}
+        style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, marginRight: 10, border: '1px solid #eee' }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 500, fontSize: 14, color: '#222', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.tenSanPham}</div>
+        <div style={{ color: '#888', fontSize: 12, marginTop: 2 }}>{Number(item.Gia).toLocaleString()}₫</div>
+      </div>
+      <button
+        onClick={handleAddToCart}
+        style={{
+          marginRight: 6,
+          background: '#2563eb',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 4,
+          padding: '5px 12px',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 500
+        }}
+      >
+        Chọn mua
+      </button>
+      <button
+        onClick={() => onRemove(item.id_SanPham)}
+        style={{
+          background: '#ef4444',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 4,
+          padding: '5px 12px',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 500
+        }}
+      >
+        Xóa
+      </button>
+    </li>
+  );
+};
 
 const WishlistPage = () => {
   const {
@@ -12,35 +74,30 @@ const WishlistPage = () => {
     clearWishlist,
     addToCart,
     fetchWishlist
-  } = useShop()
+  } = useShop();
 
   useEffect(() => {
-    fetchWishlist()
-  }, [fetchWishlist])
+    fetchWishlist();
+    // eslint-disable-next-line
+  }, [fetchWishlist]);
 
-  const handleRemoveFromWishlist = (productId) => {
-    removeFromWishlist(productId)
-  }
+  // Xóa 1 sản phẩm khỏi wishlist (truyền id_SanPham)
+  const handleRemoveFromWishlist = async (id_SanPham) => {
+    await removeFromWishlist(id_SanPham);
+    await fetchWishlist();
+  };
 
-  const handleAddToCart = (product) => {
-    const cartItem = {
-      id_SanPham: product.id,
-      kichCo: product.kichCo?.[0] || "",
-      mauSac: product.mauSac?.[0] || "",
-      soLuong: 1,
-    }
-    addToCart(cartItem)
-  }
-
-  const handleClearWishlist = () => {
+  const handleClearWishlist = async () => {
     if (window.confirm("Bạn có chắc chắn muốn xóa tất cả sản phẩm khỏi danh sách yêu thích?")) {
-      clearWishlist()
+      await clearWishlist();
+      await fetchWishlist();
     }
-  }
+  };
 
   if (loading) {
-    return <LoadingSpinner />
+    return <LoadingSpinner />;
   }
+  
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -48,14 +105,7 @@ const WishlistPage = () => {
         <h1 className="text-3xl font-bold text-gray-900">
           Danh sách yêu thích ({wishlist.length})
         </h1>
-        {wishlist.length > 0 && (
-          <button
-            onClick={handleClearWishlist}
-            className="text-red-600 hover:text-red-700 font-medium"
-          >
-            Xóa tất cả
-          </button>
-        )}
+        {/* Nút xóa tất cả đã bị ẩn vì chưa có API */}
       </div>
 
       {wishlist.length === 0 ? (
@@ -80,19 +130,18 @@ const WishlistPage = () => {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {wishlist.map((item) => (
+        <ul style={{ maxWidth: 600, margin: '0 auto', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #eee', padding: 0 }}>
+          {wishlist.map(item => (
             <WishlistItem
               key={item.id}
               item={item}
               onRemove={handleRemoveFromWishlist}
-              onAddToCart={handleAddToCart}
             />
           ))}
-        </div>
+        </ul>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default WishlistPage
+export default WishlistPage;

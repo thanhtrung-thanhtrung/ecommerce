@@ -20,7 +20,6 @@ const verifyToken = (req, res, next) => {
       .json({ message: "Token không hợp lệ hoặc đã hết hạn" });
   }
 };
-
 // Middleware xác thực tùy chọn - cho phép cả user đã đăng nhập và khách
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -29,7 +28,7 @@ const optionalAuth = (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = decoded;
+      req.user = { id: decoded.userId }; // Gán req.user.id từ decoded.userId
     } catch (error) {
       // Token không hợp lệ, tiếp tục như khách
       req.user = null;

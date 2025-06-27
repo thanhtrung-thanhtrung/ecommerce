@@ -54,29 +54,9 @@ const ProductGrid = ({ products }) => {
     }
   };
 
-  const handleAddToCart = async (product) => {
-    try {
-      // Cần lấy id_ChiTietSanPham từ API hoặc từ product detail
-      // Tạm thời thông báo cho user cần chọn variant
-      if (!product.chiTietSanPham || product.chiTietSanPham.length === 0) {
-        // Redirect to product detail page để chọn size/màu
-        window.location.href = `/products/${product.id}`;
-        return;
-      }
-
-      // Lấy variant đầu tiên nếu có
-      const firstVariant = product.chiTietSanPham[0];
-
-      const cartItem = {
-        id_ChiTietSanPham: firstVariant.id,
-        soLuong: 1,
-      };
-
-      await addToCart(cartItem);
-      toast.success("Đã thêm vào giỏ hàng!");
-    } catch (error) {
-      toast.error("Có lỗi khi thêm vào giỏ hàng");
-    }
+  const handleAddToCart = (product) => {
+    // Luôn chuyển sang trang chi tiết để chọn size/màu khi bấm Thêm vào giỏ hàng
+    window.location.href = `/products/${product.id}`;
   };
 
   const handleWishlistToggle = async (product) => {
@@ -91,7 +71,7 @@ const ProductGrid = ({ products }) => {
         await removeFromWishlist(product.id);
         toast.success("Đã xóa khỏi danh sách yêu thích");
       } else {
-        await addToWishlist(product.id);
+        await addToWishlist(product.id); // chỉ truyền product.id, không truyền object
         toast.success("Đã thêm vào danh sách yêu thích");
       }
     } catch (error) {

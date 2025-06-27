@@ -162,14 +162,20 @@ class OrderService {
       const TongThanhToan = TongTienHang - GiamGia + PhiVanChuyen;
 
       // 7. Tạo đơn hàng với field name đúng
+      // --- Sửa: sinh mã đơn hàng trước khi insert ---
+      const today = new Date();
+      const dateStr = today.toISOString().slice(2, 10).replace(/-/g, ""); // YYMMDD
+      // Insert tạm, sau đó update lại MaDonHang chuẩn
+      // Trong hàm createOrder
       const [orderResult] = await connection.execute(
         `INSERT INTO donhang (
-          id_NguoiMua, NgayDatHang, TongTienHang, GiamGia, PhiVanChuyen, 
-          TongThanhToan, DiaChiNhan, SDTNguoiNhan, TenNguoiNhan, EmailNguoiNhan,
-          TrangThai, id_ThanhToan, id_VanChuyen, MaGiamGia, GhiChu, session_id
-        ) VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+    MaDonHang, id_NguoiMua, NgayDatHang, TongTienHang, GiamGia, PhiVanChuyen, 
+    TongThanhToan, DiaChiNhan, SDTNguoiNhan, TenNguoiNhan, EmailNguoiNhan,
+    TrangThai, id_ThanhToan, id_VanChuyen, MaGiamGia, GhiChu, session_id
+  ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
         [
-          userId || null,
+          null, // MaDonHang sẽ update sau
+          userId || null, // <-- Dòng này: userId sẽ được truyền vào nếu đã đăng nhập
           TongTienHang,
           GiamGia,
           PhiVanChuyen,
@@ -178,14 +184,20 @@ class OrderService {
           soDienThoai,
           hoTen,
           email,
-          id_ThanhToan, // ✅ Use correct field name from database
+          id_ThanhToan,
           id_VanChuyen,
           MaGiamGia || null,
           ghiChu || null,
-          userId ? null : finalSessionId,
+          userId ? null : finalSessionId, // session_id chỉ dùng cho guest
         ]
       );
       const orderId = orderResult.insertId;
+      // --- Update MaDonHang chuẩn sau khi có orderId ---
+      const MaDonHang = `DH${dateStr}-${orderId}`;
+      await connection.execute(
+        `UPDATE donhang SET MaDonHang = ? WHERE id = ?`,
+        [MaDonHang, orderId]
+      );
 
       // 8. Lưu chi tiết đơn hàng và cập nhật tồn kho
       for (const item of cartItems) {

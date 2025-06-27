@@ -236,10 +236,10 @@ const CheckoutPage = () => {
 
       <Formik
         initialValues={{
-          hoTen: user?.hoTen || "",
-          email: user?.email || "",
-          soDienThoai: user?.soDienThoai || "",
-          diaChiGiao: "",
+          hoTen: user?.HoTen || "",
+          email: user?.Email || "",
+          soDienThoai: user?.SDT || "",
+          diaChiGiao: user?.DiaChi || "",
           tinh: "",
           quan: "",
           phuong: "",

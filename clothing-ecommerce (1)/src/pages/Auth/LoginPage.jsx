@@ -21,7 +21,7 @@ const LoginPage = () => {
 
   const validationSchema = Yup.object({
     email: Yup.string().email("Email không hợp lệ").required("Vui lòng nhập email"),
-    MatKhau: Yup.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").required("Vui lòng nhập mật khẩu"),
+    matKhau: Yup.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").required("Vui lòng nhập mật khẩu"),
   })
 
   const handleSubmit = async (values, { setSubmitting }) => {
@@ -54,7 +54,7 @@ const LoginPage = () => {
           </p>
         </div>
 
-        <Formik initialValues={{ email: "", MatKhau: "" }} validationSchema={validationSchema} onSubmit={handleSubmit}>
+        <Formik initialValues={{ email: "", matKhau: "" }} validationSchema={validationSchema} onSubmit={handleSubmit}>
           {({ isSubmitting }) => (
             <Form className="mt-8 space-y-6">
               {error && (
@@ -78,18 +78,18 @@ const LoginPage = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="MatKhau" className="form-label">
+                  <label htmlFor="matKhau" className="form-label">
                     Mật khẩu
                   </label>
                   <Field
-                    id="MatKhau"
-                    name="MatKhau"
+                    id="matKhau"
+                    name="matKhau"
                     type="password"
                     autoComplete="current-password"
                     className="form-input"
                     placeholder="Nhập mật khẩu"
                   />
-                  <ErrorMessage name="MatKhau" component="div" className="form-error" />
+                  <ErrorMessage name="matKhau" component="div" className="form-error" />
                 </div>
               </div>
 

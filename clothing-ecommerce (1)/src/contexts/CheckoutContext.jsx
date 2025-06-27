@@ -398,6 +398,9 @@ export const CheckoutProvider = ({ children }) => {
     initializeCheckout();
   }, [fetchPaymentMethods, fetchShippingMethods, fetchProvinces]);
 
+  // Lấy thông tin khách hàng khi đã đăng nhập
+  const { user, isAuthenticated } = getAuthInfo();
+
   const value = {
     // State
     loading,
@@ -436,6 +439,10 @@ export const CheckoutProvider = ({ children }) => {
 
     // Utility
     resetCheckoutState,
+
+    // User
+    user,
+    isAuthenticated,
   };
 
   return (

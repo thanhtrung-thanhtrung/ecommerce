@@ -1,3 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { useShop } from '../contexts/ShopContext';
-// ...existing imports...
+import React from 'react'
+
+const OrdersPage = () => {
+    return (
+        <div>
+            what is this page?
+        </div>
+    )
+}
+
+export default OrdersPage

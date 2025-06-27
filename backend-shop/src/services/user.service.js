@@ -124,6 +124,9 @@ class UserService {
   }
 
   async addToWishlist(userId, productId) {
+    if (userId == null || productId == null) {
+      throw new Error("userId và productId không được để trống");
+    }
     const [existing] = await db.execute(
       "SELECT * FROM wishlist WHERE id_NguoiDung = ? AND id_SanPham = ?",
       [userId, productId]

@@ -72,14 +72,16 @@ class UserController {
 
   async addToWishlist(req, res) {
     try {
-      const { maSanPham } = req.body;
-      await userService.addToWishlist(req.user.userId, maSanPham);
+      const userId = req.user.id || req.user.userId;
+      const { id_SanPham } = req.body;
+      if (!userId || !id_SanPham)
+        throw new Error("userId và id_SanPham không được để trống");
+      await userService.addToWishlist(userId, id_SanPham);
       res.json({ message: "Đã thêm sản phẩm vào danh sách yêu thích" });
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
   }
-
   async removeFromWishlist(req, res) {
     try {
       const { maSanPham } = req.params;

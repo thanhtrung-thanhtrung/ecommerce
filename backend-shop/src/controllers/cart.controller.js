@@ -167,10 +167,7 @@ class CartController {
       // Lấy đúng tên trường từ body
       const { id_ChiTietSanPham, SoLuong } = req.body;
 
-      // Debugging logs
-      console.log("🔍 Debug - sessionId:", sessionId);
-      console.log("🔍 Debug - Adding to cart:", { id_ChiTietSanPham, SoLuong });
-
+     
       if (!id_ChiTietSanPham || !SoLuong) {
         return res.status(400).json({
           success: false,
