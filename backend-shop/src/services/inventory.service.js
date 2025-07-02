@@ -1,6 +1,111 @@
 const db = require("../config/database");
 
 class InventoryService {
+  // Constants for order status mapping theo database schema - CẬP NHẬT 6 TRẠNG THÁI
+  static ORDER_STATUS = {
+    PENDING: 1, // Chờ xử lý - KHÔNG trừ tồn kho
+    CONFIRMED: 2, // Đã xác nhận - ĐÃ trừ tồn kho
+    PROCESSING: 3, // Đang xử lý - ĐÃ trừ tồn kho
+    SHIPPING: 4, // Đang giao - ĐÃ trừ tồn kho
+    DELIVERED: 5, // Đã giao - ĐÃ trừ tồn kho
+    CANCELLED: 6, // Đã hủy - KHÔNG trừ tồn kho (hoàn lại)
+  };
+
+  // Kiểm tra trạng thái có cần trừ tồn kho không
+  shouldDeductStock(status) {
+    const statusesToDeduct = [
+      this.constructor.ORDER_STATUS.CONFIRMED,
+      this.constructor.ORDER_STATUS.PROCESSING,
+      this.constructor.ORDER_STATUS.SHIPPING,
+      this.constructor.ORDER_STATUS.DELIVERED,
+    ];
+    return statusesToDeduct.includes(parseInt(status));
+  }
+
+  // Cập nhật tồn kho khi thay đổi trạng thái đơn hàng
+  async updateStockAfterOrderStatusChange(orderId, oldStatus, newStatus) {
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Lấy chi tiết đơn hàng
+      const [orderItems] = await connection.execute(
+        `SELECT ctdh.id_ChiTietSanPham, ctdh.SoLuong 
+         FROM chitietdonhang ctdh 
+         WHERE ctdh.id_DonHang = ?`,
+        [orderId]
+      );
+
+      if (orderItems.length === 0) {
+        await connection.rollback();
+        throw new Error("Không tìm thấy chi tiết đơn hàng");
+      }
+
+      for (const item of orderItems) {
+        const { id_ChiTietSanPham, SoLuong } = item;
+
+        // Logic thay đổi trạng thái và ảnh hưởng tồn kho
+        const shouldDeductOld = this.shouldDeductStock(oldStatus);
+        const shouldDeductNew = this.shouldDeductStock(newStatus);
+
+        if (!shouldDeductOld && shouldDeductNew) {
+          // Từ KHÔNG TRỪ (1) sang TRỪ tồn kho (2,3,4)
+          // Kiểm tra tồn kho trước khi trừ
+          const [stockCheck] = await connection.execute(
+            "SELECT TonKho FROM chitietsanpham WHERE id = ?",
+            [id_ChiTietSanPham]
+          );
+
+          if (stockCheck.length === 0 || stockCheck[0].TonKho < SoLuong) {
+            await connection.rollback();
+            throw new Error(
+              `Không đủ tồn kho cho sản phẩm ID: ${id_ChiTietSanPham}. Còn lại: ${
+                stockCheck[0]?.TonKho || 0
+              }, cần: ${SoLuong}`
+            );
+          }
+
+          await connection.execute(
+            "UPDATE chitietsanpham SET TonKho = TonKho - ? WHERE id = ?",
+            [SoLuong, id_ChiTietSanPham]
+          );
+          console.log(
+            `[INVENTORY] Trừ tồn kho: ${SoLuong} cho sản phẩm ${id_ChiTietSanPham} (${oldStatus} -> ${newStatus})`
+          );
+        } else if (shouldDeductOld && !shouldDeductNew) {
+          // Từ TRỪ (2,3,4) sang KHÔNG TRỪ tồn kho (5,6 - hủy đơn)
+          await connection.execute(
+            "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
+            [SoLuong, id_ChiTietSanPham]
+          );
+          console.log(
+            `[INVENTORY] Hoàn lại tồn kho: ${SoLuong} cho sản phẩm ${id_ChiTietSanPham} (${oldStatus} -> ${newStatus})`
+          );
+        }
+        // Nếu cả hai trạng thái đều TRỪ hoặc đều KHÔNG TRỪ thì không làm gì
+      }
+
+      await connection.commit();
+      return {
+        success: true,
+        message: `Cập nhật tồn kho thành công: ${oldStatus} -> ${newStatus}`,
+        details: {
+          orderId,
+          oldStatus,
+          newStatus,
+          itemsUpdated: orderItems.length,
+        },
+      };
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error updating stock after order status change:", error);
+      throw new Error("Không thể cập nhật tồn kho: " + error.message);
+    } finally {
+      connection.release();
+    }
+  }
+
   // Tạo mã phiếu nhập tự động
   async generateMaPhieuNhap() {
     const date = new Date();
@@ -811,6 +916,184 @@ class InventoryService {
       };
     } catch (error) {
       throw new Error("Không thể lấy thông tin sản phẩm: " + error.message);
+    }
+  }
+
+  // Kiểm tra tồn kho trước khi đặt hàng - KHÔNG TRỪ tồn kho ngay
+  async checkStockBeforeOrder(orderItems) {
+    try {
+      const stockCheck = [];
+      let hasError = false;
+
+      for (const item of orderItems) {
+        const { id_ChiTietSanPham, SoLuong } = item;
+
+        // Tính tồn kho thực tế từ phiếu nhập và đơn hàng đã xác nhận
+        const [stockInfo] = await db.execute(
+          `SELECT 
+            cts.MaSanPham,
+            sp.Ten as TenSanPham,
+            kc.Ten as KichCo,
+            ms.Ten as MauSac,
+            
+            -- Tồn kho thực tế = Nhập - Bán (chỉ tính đơn đã xác nhận TrangThai IN (2,3,4,5))
+            COALESCE(nhap.TongNhap, 0) as TongNhap,
+            COALESCE(ban.TongBan, 0) as TongBan,
+            (COALESCE(nhap.TongNhap, 0) - COALESCE(ban.TongBan, 0)) as TonKhoThucTe,
+            
+            -- Số lượng đang chờ xử lý (TrangThai = 1)
+            COALESCE(cho.TongCho, 0) as SoLuongChoXuLy
+            
+          FROM chitietsanpham cts
+          JOIN sanpham sp ON cts.id_SanPham = sp.id
+          JOIN kichco kc ON cts.id_KichCo = kc.id
+          JOIN mausac ms ON cts.id_MauSac = ms.id
+          
+          -- Tổng nhập từ phiếu nhập đã xác nhận
+          LEFT JOIN (
+            SELECT ctpn.id_ChiTietSanPham, SUM(ctpn.SoLuong) as TongNhap
+            FROM chitietphieunhap ctpn
+            JOIN phieunhap pn ON ctpn.id_PhieuNhap = pn.id
+            WHERE pn.TrangThai = 2
+            GROUP BY ctpn.id_ChiTietSanPham
+          ) nhap ON cts.id = nhap.id_ChiTietSanPham
+          
+          -- Tổng bán từ đơn hàng đã xác nhận
+          LEFT JOIN (
+            SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongBan
+            FROM chitietdonhang ctdh
+            JOIN donhang dh ON ctdh.id_DonHang = dh.id
+            WHERE dh.TrangThai IN (2,3,4,5)
+            GROUP BY ctdh.id_ChiTietSanPham
+          ) ban ON cts.id = ban.id_ChiTietSanPham
+          
+          -- Tổng chờ xử lý từ đơn hàng chờ
+          LEFT JOIN (
+            SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
+            FROM chitietdonhang ctdh
+            JOIN donhang dh ON ctdh.id_DonHang = dh.id
+            WHERE dh.TrangThai = 1
+            GROUP BY ctdh.id_ChiTietSanPham
+          ) cho ON cts.id = cho.id_ChiTietSanPham
+          
+          WHERE cts.id = ?`,
+          [id_ChiTietSanPham]
+        );
+
+        if (stockInfo.length === 0) {
+          stockCheck.push({
+            id_ChiTietSanPham,
+            error: "Sản phẩm không tồn tại",
+            isAvailable: false,
+          });
+          continue;
+        }
+
+        const stockData = stockInfo[0];
+        const tonKhoHienTai = stockData.TonKhoThucTe || 0;
+        const soLuongChoXuLy = stockData.SoLuongChoXuLy || 0;
+
+        // Tồn kho khả dụng = Tồn kho thực tế - Số lượng đang chờ xử lý
+        const tonKhoKhaDung = tonKhoHienTai - soLuongChoXuLy;
+
+        const isAvailable = tonKhoKhaDung >= SoLuong;
+        if (!isAvailable) hasError = true;
+
+        stockCheck.push({
+          id_ChiTietSanPham,
+          MaSanPham: stockData.MaSanPham,
+          TenSanPham: stockData.TenSanPham,
+          KichCo: stockData.KichCo,
+          MauSac: stockData.MauSac,
+          SoLuongYeuCau: SoLuong,
+          TonKhoThucTe: tonKhoHienTai,
+          SoLuongChoXuLy: soLuongChoXuLy,
+          TonKhoKhaDung: tonKhoKhaDung,
+          isAvailable,
+          thieuHang: isAvailable ? 0 : SoLuong - tonKhoKhaDung,
+        });
+      }
+
+      return {
+        success: !hasError,
+        hasStockIssues: hasError,
+        stockCheck,
+        message: hasError
+          ? "Có sản phẩm không đủ tồn kho"
+          : "Tồn kho đủ để đặt hàng",
+      };
+    } catch (error) {
+      throw new Error("Không thể kiểm tra tồn kho: " + error.message);
+    }
+  }
+
+  // Đồng bộ tồn kho từ database (tính lại toàn bộ theo logic mới)
+  async syncInventoryFromOrders() {
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      console.log("🔄 Bắt đầu đồng bộ tồn kho từ phiếu nhập và đơn hàng...");
+
+      // Bước 1: Reset tồn kho về 0
+      await connection.execute("UPDATE chitietsanpham SET TonKho = 0");
+
+      // Bước 2: Cộng từ phiếu nhập đã xác nhận (TrangThai = 2)
+      await connection.execute(`
+        UPDATE chitietsanpham cts
+        LEFT JOIN (
+          SELECT 
+            ctpn.id_ChiTietSanPham,
+            SUM(ctpn.SoLuong) as TongNhap
+          FROM chitietphieunhap ctpn
+          JOIN phieunhap pn ON ctpn.id_PhieuNhap = pn.id
+          WHERE pn.TrangThai = 2
+          GROUP BY ctpn.id_ChiTietSanPham
+        ) nhap ON cts.id = nhap.id_ChiTietSanPham
+        SET cts.TonKho = COALESCE(nhap.TongNhap, 0)
+      `);
+
+      // Bước 3: Trừ từ đơn hàng đã xác nhận (TrangThai IN (2,3,4,5) - loại trừ hủy đơn)
+      await connection.execute(`
+        UPDATE chitietsanpham cts
+        LEFT JOIN (
+          SELECT 
+            ctdh.id_ChiTietSanPham,
+            SUM(ctdh.SoLuong) as TongBan
+          FROM chitietdonhang ctdh
+          JOIN donhang dh ON ctdh.id_DonHang = dh.id
+          WHERE dh.TrangThai IN (2,3,4,5)
+          GROUP BY ctdh.id_ChiTietSanPham
+        ) ban ON cts.id = ban.id_ChiTietSanPham
+        SET cts.TonKho = GREATEST(0, cts.TonKho - COALESCE(ban.TongBan, 0))
+      `);
+
+      // Thống kê kết quả
+      const [stats] = await connection.execute(`
+        SELECT 
+          COUNT(*) as TongSanPham,
+          SUM(TonKho) as TongTonKho,
+          COUNT(CASE WHEN TonKho = 0 THEN 1 END) as SanPhamHetHang,
+          COUNT(CASE WHEN TonKho <= 10 AND TonKho > 0 THEN 1 END) as SanPhamSapHet
+        FROM chitietsanpham
+      `);
+
+      await connection.commit();
+
+      console.log("✅ Đồng bộ tồn kho hoàn thành!");
+
+      return {
+        success: true,
+        message: "Đồng bộ tồn kho thành công",
+        statistics: stats[0],
+      };
+    } catch (error) {
+      await connection.rollback();
+      console.error("❌ Lỗi đồng bộ tồn kho:", error);
+      throw new Error("Không thể đồng bộ tồn kho: " + error.message);
+    } finally {
+      connection.release();
     }
   }
 
