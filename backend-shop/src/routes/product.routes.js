@@ -8,7 +8,6 @@ const {
   searchProductsValidator,
   getProductDetailValidator,
   reviewProductValidator,
-  createProductValidator,
   createProductAdminValidator,
   updateProductAdminValidator,
   deleteProductValidator,
@@ -78,11 +77,9 @@ router.get(
   productController.searchProducts
 );
 
-// ✅ Colors and Sizes routes (public) - Đặt TRƯỚC /:productId
 router.get("/colors", productController.getAllColors);
 router.get("/sizes", productController.getAllSizes);
 
-// ✅ Route /:productId đặt sau để tránh conflict
 router.get(
   "/:productId",
   getProductDetailValidator,
@@ -143,10 +140,11 @@ adminRouter.get(
   productController.getProductStockInfo
 );
 
-// Quản lý màu sắc và kích cỡ (admin)
 adminRouter.post("/admin/colors", productController.createColor);
 adminRouter.put("/admin/colors/:id", productController.updateColor);
 adminRouter.delete("/admin/colors/:id", productController.deleteColor);
+
+adminRouter.get("/admin/colors/:id", productController.getColorById);
 
 adminRouter.post("/admin/sizes", productController.createSize);
 adminRouter.put("/admin/sizes/:id", productController.updateSize);

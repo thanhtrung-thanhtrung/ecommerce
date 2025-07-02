@@ -23,15 +23,18 @@ class InventoryService {
     const { id_NhaCungCap, chiTietPhieuNhap, GhiChu } = phieuNhapData;
     const maPhieuNhap = await this.generateMaPhieuNhap();
 
+    const connection = await db.getConnection();
+
     try {
-      // Tính tổng tiền
+      await connection.beginTransaction();
+
       const tongTien = chiTietPhieuNhap.reduce(
         (sum, item) => sum + item.SoLuong * item.GiaNhap,
         0
       );
 
       // Tạo phiếu nhập
-      const [result] = await db.execute(
+      const [result] = await connection.execute(
         `INSERT INTO phieunhap (
           MaPhieuNhap, NgayNhap, TongTien, id_NhaCungCap, 
           id_NguoiTao, TrangThai, GhiChu
@@ -50,10 +53,55 @@ class InventoryService {
 
       // Thêm chi tiết phiếu nhập
       for (const item of chiTietPhieuNhap) {
-        const { id_ChiTietSanPham, SoLuong, GiaNhap } = item;
+        let {
+          id_ChiTietSanPham,
+          SoLuong,
+          GiaNhap,
+          id_SanPham,
+          id_KichCo,
+          id_MauSac,
+          MaSanPham,
+          bienThe,
+        } = item;
         const thanhTien = SoLuong * GiaNhap;
 
-        await db.execute(
+        // Nếu chưa có id_ChiTietSanPham thì tạo mới biến thể sản phẩm
+        if (
+          !id_ChiTietSanPham &&
+          id_SanPham &&
+          id_KichCo &&
+          id_MauSac &&
+          MaSanPham
+        ) {
+          const [resultVariant] = await connection.execute(
+            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho)
+             VALUES (?, ?, ?, ?, 0)`,
+            [id_SanPham, id_KichCo, id_MauSac, MaSanPham]
+          );
+          id_ChiTietSanPham = resultVariant.insertId;
+        }
+
+        // Thêm các biến thể sản phẩm
+        if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
+          for (const variant of bienThe) {
+            const {
+              id_KichCo: variantSize,
+              id_MauSac: variantColor,
+              MaSanPham: variantCode,
+              SoLuong: variantQty,
+            } = variant;
+
+            // Thêm biến thể sản phẩm với tồn kho ban đầu = 0
+            await connection.execute(
+              `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho) 
+               VALUES (?, ?, ?, ?, 0)`,
+              [id_SanPham, variantSize, variantColor, variantCode]
+            );
+          }
+        }
+
+        // Thêm chi tiết phiếu nhập
+        await connection.execute(
           `INSERT INTO chitietphieunhap (
             id_PhieuNhap, id_ChiTietSanPham, 
             SoLuong, GiaNhap, ThanhTien
@@ -62,14 +110,141 @@ class InventoryService {
         );
       }
 
+      await connection.commit();
+      connection.release();
+
       return {
         success: true,
         message: "Tạo phiếu nhập thành công",
         data: { id: phieuNhapId, MaPhieuNhap: maPhieuNhap },
       };
     } catch (error) {
+      await connection.rollback();
+      connection.release();
       console.error("Error creating phieu nhap:", error);
       throw new Error("Không thể tạo phiếu nhập: " + error.message);
+    }
+  }
+
+  // Tạo phiếu nhập thông minh với tự động tạo/cập nhật biến thể
+  async createSmartPhieuNhap(phieuNhapData, userId) {
+    const { id_NhaCungCap, chiTietPhieuNhap, GhiChu } = phieuNhapData;
+    const maPhieuNhap = await this.generateMaPhieuNhap();
+
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const tongTien = chiTietPhieuNhap.reduce(
+        (sum, item) => sum + item.SoLuong * item.GiaNhap,
+        0
+      );
+
+      // Tạo phiếu nhập
+      const [result] = await connection.execute(
+        `INSERT INTO phieunhap (
+          MaPhieuNhap, NgayNhap, TongTien, id_NhaCungCap, 
+          id_NguoiTao, TrangThai, GhiChu
+        ) VALUES (?, NOW(), ?, ?, ?, ?, ?)`,
+        [maPhieuNhap, tongTien, id_NhaCungCap, userId, 1, GhiChu]
+      );
+
+      const phieuNhapId = result.insertId;
+
+      // Xử lý từng item trong chi tiết phiếu nhập
+      for (const item of chiTietPhieuNhap) {
+        const { id_SanPham, variants, GiaNhap } = item;
+
+        // Xử lý từng biến thể
+        for (const variant of variants) {
+          const { id_KichCo, id_MauSac, SoLuong, MaSanPham } = variant;
+          let id_ChiTietSanPham = null;
+
+          // Kiểm tra xem biến thể đã tồn tại chưa
+          const [existingVariant] = await connection.execute(
+            `SELECT id FROM chitietsanpham 
+             WHERE id_SanPham = ? AND id_KichCo = ? AND id_MauSac = ?`,
+            [id_SanPham, id_KichCo, id_MauSac]
+          );
+
+          if (existingVariant.length > 0) {
+            // Biến thể đã tồn tại
+            id_ChiTietSanPham = existingVariant[0].id;
+          } else {
+            // Tạo biến thể mới
+            const [newVariant] = await connection.execute(
+              `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho)
+               VALUES (?, ?, ?, ?, 0)`,
+              [id_SanPham, id_KichCo, id_MauSac, MaSanPham]
+            );
+            id_ChiTietSanPham = newVariant.insertId;
+          }
+
+          // Thêm chi tiết phiếu nhập
+          const thanhTien = SoLuong * GiaNhap;
+          await connection.execute(
+            `INSERT INTO chitietphieunhap (
+              id_PhieuNhap, id_ChiTietSanPham, 
+              SoLuong, GiaNhap, ThanhTien
+            ) VALUES (?, ?, ?, ?, ?)`,
+            [phieuNhapId, id_ChiTietSanPham, SoLuong, GiaNhap, thanhTien]
+          );
+        }
+      }
+
+      await connection.commit();
+      connection.release();
+
+      return {
+        success: true,
+        message: "Tạo phiếu nhập thông minh thành công",
+        data: { id: phieuNhapId, MaPhieuNhap: maPhieuNhap },
+      };
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      console.error("Error creating smart phieu nhap:", error);
+      throw new Error("Không thể tạo phiếu nhập thông minh: " + error.message);
+    }
+  }
+
+  // Tạo mã sản phẩm tự động cho biến thể
+  async generateVariantCode(productId, colorId, sizeId) {
+    try {
+      // Lấy thông tin sản phẩm, màu sắc và kích cỡ
+      const [productInfo] = await db.execute(
+        `SELECT sp.Ten, th.Ten as ThuongHieu, ms.Ten as MauSac, kc.Ten as KichCo
+         FROM sanpham sp
+         JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
+         CROSS JOIN mausac ms
+         CROSS JOIN kichco kc
+         WHERE sp.id = ? AND ms.id = ? AND kc.id = ?`,
+        [productId, colorId, sizeId]
+      );
+
+      if (productInfo.length === 0) {
+        throw new Error("Không thể tạo mã sản phẩm");
+      }
+
+      const { ThuongHieu, MauSac, KichCo } = productInfo[0];
+
+      // Tạo mã theo format: THUONGHIEU-MAUSAC-KICHCO-TIMESTAMP
+      const timestamp = Date.now().toString().slice(-4);
+      const code = `${ThuongHieu.replace(
+        /\s+/g,
+        ""
+      ).toUpperCase()}-${MauSac.replace(
+        /\s+/g,
+        ""
+      ).toUpperCase()}-${KichCo}-${timestamp}`;
+
+      return code;
+    } catch (error) {
+      // Fallback: tạo mã đơn giản
+      return `SP${productId}-C${colorId}-S${sizeId}-${Date.now()
+        .toString()
+        .slice(-4)}`;
     }
   }
 
@@ -413,6 +588,242 @@ class InventoryService {
       };
     } catch (error) {
       throw new Error("Không thể lấy lịch sử nhập kho: " + error.message);
+    }
+  }
+
+  // Lấy báo cáo tồn kho chi tiết sử dụng view
+  async getTonKhoReport(query = {}) {
+    try {
+      let whereClause = "WHERE 1=1";
+      let queryParams = [];
+
+      // Lọc theo sản phẩm
+      if (query.sanPham) {
+        whereClause += " AND TenSanPham LIKE ?";
+        queryParams.push(`%${query.sanPham}%`);
+      }
+
+      // Lọc theo tồn kho thấp
+      if (query.tonKhoThap) {
+        whereClause += " AND TonKho <= ?";
+        queryParams.push(parseInt(query.tonKhoThap) || 10);
+      }
+
+      const sqlQuery = `
+        SELECT 
+          id_ChiTietSanPham,
+          TenSanPham,
+          KichCo,
+          MauSac,
+          MaSanPham,
+          SoLuongNhap,
+          SoLuongBan,
+          TonKho,
+          (SoLuongNhap - SoLuongBan) as TonKhoTinhToan
+        FROM v_tonkho_sanpham
+        ${whereClause}
+        ORDER BY TonKho ASC, TenSanPham
+      `;
+
+      const [results] = await db.execute(sqlQuery, queryParams);
+
+      // Thống kê tổng quan
+      const tongSanPham = results.length;
+      const sapHetHang = results.filter(
+        (item) => item.TonKho <= 10 && item.TonKho > 0
+      ).length;
+      const hetHang = results.filter((item) => item.TonKho === 0).length;
+      const tonKhoTong = results.reduce((sum, item) => sum + item.TonKho, 0);
+
+      return {
+        success: true,
+        data: results,
+        thongKe: {
+          tongSanPham,
+          sapHetHang,
+          hetHang,
+          tonKhoTong,
+        },
+      };
+    } catch (error) {
+      throw new Error("Không thể lấy báo cáo tồn kho: " + error.message);
+    }
+  }
+
+  // Đồng bộ tồn kho (sử dụng khi cần thiết)
+  async syncTonKho() {
+    try {
+      // Gọi stored procedure để đồng bộ tồn kho
+      const [result] = await db.execute("CALL sp_DongBoTonKho()");
+
+      return {
+        success: true,
+        message: "Đồng bộ tồn kho thành công",
+        data: result,
+      };
+    } catch (error) {
+      throw new Error("Không thể đồng bộ tồn kho: " + error.message);
+    }
+  }
+
+  // Tìm kiếm sản phẩm cho phiếu nhập (có filter và pagination)
+  async searchProductsForImport(query = {}) {
+    try {
+      let whereClause = "WHERE sp.TrangThai = 1";
+      let queryParams = [];
+
+      // Lọc theo danh mục
+      if (query.danhMuc) {
+        whereClause += " AND sp.id_DanhMuc = ?";
+        queryParams.push(query.danhMuc);
+      }
+
+      // Lọc theo thương hiệu
+      if (query.thuongHieu) {
+        whereClause += " AND sp.id_ThuongHieu = ?";
+        queryParams.push(query.thuongHieu);
+      }
+
+      // Tìm kiếm theo tên sản phẩm
+      if (query.keyword) {
+        whereClause += " AND sp.Ten LIKE ?";
+        queryParams.push(`%${query.keyword}%`);
+      }
+
+      // Lọc theo nhà cung cấp
+      if (query.nhaCungCap) {
+        whereClause += " AND sp.id_NhaCungCap = ?";
+        queryParams.push(query.nhaCungCap);
+      }
+
+      // Pagination
+      const page = parseInt(query.page) || 1;
+      const limit = parseInt(query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      const sqlQuery = `
+        SELECT 
+          sp.id,
+          sp.Ten as TenSanPham,
+          sp.Gia,
+          sp.HinhAnh,
+          th.Ten as TenThuongHieu,
+          dm.Ten as TenDanhMuc,
+          ncc.Ten as TenNhaCungCap,
+          COUNT(cts.id) as SoBienTheHienTai
+        FROM sanpham sp
+        JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
+        JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
+        JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
+        LEFT JOIN chitietsanpham cts ON sp.id = cts.id_SanPham
+        ${whereClause}
+        GROUP BY sp.id, sp.Ten, sp.Gia, sp.HinhAnh, th.Ten, dm.Ten, ncc.Ten
+        ORDER BY sp.Ten ASC
+        LIMIT ? OFFSET ?
+      `;
+
+      const [products] = await db.execute(sqlQuery, [
+        ...queryParams,
+        limit,
+        offset,
+      ]);
+
+      // Đếm tổng số sản phẩm
+      const [countResult] = await db.execute(
+        `SELECT COUNT(DISTINCT sp.id) as total FROM sanpham sp 
+         JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
+         JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
+         JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
+         ${whereClause}`,
+        queryParams
+      );
+
+      return {
+        success: true,
+        data: products.map((product) => ({
+          ...product,
+          HinhAnh: this.parseProductImage(product.HinhAnh),
+        })),
+        pagination: {
+          page,
+          limit,
+          total: countResult[0].total,
+          totalPages: Math.ceil(countResult[0].total / limit),
+        },
+      };
+    } catch (error) {
+      throw new Error("Không thể tìm kiếm sản phẩm: " + error.message);
+    }
+  }
+
+  // Lấy thông tin chi tiết sản phẩm và các biến thể hiện có
+  async getProductVariantsForImport(productId) {
+    try {
+      // Lấy thông tin sản phẩm
+      const [product] = await db.execute(
+        `SELECT sp.*, th.Ten as TenThuongHieu, dm.Ten as TenDanhMuc, ncc.Ten as TenNhaCungCap
+         FROM sanpham sp
+         JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
+         JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
+         JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
+         WHERE sp.id = ? AND sp.TrangThai = 1`,
+        [productId]
+      );
+
+      if (product.length === 0) {
+        throw new Error("Sản phẩm không tồn tại");
+      }
+
+      // Lấy các biến thể hiện có
+      const [existingVariants] = await db.execute(
+        `SELECT 
+          cts.id,
+          cts.MaSanPham,
+          cts.TonKho,
+          kc.id as id_KichCo,
+          kc.Ten as TenKichCo,
+          ms.id as id_MauSac,
+          ms.Ten as TenMauSac,
+          ms.MaMau
+         FROM chitietsanpham cts
+         JOIN kichco kc ON cts.id_KichCo = kc.id
+         JOIN mausac ms ON cts.id_MauSac = ms.id
+         WHERE cts.id_SanPham = ?
+         ORDER BY kc.Ten, ms.Ten`,
+        [productId]
+      );
+
+      // Lấy tất cả kích cỡ và màu sắc có sẵn
+      const [allSizes] = await db.execute("SELECT * FROM kichco ORDER BY Ten");
+      const [allColors] = await db.execute("SELECT * FROM mausac ORDER BY Ten");
+
+      return {
+        success: true,
+        data: {
+          product: {
+            ...product[0],
+            HinhAnh: this.parseProductImage(product[0].HinhAnh),
+          },
+          existingVariants,
+          allSizes,
+          allColors,
+        },
+      };
+    } catch (error) {
+      throw new Error("Không thể lấy thông tin sản phẩm: " + error.message);
+    }
+  }
+
+  // Utility function để parse hình ảnh
+  parseProductImage(hinhAnh) {
+    try {
+      if (hinhAnh) {
+        const imageData = JSON.parse(hinhAnh);
+        return imageData.anhChinh || null;
+      }
+      return null;
+    } catch (error) {
+      return null;
     }
   }
 }

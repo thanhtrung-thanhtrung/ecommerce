@@ -53,8 +53,13 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative h-[70vh] bg-gradient-to-r from-primary-600 to-primary-800 flex items-center">
+      <section
+        className="relative h-[70vh] bg-cover bg-center flex items-center"
+        style={{
+          backgroundImage:
+            "url('https://res.cloudinary.com/db7jn3ooa/image/upload/v1751255472/pexels-rdne-5698854_orodfy.jpg')",
+        }}
+      >
         <div className="absolute inset-0 bg-black opacity-20"></div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-2xl text-white">
@@ -69,18 +74,13 @@ const HomePage = () => {
               <Link to="/products" className="btn-primary text-center">
                 Mua Ngay
               </Link>
-              <Link
-                to="/products?sale=true"
-                className="btn-outline text-center"
-              >
+              <Link to="/products?sale=true" className="btn-outline text-center">
                 Xem Khuyến Mãi
               </Link>
             </div>
           </div>
         </div>
       </section>
-
-      {/* Categories Section */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -101,9 +101,9 @@ const HomePage = () => {
               >
                 <div className="aspect-w-4 aspect-h-3">
                   <img
-                    src={category.image || "/placeholder.svg"}
+                    src='https://res.cloudinary.com/db7jn3ooa/image/upload/v1750488464/shoes_shop/products/t4fiba9mlh90ta25l3jh.jpg'
                     alt={category.name}
-                    className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-300"
+                    className="w-full h-40 sm:h-64 object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
                 <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
@@ -157,7 +157,7 @@ const HomePage = () => {
                           {formatCurrency(
                             product.GiaKhuyenMai || product.Gia
                           )}{" "}
-                          đ
+
                         </span>
                         {product.GiaKhuyenMai && (
                           <span className="text-sm text-gray-500 line-through">
@@ -193,14 +193,18 @@ const HomePage = () => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
-            {displayBrands.map((brand, index) => (
+            {brands.map((brand) => (
               <div
-                key={index}
+                key={brand.id}
                 className="flex items-center justify-center p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
               >
                 <img
-                  src={brand.logo || "/placeholder.svg"}
-                  alt={brand.name}
+                  onClick={() => window.open(brand.Website || "#", "_blank")}
+                  loading="lazy"
+                  draggable="false"
+                  style={{ maxWidth: "100px", maxHeight: "50px", cursor: "pointer" }}
+                  src={brand.Logo || "/placeholder.svg"}
+                  alt={brand.Ten}
                   className="max-h-12 w-auto grayscale hover:grayscale-0 transition-all"
                 />
               </div>
@@ -208,8 +212,6 @@ const HomePage = () => {
           </div>
         </div>
       </section>
-
-      {/* Features Section */}
       <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

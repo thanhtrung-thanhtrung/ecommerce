@@ -41,11 +41,21 @@ const createPhieuNhapValidator = [
     .isArray({ min: 1 })
     .withMessage("Vui lòng thêm ít nhất một sản phẩm"),
 
-  body("chiTietPhieuNhap.*.id_ChiTietSanPham")
-    .notEmpty()
-    .withMessage("Vui lòng chọn sản phẩm")
-    .isInt()
-    .withMessage("ID chi tiết sản phẩm không hợp lệ"),
+  // Sửa lại validate cho id_ChiTietSanPham: optional, nếu không có thì phải có đủ các trường biến thể
+  body("chiTietPhieuNhap.*").custom((item, { path }) => {
+    if (
+      !item.id_ChiTietSanPham &&
+      (!item.id_SanPham ||
+        !item.id_KichCo ||
+        !item.id_MauSac ||
+        !item.MaSanPham)
+    ) {
+      throw new Error(
+        "Vui lòng chọn sản phẩm hoặc nhập đủ thông tin biến thể (id_SanPham, id_KichCo, id_MauSac, MaSanPham)"
+      );
+    }
+    return true;
+  }),
 
   body("chiTietPhieuNhap.*.SoLuong")
     .notEmpty()

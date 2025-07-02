@@ -2,10 +2,7 @@ import React from 'react'
 
 const TrackOrderPage = () => {
     return (
-        <div>
-            thái
-
-        </div>
+        <div>TrackOrderPage</div>
     )
 }
 

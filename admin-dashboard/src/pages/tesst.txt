@@ -1,0 +1,270 @@
+curl --silent --location --request GET "http://localhost:5000/api/inventory/products/search?keyword=Nike&danhMuc=1&thuongHieu=2&nhaCungCap=6&page=1&limit=10" \
+--header "Cookie: Cookie_1=value; connect.sid=s%3A0XMY4rKmEuaDxjO6dJ4snD-BQLRJExvY.iOKRWH24ky9vP6J9SGdkYGEsed2lnOgCo5hdMpcnyKU"
+
+
+{
+    "success": true,
+    "data": [],
+    "pagination": {
+        "page": 1,
+        "limit": 10,
+        "total": 0,
+        "totalPages": 0
+    }
+}
+
+
+
+curl --silent --location --request GET "http://localhost:5000/api/inventory/products/145/variants" \
+--header "Cookie: Cookie_1=value; connect.sid=s%3A0XMY4rKmEuaDxjO6dJ4snD-BQLRJExvY.iOKRWH24ky9vP6J9SGdkYGEsed2lnOgCo5hdMpcnyKU"
+{
+    "success": true,
+    "data": {
+        "product": {
+            "id": 145,
+            "Ten": "Giày Bitis Hunter X",
+            "MoTa": "Giày thể thao quốc dân Việt Nam",
+            "MoTaChiTiet": "\"Bitis Hunter X với giá hợp lý, thiết kế trẻ trung, phù hợp học sinh, sinh viên...\"",
+            "ThongSoKyThuat": "{\"ChatLieu\":\"Vải lưới, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Việt Nam\"}",
+            "Gia": "800000.00",
+            "GiaKhuyenMai": "750000.00",
+            "SoLuongDaBan": 1,
+            "id_DanhMuc": 3,
+            "id_ThuongHieu": 7,
+            "id_NhaCungCap": 1,
+            "HinhAnh": "https://res.cloudinary.com/db7jn3ooa/image/upload/v1750080727/shoes_shop/products/gdepwxbpyqa2mqv5pqrp.jpg",
+            "TrangThai": 1,
+            "NgayTao": "2025-06-16T13:32:09.000Z",
+            "NgayCapNhat": "2025-06-24T18:19:59.000Z",
+            "TenThuongHieu": "Reebok",
+            "TenDanhMuc": "Giày Thể Thao",
+            "TenNhaCungCap": "Nike Việt Nam "
+        },
+        "existingVariants": [
+            {
+                "id": 325,
+                "MaSanPham": "NIKE-AM2023-DEN-39",
+                "TonKho": 0,
+                "id_KichCo": 1,
+                "TenKichCo": "36",
+                "id_MauSac": 1,
+                "TenMauSac": "Đen",
+                "MaMau": "#000000"
+            },
+            {
+                "id": 326,
+                "MaSanPham": "NIKE-AM2023-DEN-40",
+                "TonKho": 0,
+                "id_KichCo": 2,
+                "TenKichCo": "37",
+                "id_MauSac": 1,
+                "TenMauSac": "Đen",
+                "MaMau": "#000000"
+            },
+            {
+                "id": 375,
+                "MaSanPham": "BITIS-DO-38-AUTO",
+                "TonKho": 60,
+                "id_KichCo": 3,
+                "TenKichCo": "38",
+                "id_MauSac": 3,
+                "TenMauSac": "Đỏ",
+                "MaMau": "#FF0000"
+            },
+            {
+                "id": 376,
+                "MaSanPham": "BITIS-DO-38-UTO",
+                "TonKho": 20,
+                "id_KichCo": 4,
+                "TenKichCo": "39",
+                "id_MauSac": 5,
+                "TenMauSac": "Xanh Lá",
+                "MaMau": "#00FF00"
+            }
+        ],
+        "allSizes": [
+            {
+                "id": 11,
+                "Ten": "35"
+            },
+            {
+                "id": 1,
+                "Ten": "36"
+            },
+            {
+                "id": 2,
+                "Ten": "37"
+            },
+            {
+                "id": 3,
+                "Ten": "38"
+            },
+            {
+                "id": 4,
+                "Ten": "39"
+            },
+            {
+                "id": 5,
+                "Ten": "40"
+            },
+            {
+                "id": 6,
+                "Ten": "41"
+            },
+            {
+                "id": 7,
+                "Ten": "42"
+            },
+            {
+                "id": 8,
+                "Ten": "43"
+            },
+            {
+                "id": 9,
+                "Ten": "44"
+            },
+            {
+                "id": 10,
+                "Ten": "45"
+            }
+        ],
+        "allColors": [
+            {
+                "id": 8,
+                "Ten": "Cam",
+                "MaMau": "#FFA500"
+            },
+            {
+                "id": 9,
+                "Ten": "Hồng",
+                "MaMau": "#FFC0CB"
+            },
+            {
+                "id": 10,
+                "Ten": "Nâu",
+                "MaMau": "#A52A2A"
+            },
+            {
+                "id": 11,
+                "Ten": "Tím",
+                "MaMau": "#800080"
+            },
+            {
+                "id": 2,
+                "Ten": "Trắng",
+                "MaMau": "#FFFFFF"
+            },
+            {
+                "id": 7,
+                "Ten": "Vàng",
+                "MaMau": "#FFFF00"
+            },
+            {
+                "id": 6,
+                "Ten": "Xám",
+                "MaMau": "#808080"
+            },
+            {
+                "id": 4,
+                "Ten": "Xanh Dương",
+                "MaMau": "#0000FF"
+            },
+            {
+                "id": 5,
+                "Ten": "Xanh Lá",
+                "MaMau": "#00FF00"
+            },
+            {
+                "id": 13,
+                "Ten": "Xanh Lá Cây",
+                "MaMau": "#228B22"
+            },
+            {
+                "id": 12,
+                "Ten": "Xanh Navy",
+                "MaMau": "#000080"
+            },
+            {
+                "id": 1,
+                "Ten": "Đen",
+                "MaMau": "#000000"
+            },
+            {
+                "id": 3,
+                "Ten": "Đỏ",
+                "MaMau": "#FF0000"
+            }
+        ]
+    }
+}
+
+
+curl --silent --location --request POST "http://localhost:5000/api/inventory/generate-variant-code" \
+--header "Content-Type: application/json" \
+--header "Cookie: Cookie_1=value; connect.sid=s%3A6PUDL6JW6G6r7NFq26K60Yul64TcxVam.uYoHkGCUL3Y%2BHHZMA5hMrsnMEPDPv3NrF4K%2FLLhjCUM" \
+--data "{
+  \"productId\": 144,
+  \"colorId\": 1,
+  \"sizeId\": 2
+}"{
+    "success": true,
+    "data": {
+        "code": "ADIDAS-ĐEN-37-0717"
+    }
+}
+curl --silent --location --request POST "http://localhost:5000/api/inventory/admin/phieu-nhap/smart-create" \
+--header "Content-Type: application/json" \
+--header "Cookie: Cookie_1=value; connect.sid=s%3Au1k_vcsU3J_q3hbHfBTNcx3v4wGN3-6p.KFhNWQYblKF7o9OKxyeP7%2B0QBJaXQp%2BN1XTe2RwQKRU" \
+--data "{
+  \"id_NhaCungCap\": 1,
+  \"userId\": 1,
+  \"GhiChu\": \"Phiếu nhập thông minh test\",
+  \"chiTietPhieuNhap\": [
+    {
+      \"id_SanPham\": 144,
+      \"GiaNhap\": 1200000,
+      \"variants\": [
+        {
+          \"id_KichCo\": 1,
+          \"id_MauSac\": 1,
+          \"SoLuong\": 10,
+          \"MaSanPham\": \"NIKE-DEN-36-AUTO\"
+        },
+        {
+          \"id_KichCo\": 2,
+          \"id_MauSac\": 2,
+          \"SoLuong\": 15,
+          \"MaSanPham\": \"NIKE-TRANG-37-AUTO\"
+        }
+      ]
+    },
+    {
+      \"id_SanPham\": 145,
+      \"GiaNhap\": 500000,
+      \"variants\": [
+        {
+          \"id_KichCo\": 3,
+          \"id_MauSac\": 3,
+          \"SoLuong\": 20,
+          \"MaSanPham\": \"BITIS-DO-38-AUTO\"
+        },
+         {
+          \"id_KichCo\": 4,
+          \"id_MauSac\": 5,
+          \"SoLuong\": 20,
+          \"MaSanPham\": \"BITIS-DO-38-UTO\"
+        }
+      ]
+    }
+  ]
+}"
+{
+    "success": true,
+    "message": "Tạo phiếu nhập thông minh thành công",
+    "data": {
+        "id": 27,
+        "MaPhieuNhap": "PN-250702-006"
+    }
+}
+
+

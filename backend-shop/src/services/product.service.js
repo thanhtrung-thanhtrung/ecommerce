@@ -881,7 +881,21 @@ class ProductService {
       throw new Error("Không thể lấy danh sách màu sắc");
     }
   }
-
+async getColorById(colorId) {
+    try { 
+      const [color] = await db.execute(
+        "SELECT id, Ten as Ten, MaMau FROM mausac WHERE id = ?",
+        [colorId]
+      );
+      if (color.length === 0) {
+        throw new Error("Màu sắc không tồn tại");
+      }
+      return color[0];
+    } catch (error) {
+      console.error("Error getting color by ID:", error);   
+      throw new Error("Không thể lấy thông tin màu sắc");
+    }
+  } 
   async getAllSizes() {
     try {
       const [sizes] = await db.execute(
@@ -1008,6 +1022,19 @@ class ProductService {
       console.error("Error deleting size:", error);
       throw error;
     }
+  }
+
+  async getProductVariants(productId) {
+    // Lấy danh sách biến thể của sản phẩm theo productId
+    const [variants] = await db.execute(
+      `SELECT ctsp.*, kc.Ten as tenKichCo, ms.Ten as tenMauSac
+       FROM chitietsanpham ctsp
+       JOIN kichco kc ON ctsp.id_KichCo = kc.id
+       JOIN mausac ms ON ctsp.id_MauSac = ms.id
+       WHERE ctsp.id_SanPham = ?`,
+      [productId]
+    );
+    return variants;
   }
 }
 

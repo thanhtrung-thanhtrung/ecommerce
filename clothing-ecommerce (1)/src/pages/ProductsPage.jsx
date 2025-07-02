@@ -7,7 +7,7 @@ import ProductSort from "../components/Product/ProductSort";
 import Pagination from "../components/Common/Pagination";
 import LoadingSpinner from "../components/Common/LoadingSpinner"
 
-const ITEMS_PER_PAGE = 8;
+const ITEMS_PER_PAGE = 12;
 
 const ProductsPage = () => {
   const navigate = useNavigate();

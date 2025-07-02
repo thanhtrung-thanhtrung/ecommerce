@@ -32,6 +32,6 @@ router.get("/order-history", userController.getOrderHistory);
 // Routes quản lý wishlist
 router.get("/wishlist", userController.getWishlist);
 router.post("/wishlist", userController.addToWishlist);
-router.delete("/wishlist/:maSanPham", userController.removeFromWishlist);
+router.delete("/wishlist/:id_SanPham", userController.removeFromWishlist);
 
 module.exports = router;

@@ -1,44 +1,54 @@
-"use client";
-
-import { Link } from "react-router-dom";
-import { Trash, ShoppingCart } from "lucide-react";
-import { formatCurrency } from "../../utils/helpers";
-
-const WishlistItem = ({ item, onRemove, onAddToCart }) => {
+const WishlistItem = ({ item, onRemove }) => {
   let imageUrl = "/placeholder.svg?height=60&width=60";
   try {
-    if (item.HinhAnh) {
-      const imgObj =
-        typeof item.HinhAnh === "string" ? JSON.parse(item.HinhAnh) : item.HinhAnh;
-      if (imgObj.anhChinh) imageUrl = imgObj.anhChinh;
-    }
-  } catch { }
+    const imgObj = typeof item.HinhAnh === "string" ? JSON.parse(item.HinhAnh) : item.HinhAnh;
+    if (imgObj?.anhChinh) imageUrl = imgObj.anhChinh;
+  } catch (err) {
+    console.error("Lỗi parse HinhAnh:", err);
+  }
+
+  const handleGoToProduct = () => {
+    window.location.href = `/products/${item.id_SanPham}`;
+  };
 
   return (
-    <li style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #eee', padding: 8 }}>
+    <li style={{
+      display: 'flex', alignItems: 'center', borderBottom: '1px solid #eee', padding: 8,
+      background: '#fff', marginBottom: 2
+    }}>
       <img
         src={imageUrl}
         alt={item.tenSanPham}
-        style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, marginRight: 12 }}
+        style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, marginRight: 10 }}
       />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 500 }}>{item.tenSanPham}</div>
-        <div style={{ color: '#888', fontSize: 13 }}>{Number(item.Gia).toLocaleString()}₫</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 500, fontSize: 14, color: '#222', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {item.tenSanPham}
+        </div>
+        <div style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+          {Number(item.Gia).toLocaleString()}₫
+        </div>
       </div>
       <button
-        onClick={() => onAddToCart(item)}
-        style={{ marginRight: 8, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 13 }}
+        onClick={handleGoToProduct}
+        style={{
+          marginRight: 6, background: '#2563eb', color: '#fff',
+          border: 'none', borderRadius: 4, padding: '5px 12px',
+          cursor: 'pointer', fontSize: 13, fontWeight: 500
+        }}
       >
-        Thêm vào giỏ
+        Chọn mua
       </button>
       <button
         onClick={() => onRemove(item.id_SanPham)}
-        style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 13 }}
+        style={{
+          background: '#ef4444', color: '#fff', border: 'none',
+          borderRadius: 4, padding: '5px 12px',
+          cursor: 'pointer', fontSize: 13, fontWeight: 500
+        }}
       >
         Xóa
       </button>
     </li>
   );
 };
-
-export default WishlistItem;

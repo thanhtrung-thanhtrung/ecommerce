@@ -67,7 +67,32 @@ router.get(
   InventoryController.getProductImportHistory
 );
 
+// Routes mới đã thêm
+router.get("/bao-cao/ton-kho", InventoryController.getTonKhoReport);
+
+router.post("/sync", InventoryController.syncTonKho);
+
 // Route kiểm tra tồn kho
 router.post("/kiem-tra-ton-kho", InventoryController.checkStockBeforeImport);
+
+// ===== API MỚI CHO PHIẾU NHẬP THÔNG MINH =====
+
+// Tìm kiếm sản phẩm cho phiếu nhập (có filter)
+router.get("/products/search", InventoryController.searchProductsForImport);
+
+// Lấy thông tin sản phẩm và biến thể hiện có
+router.get(
+  "/products/:productId/variants",
+  InventoryController.getProductVariantsForImport
+);
+
+// Tạo phiếu nhập thông minh
+router.post(
+  "/admin/phieu-nhap/smart-create",
+  InventoryController.createSmartPhieuNhap
+);
+
+// Tạo mã sản phẩm tự động
+router.post("/generate-variant-code", InventoryController.generateVariantCode);
 
 module.exports = router;

@@ -453,11 +453,13 @@ export const ShopProvider = ({ children }) => {
     // Wishlist functions
     const addToWishlist = useCallback(async (productId) => {
         try {
-            if (!productId) throw new Error("Thiếu productId");
-            if (isAuthenticated && user?.id) {
+            if (isAuthenticated) {
+                if (!productId) throw new Error("Thiếu productId");
                 const response = await apiCall("/api/users/wishlist", {
                     method: "POST",
-                    body: JSON.stringify({ userId: user.id, id_SanPham: productId }),
+                    body: JSON.stringify({
+                        id_SanPham: productId,
+                    }), // chỉ gửi productId
                 });
                 if (response.success) {
                     const wishlistResponse = await apiCall("/api/users/wishlist");
@@ -467,19 +469,17 @@ export const ShopProvider = ({ children }) => {
                     toast.success("Đã thêm vào danh sách yêu thích!");
                     return response;
                 }
-            } else if (!isAuthenticated) {
+            } else {
                 const newWishlist = [...wishlist, { id: productId }];
                 setWishlist(newWishlist);
                 localStorage.setItem("wishlist", JSON.stringify(newWishlist));
                 toast.success("Đã thêm vào danh sách yêu thích!");
-            } else {
-                throw new Error("Người dùng chưa đăng nhập hoặc không hợp lệ");
             }
         } catch (error) {
             toast.error(error.message || "Lỗi khi thêm vào danh sách yêu thích");
             throw error;
         }
-    }, [apiCall, isAuthenticated, user, wishlist]);
+    }, [apiCall, isAuthenticated, wishlist]);
 
     const removeFromWishlist = useCallback(async (productId) => {
         try {
@@ -512,37 +512,42 @@ export const ShopProvider = ({ children }) => {
             if (isAuthenticated) {
                 const response = await apiCall("/api/users/wishlist");
 
-                // API trả về trực tiếp array, không phải object {success, data}
-                if (Array.isArray(response)) {
+                console.log("Wishlist API response:", response);
+
+                if (response.success && Array.isArray(response.data)) {
+                    setWishlist(response.data);
+                    return { success: true, data: response.data };
+                } else if (Array.isArray(response)) {
+                    // fallback nếu API không trả chuẩn mà trả luôn mảng
                     setWishlist(response);
                     return { success: true, data: response };
-                } else if (response && response.success) {
-                    // Nếu API trả về format {success, data}
-                    setWishlist(response.data || []);
-                    return response;
                 } else {
                     setWishlist([]);
                     return { success: false, data: [] };
                 }
             } else {
                 const savedWishlist = localStorage.getItem("wishlist");
+
                 if (savedWishlist) {
                     try {
                         const wishlistData = JSON.parse(savedWishlist);
-                        setWishlist(wishlistData);
-                        return { success: true, data: wishlistData };
+                        if (Array.isArray(wishlistData)) {
+                            setWishlist(wishlistData);
+                            return { success: true, data: wishlistData };
+                        }
                     } catch (error) {
-                        localStorage.removeItem("wishlist");
-                        setWishlist([]);
+                        console.error("Lỗi parse local wishlist:", error);
                     }
+
+                    localStorage.removeItem("wishlist");
                 }
             }
-            setWishlist([]);
-            return { success: true, data: [] };
         } catch (error) {
-            setWishlist([]);
-            return { success: false, data: [] };
+            console.error("Lỗi fetchWishlist:", error);
         }
+
+        setWishlist([]);
+        return { success: false, data: [] };
     }, [apiCall, isAuthenticated]);
 
     // ================= USER PROFILE & ACCOUNT =================

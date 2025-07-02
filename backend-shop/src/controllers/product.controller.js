@@ -394,6 +394,9 @@ class ProductController {
     }
   }
 
+
+  
+
   // Cập nhật trạng thái sản phẩm (admin)
   async updateProductStatus(req, res) {
     try {
@@ -548,6 +551,21 @@ class ProductController {
       res.json(result);
     } catch (error) {
       console.error("Error updating color:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+
+  async getColorById(req, res) {
+    try { 
+      const { id } = req.params;
+      const color = await productService.getColorById(id);  
+      if (!color) {
+        return res.status(404).json({ message: "Màu sắc không tồn tại" });
+      }
+      res.json(color);
+    } catch (error) { 
+      console.error("Error getting color by ID:", error);
       res.status(500).json({ message: error.message });
     }
   }

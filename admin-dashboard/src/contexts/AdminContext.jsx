@@ -313,8 +313,10 @@ export const AdminProvider = ({ children }) => {
     });
   };
 
+  // Lấy biến thể sản phẩm cho trang admin
   const getProductVariants = async (productId) => {
     return await apiCall(`/api/products/admin/${productId}/variants`);
+
   };
 
   const getProductStockInfo = async (productId) => {
@@ -498,8 +500,18 @@ export const AdminProvider = ({ children }) => {
 
   // Suppliers API
   const getSuppliers = async () => {
-    // Lấy danh sách nhà cung cấp hoạt động cho dropdown
-    return await apiCall("/api/suppliers/hoat-dong");
+    // Thử cả hai endpoint để đảm bảo có dữ liệu
+    try {
+      const response = await apiCall("/api/suppliers/hoat-dong");
+      if (response.success && response.data && response.data.length > 0) {
+        return response;
+      }
+      // Nếu endpoint hoat-dong không có dữ liệu, thử endpoint chính
+      return await apiCall("/api/suppliers");
+    } catch (error) {
+      console.error('Error with hoat-dong endpoint, trying main endpoint:', error);
+      return await apiCall("/api/suppliers");
+    }
   };
 
   const getSuppliersAll = async () => {
@@ -589,17 +601,38 @@ export const AdminProvider = ({ children }) => {
     return await apiCall(url);
   };
 
-  const createImportReceipt = async (importData) => {
-    return await apiCall(`/api/inventory/admin/phieu-nhap/create`, {
-      method: "POST",
-      body: JSON.stringify(importData),
-    });
+  const searchProductsInventory = async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `/api/inventory/products/search?${queryString}` : "/api/inventory/products/search";
+    return await apiCall(url);
+  };
+
+  const getInventoryProductVariants = async (productId) => {
+    return await apiCall(`/api/inventory/products/${productId}/variants`);
   };
 
   const updateImportReceipt = async (receiptId, updateData) => {
     return await apiCall(`/api/inventory/admin/phieu-nhap/${receiptId}`, {
       method: "PUT",
       body: JSON.stringify(updateData),
+    });
+  };
+
+  const createImportReceipt = async (receiptData) => {
+    return await apiCall("/api/inventory/admin/phieu-nhap/smart-create", {
+      method: "POST",
+      body: JSON.stringify(receiptData),
+    });
+  };
+
+  const generateVariantCode = async (productId, colorId, sizeId) => {
+    return await apiCall("/api/inventory/generate-variant-code", {
+      method: "POST",
+      body: JSON.stringify({
+        productId,
+        colorId,
+        sizeId
+      }),
     });
   };
 
@@ -766,8 +799,11 @@ export const AdminProvider = ({ children }) => {
     getInventoryStats,
     getInventoryList,
     getInventoryImportStats,
-    createImportReceipt,
+    searchProductsInventory,
+    getInventoryProductVariants,
     updateImportReceipt,
+    createImportReceipt,
+    generateVariantCode,
     getImportReceipts,
     getImportReceiptDetail,
     updateInventory,

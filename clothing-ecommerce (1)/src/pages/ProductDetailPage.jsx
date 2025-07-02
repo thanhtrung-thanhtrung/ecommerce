@@ -31,6 +31,7 @@ const ProductDetailPage = () => {
   const [selectedColor, setSelectedColor] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState("description");
+  const [stock, setStock] = useState(0);
 
   const isInWishlist = wishlist.some(
     (item) => item.id === Number.parseInt(id)
@@ -143,6 +144,20 @@ const ProductDetailPage = () => {
       }
     }
   }, [currentProduct]);
+
+  // Cập nhật tồn kho khi thay đổi size/màu
+  useEffect(() => {
+    if (currentProduct && currentProduct.bienThe?.length > 0 && selectedSize && selectedColor) {
+      const selectedVariant = currentProduct.bienThe.find(
+        (item) => item.tenKichCo === selectedSize && item.tenMau === selectedColor
+      );
+      setStock(selectedVariant ? selectedVariant.TonKho || 0 : 0);
+      // Nếu số lượng vượt quá tồn kho thì giảm lại
+      setQuantity((prev) => selectedVariant && prev > (selectedVariant.TonKho || 0) ? (selectedVariant.TonKho || 1) : prev);
+    } else {
+      setStock(0);
+    }
+  }, [currentProduct, selectedSize, selectedColor]);
 
   const handleAddToCart = async () => {
     if (!selectedSize || !selectedColor) {
@@ -297,18 +312,24 @@ const ProductDetailPage = () => {
             <div>
               <h3 className="font-medium text-gray-800 mb-3">Kích cỡ:</h3>
               <div className="flex flex-wrap gap-2">
-                {availableSizes.map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={`px-4 py-2 border rounded-lg font-medium transition-colors ${selectedSize === size
-                      ? "border-primary-600 bg-primary-600 text-white"
-                      : "border-gray-300 text-gray-700 hover:border-primary-600"
-                      }`}
-                  >
-                    {size}
-                  </button>
-                ))}
+                {availableSizes.map((size) => {
+                  const isOutOfStock = !currentProduct.bienThe.some(
+                    (item) => item.tenKichCo === size && item.TonKho > 0
+                  );
+                  return (
+                    <button
+                      key={size}
+                      onClick={() => !isOutOfStock && setSelectedSize(size)}
+                      className={`px-4 py-2 border rounded-lg font-medium transition-colors ${selectedSize === size
+                          ? "border-primary-600 bg-primary-600 text-white"
+                          : "border-gray-300 text-gray-700 hover:border-primary-600"
+                        } ${isOutOfStock ? "opacity-50 cursor-not-allowed" : ""}`}
+                      disabled={isOutOfStock}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -318,48 +339,76 @@ const ProductDetailPage = () => {
             <div>
               <h3 className="font-medium text-gray-800 mb-3">Màu sắc:</h3>
               <div className="flex flex-wrap gap-2">
-                {availableColors.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`px-4 py-2 border rounded-lg font-medium transition-colors ${selectedColor === color
-                      ? "border-primary-600 bg-primary-600 text-white"
-                      : "border-gray-300 text-gray-700 hover:border-primary-600"
-                      }`}
-                  >
-                    {color}
-                  </button>
-                ))}
+                {availableColors.map((color) => {
+                  const isOutOfStock = !currentProduct.bienThe.some(
+                    (item) => item.tenMau === color && item.TonKho > 0
+                  );
+                  return (
+                    <button
+                      key={color}
+                      onClick={() => !isOutOfStock && setSelectedColor(color)}
+                      className={`px-4 py-2 border rounded-lg font-medium transition-colors ${selectedColor === color
+                          ? "border-primary-600 bg-primary-600 text-white"
+                          : "border-gray-300 text-gray-700 hover:border-primary-600"
+                        } ${isOutOfStock ? "opacity-50 cursor-not-allowed" : ""}`}
+                      disabled={isOutOfStock}
+                      
+                    >
+                      {color}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Quantity */}
+          {/* Quantity & Stock */}
           <div>
-            <h3 className="font-medium text-gray-800 mb-3">Số lượng:</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-gray-800">Số lượng:</h3>
+              <span className="text-sm text-gray-500">Tồn kho: <span className="font-semibold text-gray-800">{stock}</span></span>
+            </div>
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="w-10 h-10 border border-gray-300 rounded-lg flex items-center justify-center hover:border-primary-600"
+                disabled={quantity <= 1}
               >
                 -
               </button>
-              <span className="w-16 text-center font-medium">{quantity}</span>
+              <input
+                type="number"
+                min={1}
+                max={stock}
+                value={quantity}
+                onChange={e => {
+                  let val = Number(e.target.value);
+                  if (val > stock) val = stock;
+                  if (val < 1) val = 1;
+                  setQuantity(val);
+                }}
+                className="w-16 text-center font-medium border rounded-lg border-gray-300"
+                disabled={stock === 0}
+              />
               <button
-                onClick={() => setQuantity(quantity + 1)}
+                onClick={() => setQuantity(Math.min(stock, quantity + 1))}
                 className="w-10 h-10 border border-gray-300 rounded-lg flex items-center justify-center hover:border-primary-600"
+                disabled={quantity >= stock}
               >
                 +
               </button>
             </div>
+            {stock === 0 && (
+              <div className="text-red-500 text-sm mt-2">Sản phẩm này đã hết hàng.</div>
+            )}
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
-            <button onClick={handleAddToCart} className="btn-primary flex-1">
+            <button onClick={handleAddToCart} className="btn-primary flex-1" disabled={stock === 0}>
               🛒 Thêm vào giỏ hàng
             </button>
-            <button onClick={handleBuyNow} className="btn-secondary flex-1">
+            <button onClick={handleBuyNow} className="btn-secondary flex-1" disabled={stock === 0}>
               Mua ngay
             </button>
             <button

@@ -84,8 +84,8 @@ class UserController {
   }
   async removeFromWishlist(req, res) {
     try {
-      const { maSanPham } = req.params;
-      await userService.removeFromWishlist(req.user.userId, maSanPham);
+      const { id_SanPham } = req.params;
+      await userService.removeFromWishlist(req.user.userId, id_SanPham);
       res.json({ message: "Đã xóa sản phẩm khỏi danh sách yêu thích" });
     } catch (error) {
       res.status(400).json({ message: error.message });
