@@ -209,29 +209,24 @@ export const AdminProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_BASE_URL}/products`, {
+      const response = await fetch(`${API_BASE_URL}/api/products/admin/create`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(productData),
+        credentials: 'include',
+        body: productData, // Gửi FormData trực tiếp, không set Content-Type
       });
 
       if (!response.ok) {
         let errorMessage = 'Có lỗi xảy ra khi tạo sản phẩm';
         try {
           const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
         } catch {
+          // Keep default error message if response is not JSON
         }
         throw new Error(errorMessage);
       }
 
       const result = await response.json();
-
-      // Refresh products list
-      await fetchProducts();
-
       return result;
     } catch (error) {
       console.error('Create product error:', error);

@@ -33,7 +33,7 @@ const Sidebar = () => {
     { id: "brands", label: "Thương hiệu", icon: FiAward, path: "/brands" },
     { id: "suppliers", label: "Nhà cung cấp", icon: FiTruck, path: "/suppliers" },
     { id: "inventorys", label: "Tồn kho", icon: FiArchive, path: "/inventorys" },
-    { id: "import-receipts", label: "Phiếu nhập kho", icon: FiPackage, path: "/import-receipts" },
+    { id: "import-receipts", label: "Phiếu nhập", icon: FiPackage, path: "/import-receipts" },
     { id: "vouchers", label: "Giảm giá", icon: FiPercent, path: "/vouchers" },
     { id: "payments", label: "Thanh toán", icon: FiCreditCard, path: "/payments" },
     { id: "shippings", label: "Vận chuyển", icon: FiTruck, path: "/shippings" },
@@ -50,7 +50,7 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile overlay - simple */}
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -58,23 +58,23 @@ const Sidebar = () => {
         />
       )}
 
-      {/* Sidebar - clean design */}
+      {/* Sidebar - compact design */}
       <aside
         className={`
-          fixed top-0 left-0 z-50 h-full w-48 bg-slate-800 text-white
+          fixed top-0 left-0 z-50 h-full w-40 bg-slate-800 text-white
           transform transition-transform duration-200
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0 border-r border-slate-700 flex flex-col
         `}
       >
-        {/* Simple Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between p-2 border-b border-slate-700">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-              <FiPackage className="w-4 h-4 text-white" />
+            <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
+              <FiPackage className="w-3 h-3 text-white" />
             </div>
             <div>
-              <span className="text-lg font-semibold text-white">Shoes Shop</span>
+              <span className="text-sm font-semibold text-white">Shoes Shop</span>
               <p className="text-xs text-slate-400">Admin</p>
             </div>
           </div>
@@ -82,13 +82,13 @@ const Sidebar = () => {
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden p-1 rounded text-slate-400 hover:text-white"
           >
-            <FiX className="w-4 h-4" />
+            <FiX className="w-3 h-3" />
           </button>
         </div>
 
-        {/* Simple Navigation */}
-        <nav className="flex-1 py-2 px-3 overflow-y-auto">
-          <ul className="space-y-1">
+        {/* Compact Navigation */}
+        <nav className="flex-1 py-1 px-2 overflow-y-auto">
+          <ul className="space-y-0.5">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -98,14 +98,14 @@ const Sidebar = () => {
                     to={item.path}
                     onClick={handleLinkClick}
                     className={`
-                      flex items-center px-3 py-2 rounded text-sm
+                      flex items-center px-2 py-1.5 rounded text-xs
                       ${isActive
                         ? "bg-blue-600 text-white"
                         : "text-slate-300 hover:bg-slate-700 hover:text-white"
                       }
                     `}
                   >
-                    <Icon className="w-4 h-4 mr-3" />
+                    <Icon className="w-3 h-3 mr-2" />
                     <span>{item.label}</span>
                   </Link>
                 </li>
@@ -114,22 +114,20 @@ const Sidebar = () => {
           </ul>
         </nav>
 
-        {/* Simple User Section */}
-        <div className="border-t border-slate-700 p-3">
-          <div className="flex items-center space-x-3 p-2 rounded bg-slate-700">
-            <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center">
-              <FiUser className="w-4 h-4 text-white" />
+        {/* Compact User Section */}
+        <div className="border-t border-slate-700 p-2">
+          <div className="flex items-center space-x-2 p-1.5 rounded bg-slate-700">
+            <div className="w-6 h-6 bg-slate-600 rounded-full flex items-center justify-center">
+              <FiUser className="w-3 h-3 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-white">Admin User</p>
+              <p className="text-xs font-medium text-white">Admin</p>
               <p className="text-xs text-slate-400">Online</p>
             </div>
             <button className="p-1 text-slate-400 hover:text-red-400">
-              <FiLogOut className="w-4 h-4" />
+              <FiLogOut className="w-3 h-3" />
             </button>
           </div>
-
-
         </div>
       </aside>
     </>

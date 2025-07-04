@@ -71,7 +71,7 @@ const Categories = () => {
       console.error("Error saving category:", error);
       toast.error(
         "Lỗi khi lưu danh mục: " +
-          (error.response?.data?.message || error.message || "Không xác định")
+        (error.response?.data?.message || error.message || "Không xác định")
       );
     }
   };
@@ -126,38 +126,38 @@ const Categories = () => {
   );
 
   return (
-    <div className="p-4 lg:p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <div className="p-2">
+      {/* Compact Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản lý danh mục</h1>
-          <p className="text-gray-600 mt-1">
-            Quản lý danh mục sản phẩm ({categories.length} danh mục)
+          <h1 className="text-xl font-bold text-gray-900">Quản lý danh mục</h1>
+          <p className="text-sm text-gray-600">
+            {categories.length} danh mục
           </p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex space-x-2">
           <button
             onClick={loadCategories}
-            className="bg-gray-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-gray-600"
+            className="bg-gray-500 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1.5 hover:bg-gray-600 text-sm"
             disabled={loading}
           >
             <FiRefreshCw
-              className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
             />
             <span className="hidden sm:inline">Làm mới</span>
           </button>
           <button
             onClick={() => setShowModal(true)}
-            className="bg-blue-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-600"
+            className="bg-blue-500 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1.5 hover:bg-blue-600 text-sm"
           >
-            <FiPlus className="w-4 h-4" />
-            <span className="hidden sm:inline">Thêm danh mục</span>
+            <FiPlus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Thêm</span>
           </button>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-6 bg-white p-4 rounded-lg shadow">
+      {/* Compact Search */}
+      <div className="mb-4 bg-white p-3 rounded-lg shadow">
         <div className="relative max-w-md">
           <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
@@ -165,32 +165,32 @@ const Categories = () => {
             placeholder="Tìm kiếm danh mục..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           />
         </div>
       </div>
 
-      {/* Categories List */}
+      {/* Compact Categories List */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
-          <div className="px-6 py-12 text-center">
+          <div className="px-6 py-8 text-center">
             <div className="flex items-center justify-center">
-              <FiRefreshCw className="w-8 h-8 animate-spin mr-3 text-blue-500" />
-              <span className="text-lg text-gray-600">Đang tải danh mục...</span>
+              <FiRefreshCw className="w-6 h-6 animate-spin mr-3 text-blue-500" />
+              <span className="text-sm text-gray-600">Đang tải...</span>
             </div>
           </div>
         ) : filteredCategories.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <FiTag className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+          <div className="px-6 py-8 text-center">
+            <FiTag className="mx-auto h-12 w-12 text-gray-300 mb-3" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Không có danh mục nào
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-sm text-gray-500 mb-4">
               Thêm danh mục đầu tiên để bắt đầu
             </p>
             <button
               onClick={() => setShowModal(true)}
-              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm"
             >
               Thêm danh mục đầu tiên
             </button>
@@ -199,47 +199,58 @@ const Categories = () => {
           <table className="table-auto w-full text-left">
             <thead className="bg-gray-100">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Tên danh mục
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trạng thái
                 </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {filteredCategories.map((category, index) => (
-                <tr key={category.id} className="border-b">
-                  <td className="px-4 py-2 text-gray-900">{index + 1}</td>
-                  <td className="px-4 py-2 text-gray-900">{category.Ten}</td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={`inline-flex w-2 h-2 rounded-full ${
-                        category.TrangThai
-                          ? "bg-green-500"
-                          : "bg-red-500"
-                      }`}
-                      title={category.TrangThai ? "Hoạt động" : "Không hoạt động"}
+                <tr key={category.id} className="border-b hover:bg-gray-50">
+                  <td className="px-3 py-2 text-xs text-gray-900">{index + 1}</td>
+                  <td className="px-3 py-2 text-sm text-gray-900">{category.Ten}</td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => handleToggleStatus(category.id, category.TrangThai)}
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${category.TrangThai
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                        }`}
+                      title={category.TrangThai ? "Click để ẩn" : "Click để hiện"}
                     >
-                    </span>
+                      {category.TrangThai ? (
+                        <>
+                          <FiEye className="w-3 h-3 mr-1" />
+                          Hiện
+                        </>
+                      ) : (
+                        <>
+                          <FiEyeOff className="w-3 h-3 mr-1" />
+                          Ẩn
+                        </>
+                      )}
+                    </button>
                   </td>
-                  <td className="px-4 py-2">
-                    <div className="flex space-x-2">
+                  <td className="px-3 py-2">
+                    <div className="flex space-x-1">
                       <button
                         onClick={() => handleEdit(category)}
-                        className="text-blue-600 hover:underline flex items-center space-x-1"
+                        className="text-blue-600 hover:text-blue-800 p-1.5 rounded hover:bg-blue-50 transition-colors"
+                        title="Chỉnh sửa"
                       >
-                        <FiEdit2 className="w-4 h-4" />
-                      
+                        <FiEdit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(category.id)}
-                        className="text-red-600 hover:underline flex items-center space-x-1"
+                        className="text-red-600 hover:text-red-800 p-1.5 rounded hover:bg-red-50 transition-colors"
+                        title="Xóa"
                       >
-                        <FiTrash2 className="w-4 h-4" />
-                     
+                        <FiTrash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </td>
@@ -250,15 +261,15 @@ const Categories = () => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Compact Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">
+          <div className="bg-white rounded-lg p-4 w-full max-w-md">
+            <h2 className="text-lg font-bold mb-3">
               {editingCategory ? "Chỉnh sửa danh mục" : "Thêm danh mục mới"}
             </h2>
             <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Tên danh mục *
@@ -269,7 +280,7 @@ const Categories = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, TenDanhMuc: e.target.value })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="Ví dụ: Giày thể thao"
                     required
                   />
@@ -287,7 +298,7 @@ const Categories = () => {
                         TrangThai: parseInt(e.target.value),
                       })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value={1}>Hoạt động</option>
                     <option value={0}>Ẩn</option>
@@ -295,27 +306,27 @@ const Categories = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3 mt-6">
+              <div className="flex justify-end space-x-3 mt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setShowModal(false);
                     resetForm();
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                  className="px-3 py-1.5 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
                 >
                   {loading
                     ? "Đang lưu..."
                     : editingCategory
-                    ? "Cập nhật"
-                    : "Thêm danh mục"}
+                      ? "Cập nhật"
+                      : "Thêm"}
                 </button>
               </div>
             </form>

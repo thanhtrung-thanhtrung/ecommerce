@@ -26,7 +26,7 @@ const Brands = () => {
 
   const loadBrands = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/brands"); // Corrected API endpoint
+      const response = await fetch("http://localhost:5000/api/brands");
       const data = await response.json();
       if (data.success) {
         setBrands(data.data);
@@ -47,13 +47,11 @@ const Brands = () => {
     try {
       const formDataToSend = new FormData();
 
-      // Append form fields - using correct API field names
       formDataToSend.append("Ten", formData.Ten);
       formDataToSend.append("MoTa", formData.MoTa);
       formDataToSend.append("Website", formData.Website);
       formDataToSend.append("TrangThai", formData.TrangThai);
 
-      // Append logo if selected
       if (selectedLogo) {
         formDataToSend.append("Logo", selectedLogo);
       }
@@ -82,7 +80,7 @@ const Brands = () => {
       MoTa: brand.MoTa || "",
       Website: brand.Website || "",
       TrangThai: brand.TrangThai ?? 1,
-      Logo: brand.Logo || "", // Keep current logo URL
+      Logo: brand.Logo || "",
     });
     setShowModal(true);
   };
@@ -121,146 +119,187 @@ const Brands = () => {
       .includes(searchTerm.toLowerCase())
   );
 
-  const renderBrandList = () => (
-    <div className="overflow-hidden">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-              STT
-            </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Thương hiệu
-            </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-              Website
-            </th>
-            <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-              Trạng thái
-            </th>
-            <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-              Thao tác
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {filteredBrands.map((brand, index) => (
-            <tr key={brand.id} className="hover:bg-gray-50">
-              <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                {index + 1}
-              </td>
-              <td className="px-3 py-3">
-                <div className="flex items-center space-x-3">
-                  {brand.Logo ? (
-                    <img
-                      src={brand.Logo}
-                      alt={brand.Ten || brand.TenThuongHieu}
-                      className="h-8 w-8 object-cover rounded-md border flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="h-8 w-8 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
-                      <FiImage className="h-4 w-4 text-gray-400" />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-gray-900 truncate" title={brand.Ten || brand.TenThuongHieu}>
-                      {brand.Ten || brand.TenThuongHieu}
-                    </div>
-                    {brand.MoTa && (
-                      <div 
-                        className="text-xs text-gray-500 line-clamp-2 max-w-xs" 
-                        title={brand.MoTa}
-                        style={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {brand.MoTa}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </td>
-              <td className="px-3 py-3 whitespace-nowrap">
-                {brand.Website ? (
-                  <a
-                    href={brand.Website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline truncate block"
-                    title={brand.Website}
-                  >
-                    {brand.Website.replace(/^https?:\/\//, '').substring(0, 20)}
-                  </a>
-                ) : (
-                  <span className="text-xs text-gray-400">-</span>
-                )}
-              </td>
-              <td className="px-2 py-3 whitespace-nowrap">
-                <span className={`inline-flex w-2 h-2 rounded-full ${
-                  brand.TrangThai === 1 || brand.TrangThai === "1"
-                    ? "bg-green-500"
-                    : "bg-red-500"
-                }`} title={brand.TrangThai === 1 || brand.TrangThai === "1" ? "Hoạt động" : "Không hoạt động"}>
-                </span>
-              </td>
-              <td className="px-2 py-3 whitespace-nowrap">
-                <div className="flex space-x-1">
-                  <button
-                    onClick={() => handleEdit(brand)}
-                    className="text-blue-600 hover:text-blue-900 p-1"
-                    title="Chỉnh sửa"
-                  >
-                    <FiEdit2 className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(brand.id)}
-                    className="text-red-600 hover:text-red-900 p-1"
-                    title="Xóa"
-                  >
-                    <FiTrash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-
   return (
-    <div className="p-4 lg:p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Quản lý thương hiệu</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-        >
-          Thêm thương hiệu
-        </button>
+    <div className="p-2">
+      {/* Compact Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Quản lý thương hiệu</h1>
+          <p className="text-sm text-gray-600">{brands.length} thương hiệu</p>
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={loadBrands}
+            className="bg-gray-500 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1.5 hover:bg-gray-600 text-sm"
+            disabled={loading}
+          >
+            <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Làm mới</span>
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-blue-500 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1.5 hover:bg-blue-600 text-sm"
+          >
+            <FiPlus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Thêm</span>
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
+      {/* Compact Search */}
+      <div className="mb-4 bg-white p-3 rounded-lg shadow">
+        <div className="relative max-w-md">
+          <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm thương hiệu..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Compact Brands List */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
-          <p className="text-center text-gray-500">Đang tải...</p>
+          <div className="px-6 py-8 text-center">
+            <div className="flex items-center justify-center">
+              <FiRefreshCw className="w-6 h-6 animate-spin mr-3 text-blue-500" />
+              <span className="text-sm text-gray-600">Đang tải...</span>
+            </div>
+          </div>
         ) : filteredBrands.length === 0 ? (
-          <p className="text-center text-gray-500">Không có thương hiệu nào.</p>
+          <div className="px-6 py-8 text-center">
+            <FiTag className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Không có thương hiệu nào</h3>
+            <p className="text-sm text-gray-500 mb-4">Thêm thương hiệu đầu tiên để bắt đầu</p>
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm"
+            >
+              Thêm thương hiệu đầu tiên
+            </button>
+          </div>
         ) : (
-          renderBrandList()
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                    STT
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Thương hiệu
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                    Website
+                  </th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                    Trạng thái
+                  </th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                    Thao tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredBrands.map((brand, index) => (
+                  <tr key={brand.id} className="hover:bg-gray-50">
+                    <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 text-center">
+                      {index + 1}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center space-x-2">
+                        {brand.Logo ? (
+                          <img
+                            src={brand.Logo}
+                            alt={brand.Ten || brand.TenThuongHieu}
+                            className="h-6 w-6 object-cover rounded border flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="h-6 w-6 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+                            <FiImage className="h-3 w-3 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-medium text-gray-900 truncate" title={brand.Ten || brand.TenThuongHieu}>
+                            {brand.Ten || brand.TenThuongHieu}
+                          </div>
+                          {brand.MoTa && (
+                            <div
+                              className="text-xs text-gray-500 line-clamp-1 max-w-xs"
+                              title={brand.MoTa}
+                              style={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 1,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {brand.MoTa}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {brand.Website ? (
+                        <a
+                          href={brand.Website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline truncate block"
+                          title={brand.Website}
+                        >
+                          {brand.Website.replace(/^https?:\/\//, '').substring(0, 15)}...
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <span className={`inline-flex w-2 h-2 rounded-full ${brand.TrangThai === 1 || brand.TrangThai === "1"
+                          ? "bg-green-500"
+                          : "bg-red-500"
+                        }`} title={brand.TrangThai === 1 || brand.TrangThai === "1" ? "Hoạt động" : "Không hoạt động"}>
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => handleEdit(brand)}
+                          className="text-blue-600 hover:text-blue-900 p-1.5 rounded hover:bg-blue-50 transition-colors"
+                          title="Chỉnh sửa"
+                        >
+                          <FiEdit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(brand.id)}
+                          className="text-red-600 hover:text-red-900 p-1.5 rounded hover:bg-red-50 transition-colors"
+                          title="Xóa"
+                        >
+                          <FiTrash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
+      {/* Compact Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-            <h2 className="text-xl font-bold mb-4">
+          <div className="bg-white rounded-lg p-4 w-full max-w-lg">
+            <h2 className="text-lg font-bold mb-3">
               {editingBrand ? "Chỉnh sửa thương hiệu" : "Thêm thương hiệu mới"}
             </h2>
             <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Tên thương hiệu *
@@ -274,7 +313,7 @@ const Brands = () => {
                         Ten: e.target.value,
                       })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
                     required
                   />
                 </div>
@@ -288,7 +327,8 @@ const Brands = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, MoTa: e.target.value })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
+                    rows={2}
                   />
                 </div>
 
@@ -302,7 +342,7 @@ const Brands = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, Website: e.target.value })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="https://example.com"
                   />
                 </div>
@@ -311,44 +351,44 @@ const Brands = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Logo thương hiệu
                   </label>
-                  
-                  {/* Hiển thị ảnh hiện tại nếu có */}
+
+                  {/* Hiển thị ảnh hiện tại */}
                   {editingBrand && formData.Logo && !selectedLogo && (
-                    <div className="mb-3">
-                      <p className="text-sm text-gray-600 mb-2">Ảnh hiện tại:</p>
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-600 mb-1">Ảnh hiện tại:</p>
                       <img
                         src={formData.Logo}
                         alt="Logo hiện tại"
-                        className="h-20 w-20 object-cover rounded-lg border"
+                        className="h-16 w-16 object-cover rounded border"
                       />
                     </div>
                   )}
-                  
-                  {/* Hiển thị ảnh mới được chọn */}
+
+                  {/* Hiển thị ảnh mới */}
                   {selectedLogo && (
-                    <div className="mb-3">
-                      <p className="text-sm text-gray-600 mb-2">Ảnh mới được chọn:</p>
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-600 mb-1">Ảnh mới:</p>
                       <img
                         src={URL.createObjectURL(selectedLogo)}
                         alt="Logo mới"
-                        className="h-20 w-20 object-cover rounded-lg border"
+                        className="h-16 w-16 object-cover rounded border"
                       />
                     </div>
                   )}
-                  
+
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleLogoUpload}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                   {selectedLogo && (
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       Đã chọn: {selectedLogo.name}
                     </p>
                   )}
                   {editingBrand && formData.Logo && !selectedLogo && (
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       Để trống nếu không muốn thay đổi logo
                     </p>
                   )}
@@ -363,7 +403,7 @@ const Brands = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, TrangThai: parseInt(e.target.value) })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value={1}>Hoạt động</option>
                     <option value={0}>Không hoạt động</option>
@@ -371,21 +411,21 @@ const Brands = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3 mt-6">
+              <div className="flex justify-end space-x-3 mt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setShowModal(false);
                     resetForm();
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                  className="px-3 py-1.5 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
                 >
                   {loading ? "Đang lưu..." : editingBrand ? "Cập nhật" : "Thêm"}
                 </button>
