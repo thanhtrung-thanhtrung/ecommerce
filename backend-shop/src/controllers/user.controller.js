@@ -4,7 +4,7 @@ const userService = require("../services/user.service");
 class UserController {
   async getProfile(req, res) {
     try {
-      const profile = await userService.getProfile(req.user.userId);
+      const profile = await userService.getProfile(req.user.id);
       res.json(profile);
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -19,7 +19,7 @@ class UserController {
       }
 
       const updatedProfile = await userService.updateProfile(
-        req.user.userId,
+        req.user.id,
         req.body
       );
       res.json(updatedProfile);
@@ -36,7 +36,7 @@ class UserController {
       }
 
       const { matKhauCu, matKhauMoi } = req.body;
-      await userService.changePassword(req.user.userId, matKhauCu, matKhauMoi);
+      await userService.changePassword(req.user.id, matKhauCu, matKhauMoi);
       res.json({ message: "Đổi mật khẩu thành công" });
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -45,7 +45,7 @@ class UserController {
 
   async deleteAccount(req, res) {
     try {
-      await userService.deleteAccount(req.user.userId);
+      await userService.deleteAccount(req.user.id);
       res.json({ message: "Xóa tài khoản thành công" });
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -54,7 +54,7 @@ class UserController {
 
   async getOrderHistory(req, res) {
     try {
-      const orders = await userService.getOrderHistory(req.user.userId);
+      const orders = await userService.getOrderHistory(req.user.id);
       res.json(orders);
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -63,7 +63,7 @@ class UserController {
 
   async getWishlist(req, res) {
     try {
-      const wishlist = await userService.getWishlist(req.user.userId);
+      const wishlist = await userService.getWishlist(req.user.id);
       res.json(wishlist);
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -72,23 +72,46 @@ class UserController {
 
   async addToWishlist(req, res) {
     try {
-      const userId = req.user.id || req.user.userId;
+      const userId = req.user.id;
       const { id_SanPham } = req.body;
-      if (!userId || !id_SanPham)
-        throw new Error("userId và id_SanPham không được để trống");
-      await userService.addToWishlist(userId, id_SanPham);
-      res.json({ message: "Đã thêm sản phẩm vào danh sách yêu thích" });
+
+      if (!userId || !id_SanPham) {
+        return res.status(400).json({
+          message: "userId và id_SanPham không được để trống",
+        });
+      }
+
+      const result = await userService.addToWishlist(userId, id_SanPham);
+      res.json({
+        success: true,
+        message: "Đã thêm sản phẩm vào danh sách yêu thích",
+        data: result,
+      });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
+
   async removeFromWishlist(req, res) {
     try {
       const { id_SanPham } = req.params;
-      await userService.removeFromWishlist(req.user.userId, id_SanPham);
-      res.json({ message: "Đã xóa sản phẩm khỏi danh sách yêu thích" });
+      const result = await userService.removeFromWishlist(
+        req.user.id,
+        id_SanPham
+      );
+      res.json({
+        success: true,
+        message: "Đã xóa sản phẩm khỏi danh sách yêu thích",
+        data: result,
+      });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 }

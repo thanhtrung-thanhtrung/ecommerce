@@ -165,10 +165,20 @@ class ProductService {
     const product = products[0];
 
     const [variants] = await db.execute(
-      `SELECT ctsp.*, kc.Ten as tenKichCo, ms.Ten as tenMau
+      `SELECT ctsp.*, kc.Ten as tenKichCo, ms.Ten as tenMau,
+              fn_TinhTonKhoRealTime(ctsp.id) as TonKho,
+              COALESCE(cho.TongCho, 0) as SoLuongDangCho,
+              GREATEST(0, fn_TinhTonKhoRealTime(ctsp.id) - COALESCE(cho.TongCho, 0)) as CoTheBan
         FROM chitietsanpham ctsp
         JOIN kichco kc ON ctsp.id_KichCo = kc.id
         JOIN mausac ms ON ctsp.id_MauSac = ms.id
+        LEFT JOIN (
+          SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
+          FROM chitietdonhang ctdh
+          JOIN donhang dh ON ctdh.id_DonHang = dh.id
+          WHERE dh.TrangThai = 1
+          GROUP BY ctdh.id_ChiTietSanPham
+        ) cho ON ctsp.id = cho.id_ChiTietSanPham
         WHERE ctsp.id_SanPham = ?`,
       [productId]
     );
@@ -309,11 +319,11 @@ class ProductService {
         for (const variant of bienThe) {
           const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
 
-          // ✅ Sửa: Thêm cột TonKho vào INSERT statement
+          // ✅ SỬA: Không cần khởi tạo TonKho nữa, sẽ dùng real-time calculation
           await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho) 
-             VALUES (?, ?, ?, ?, ?)`,
-            [productId, id_KichCo, id_MauSac, MaSanPham, SoLuong || 0]
+            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
+             VALUES (?, ?, ?, ?)`,
+            [productId, id_KichCo, id_MauSac, MaSanPham]
           );
         }
       }
@@ -456,9 +466,9 @@ class ProductService {
           const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
 
           await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho) 
-             VALUES (?, ?, ?, ?, ?)`,
-            [productId, id_KichCo, id_MauSac, MaSanPham, SoLuong || 0]
+            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
+             VALUES (?, ?, ?, ?)`,
+            [productId, id_KichCo, id_MauSac, MaSanPham]
           );
         }
       }
@@ -605,9 +615,9 @@ class ProductService {
           const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
 
           await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho) 
-             VALUES (?, ?, ?, ?, ?)`,
-            [productId, id_KichCo, id_MauSac, MaSanPham, SoLuong || 0]
+            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
+             VALUES (?, ?, ?, ?)`,
+            [productId, id_KichCo, id_MauSac, MaSanPham]
           );
         }
       }
@@ -739,9 +749,11 @@ class ProductService {
 
       // Kiểm tra sản phẩm có trong đơn hàng hay không
       const hasOrders = await this.checkProductInOrders(productId);
-      
+
       if (hasOrders) {
-        throw new Error("Không thể xóa sản phẩm này vì đã có khách hàng mua. Bạn chỉ có thể ẩn sản phẩm bằng cách đổi trạng thái thành 'Ngừng bán'.");
+        throw new Error(
+          "Không thể xóa sản phẩm này vì đã có khách hàng mua. Bạn chỉ có thể ẩn sản phẩm bằng cách đổi trạng thái thành 'Ngừng bán'."
+        );
       }
 
       // Nếu không có trong đơn hàng, thực hiện soft delete chỉ bảng sanpham
@@ -753,7 +765,7 @@ class ProductService {
       return {
         success: true,
         message: "Xóa sản phẩm thành công",
-        productName: existingProduct[0].Ten
+        productName: existingProduct[0].Ten,
       };
     } catch (error) {
       console.error("Error deleting product:", error);
@@ -771,7 +783,7 @@ class ProductService {
          WHERE ctsp.id_SanPham = ?`,
         [productId]
       );
-      
+
       return orders[0].count > 0;
     } catch (error) {
       console.error("Error checking product in orders:", error);
@@ -781,7 +793,7 @@ class ProductService {
 
   async getAllProductsAdmin(page = 1, limit = 10, search = "", status = null) {
     const offset = (page - 1) * limit;
-    
+
     let query = `
       SELECT sp.*, dm.Ten as tenDanhMuc, th.Ten as tenThuongHieu, ncc.Ten as tenNhaCungCap,
              COUNT(ctsp.id) as soBienThe,
@@ -794,40 +806,41 @@ class ProductService {
       LEFT JOIN chitietdonhang ctdh ON ctsp.id = ctdh.id_ChiTietSanPham
       WHERE 1=1
     `;
-    
+
     const params = [];
-    
+
     if (search) {
       query += " AND (sp.Ten LIKE ? OR sp.MoTa LIKE ?)";
       params.push(`%${search}%`, `%${search}%`);
     }
-    
+
     if (status !== null) {
       query += " AND sp.TrangThai = ?";
       params.push(status);
     }
-    
+
     query += " GROUP BY sp.id ORDER BY sp.NgayTao DESC LIMIT ? OFFSET ?";
     params.push(limit, offset);
-    
+
     const [products] = await db.execute(query, params);
-    
+
     // Count total
-    let countQuery = "SELECT COUNT(DISTINCT sp.id) as total FROM sanpham sp WHERE 1=1";
+    let countQuery =
+      "SELECT COUNT(DISTINCT sp.id) as total FROM sanpham sp WHERE 1=1";
     const countParams = [];
-    
+
     if (search) {
       countQuery += " AND (sp.Ten LIKE ? OR sp.MoTa LIKE ?)";
       countParams.push(`%${search}%`, `%${search}%`);
     }
-    
+
     if (status !== null) {
       countQuery += " AND sp.TrangThai = ?";
       countParams.push(status);
     }
-    
+
     const [total] = await db.execute(countQuery, countParams);
-    
+
     return {
       products,
       pagination: {
@@ -860,7 +873,7 @@ class ProductService {
         success: true,
         message: status === 1 ? "Đã kích hoạt sản phẩm" : "Đã ẩn sản phẩm",
         productName: existingProduct[0].Ten,
-        newStatus: status
+        newStatus: status,
       };
     } catch (error) {
       console.error("Error updating product status:", error);
@@ -881,8 +894,8 @@ class ProductService {
       throw new Error("Không thể lấy danh sách màu sắc");
     }
   }
-async getColorById(colorId) {
-    try { 
+  async getColorById(colorId) {
+    try {
       const [color] = await db.execute(
         "SELECT id, Ten as Ten, MaMau FROM mausac WHERE id = ?",
         [colorId]
@@ -892,10 +905,10 @@ async getColorById(colorId) {
       }
       return color[0];
     } catch (error) {
-      console.error("Error getting color by ID:", error);   
+      console.error("Error getting color by ID:", error);
       throw new Error("Không thể lấy thông tin màu sắc");
     }
-  } 
+  }
   async getAllSizes() {
     try {
       const [sizes] = await db.execute(
@@ -915,10 +928,10 @@ async getColorById(colorId) {
         "INSERT INTO mausac (Ten, MaMau) VALUES (?, ?)",
         [Ten, MaMau]
       );
-      
+
       return {
         id: result.insertId,
-        message: "Thêm màu sắc thành công"
+        message: "Thêm màu sắc thành công",
       };
     } catch (error) {
       console.error("Error creating color:", error);
@@ -929,14 +942,13 @@ async getColorById(colorId) {
   async createSize(sizeData) {
     try {
       const { Ten } = sizeData;
-      const [result] = await db.execute(
-        "INSERT INTO kichco (Ten) VALUES (?)",
-        [Ten]
-      );
-      
+      const [result] = await db.execute("INSERT INTO kichco (Ten) VALUES (?)", [
+        Ten,
+      ]);
+
       return {
         id: result.insertId,
-        message: "Thêm kích cỡ thành công"
+        message: "Thêm kích cỡ thành công",
       };
     } catch (error) {
       console.error("Error creating size:", error);
@@ -947,13 +959,14 @@ async getColorById(colorId) {
   async updateColor(colorId, colorData) {
     try {
       const { Ten, MaMau } = colorData;
-      await db.execute(
-        "UPDATE mausac SET Ten = ?, MaMau = ? WHERE id = ?",
-        [Ten, MaMau, colorId]
-      );
-      
+      await db.execute("UPDATE mausac SET Ten = ?, MaMau = ? WHERE id = ?", [
+        Ten,
+        MaMau,
+        colorId,
+      ]);
+
       return {
-        message: "Cập nhật màu sắc thành công"
+        message: "Cập nhật màu sắc thành công",
       };
     } catch (error) {
       console.error("Error updating color:", error);
@@ -964,13 +977,10 @@ async getColorById(colorId) {
   async updateSize(sizeId, sizeData) {
     try {
       const { Ten } = sizeData;
-      await db.execute(
-        "UPDATE kichco SET Ten = ? WHERE id = ?",
-        [Ten, sizeId]
-      );
-      
+      await db.execute("UPDATE kichco SET Ten = ? WHERE id = ?", [Ten, sizeId]);
+
       return {
-        message: "Cập nhật kích cỡ thành công"
+        message: "Cập nhật kích cỡ thành công",
       };
     } catch (error) {
       console.error("Error updating size:", error);
@@ -985,15 +995,17 @@ async getColorById(colorId) {
         "SELECT COUNT(*) as count FROM chitietsanpham WHERE id_MauSac = ?",
         [colorId]
       );
-      
+
       if (usage[0].count > 0) {
-        throw new Error("Không thể xóa màu sắc này vì đang được sử dụng trong sản phẩm");
+        throw new Error(
+          "Không thể xóa màu sắc này vì đang được sử dụng trong sản phẩm"
+        );
       }
-      
+
       await db.execute("DELETE FROM mausac WHERE id = ?", [colorId]);
-      
+
       return {
-        message: "Xóa màu sắc thành công"
+        message: "Xóa màu sắc thành công",
       };
     } catch (error) {
       console.error("Error deleting color:", error);
@@ -1008,15 +1020,17 @@ async getColorById(colorId) {
         "SELECT COUNT(*) as count FROM chitietsanpham WHERE id_KichCo = ?",
         [sizeId]
       );
-      
+
       if (usage[0].count > 0) {
-        throw new Error("Không thể xóa kích cỡ này vì đang được sử dụng trong sản phẩm");
+        throw new Error(
+          "Không thể xóa kích cỡ này vì đang được sử dụng trong sản phẩm"
+        );
       }
-      
+
       await db.execute("DELETE FROM kichco WHERE id = ?", [sizeId]);
-      
+
       return {
-        message: "Xóa kích cỡ thành công"
+        message: "Xóa kích cỡ thành công",
       };
     } catch (error) {
       console.error("Error deleting size:", error);
@@ -1035,6 +1049,117 @@ async getColorById(colorId) {
       [productId]
     );
     return variants;
+  }
+
+  // Lấy tồn kho real-time cho biến thể sản phẩm
+  async getProductStockInfo(productId) {
+    try {
+      const [stockInfo] = await db.execute(
+        `SELECT 
+          cts.id,
+          cts.MaSanPham,
+          sp.Ten as TenSanPham,
+          kc.Ten as TenKichCo,
+          ms.Ten as TenMauSac,
+          -- Sử dụng function tính tồn kho real-time
+          fn_TinhTonKhoRealTime(cts.id) as TonKhoThucTe,
+          -- Tính số lượng đang chờ xác nhận
+          COALESCE(cho.TongCho, 0) as SoLuongDangCho,
+          -- Tồn kho có thể bán = Tồn kho - Đang chờ
+          GREATEST(0, fn_TinhTonKhoRealTime(cts.id) - COALESCE(cho.TongCho, 0)) as CoTheBan
+        FROM chitietsanpham cts
+        JOIN sanpham sp ON cts.id_SanPham = sp.id
+        JOIN kichco kc ON cts.id_KichCo = kc.id
+        JOIN mausac ms ON cts.id_MauSac = ms.id
+        
+        -- Tính số lượng đang chờ xác nhận
+        LEFT JOIN (
+          SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
+          FROM chitietdonhang ctdh
+          JOIN donhang dh ON ctdh.id_DonHang = dh.id
+          WHERE dh.TrangThai = 1
+          GROUP BY ctdh.id_ChiTietSanPham
+        ) cho ON cts.id = cho.id_ChiTietSanPham
+        
+        WHERE cts.id_SanPham = ?
+        ORDER BY kc.Ten, ms.Ten`,
+        [productId]
+      );
+
+      return {
+        success: true,
+        data: stockInfo,
+        productId: productId,
+      };
+    } catch (error) {
+      console.error("Error getting product stock info:", error);
+      throw new Error("Không thể lấy thông tin tồn kho: " + error.message);
+    }
+  }
+
+  // Kiểm tra tồn kho trước khi đặt hàng - DÙNG REAL-TIME
+  async checkStockBeforeOrder(productVariantId, requestedQuantity) {
+    try {
+      const [stockCheck] = await db.execute(
+        `SELECT 
+          cts.id,
+          cts.MaSanPham,
+          sp.Ten as TenSanPham,
+          kc.Ten as TenKichCo,
+          ms.Ten as TenMauSac,
+          -- Sử dụng function tính tồn kho real-time
+          fn_TinhTonKhoRealTime(cts.id) as TonKhoThucTe,
+          -- Sử dụng function kiểm tra có thể bán
+          fn_CoTheBan(cts.id, ?) as CoTheBan,
+          -- Tính số lượng đang chờ xác nhận
+          COALESCE(cho.TongCho, 0) as SoLuongDangCho
+        FROM chitietsanpham cts
+        JOIN sanpham sp ON cts.id_SanPham = sp.id
+        JOIN kichco kc ON cts.id_KichCo = kc.id
+        JOIN mausac ms ON cts.id_MauSac = ms.id
+        
+        -- Tính số lượng đang chờ xác nhận
+        LEFT JOIN (
+          SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
+          FROM chitietdonhang ctdh
+          JOIN donhang dh ON ctdh.id_DonHang = dh.id
+          WHERE dh.TrangThai = 1
+          GROUP BY ctdh.id_ChiTietSanPham
+        ) cho ON cts.id = cho.id_ChiTietSanPham
+        
+        WHERE cts.id = ?`,
+        [requestedQuantity, productVariantId]
+      );
+
+      if (stockCheck.length === 0) {
+        throw new Error("Biến thể sản phẩm không tồn tại");
+      }
+
+      const product = stockCheck[0];
+      const canSell = product.CoTheBan === 1;
+
+      return {
+        success: true,
+        data: {
+          id_ChiTietSanPham: product.id,
+          TenSanPham: product.TenSanPham,
+          MaSanPham: product.MaSanPham,
+          KichCo: product.TenKichCo,
+          MauSac: product.TenMauSac,
+          TonKhoThucTe: product.TonKhoThucTe,
+          SoLuongCanKiem: requestedQuantity,
+          SoLuongDangCho: product.SoLuongDangCho,
+          CoTheBan: canSell,
+          isAvailable: canSell,
+          message: canSell
+            ? "Có thể đặt hàng"
+            : `Không đủ hàng. Tồn kho: ${product.TonKhoThucTe}, Đang chờ: ${product.SoLuongDangCho}`,
+        },
+      };
+    } catch (error) {
+      console.error("Error checking stock before order:", error);
+      throw new Error("Không thể kiểm tra tồn kho: " + error.message);
+    }
   }
 }
 

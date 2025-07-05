@@ -5,23 +5,19 @@ const db = require("../config/database");
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = { id: decoded.userId }; // Gán req.user.id từ decoded.userId
-    } catch (error) {
-      return res
-        .status(401)
-        .json({ message: "Token không hợp lệ hoặc đã hết hạn" });
-    }
-  }
+
   if (!token) {
     return res.status(401).json({ message: "Không tìm thấy token xác thực" });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    // Đảm bảo req.user có đầy đủ thông tin từ token
+    req.user = {
+      id: decoded.userId,
+      email: decoded.email,
+      role: decoded.role,
+    };
     next();
   } catch (error) {
     return res
@@ -37,7 +33,12 @@ const optionalAuth = (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = { id: decoded.userId }; // Gán req.user.id từ decoded.userId
+      // Đảm bảo req.user có đầy đủ thông tin từ token
+      req.user = {
+        id: decoded.userId,
+        email: decoded.email,
+        role: decoded.role,
+      };
     } catch (error) {
       // Token không hợp lệ, tiếp tục như khách
       req.user = null;

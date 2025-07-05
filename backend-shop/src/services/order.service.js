@@ -2,7 +2,7 @@
 // (đã sửa tên cột theo chuẩn database: id, id_SanPham, id_NguoiDung, ...)
 
 const db = require("../config/database");
-const InventoryService = require("./inventory.service");
+// ❌ BỎ: const InventoryService = require("./inventory.service");
 const emailService = require("./email.service");
 
 class OrderService {
@@ -65,7 +65,6 @@ class OrderService {
 
       // 1. Lấy giỏ hàng
       let cartQuery, cartParams;
-      // Đảm bảo truy vấn giỏ hàng xử lý đúng cho cả khách vãng lai và người dùng đã đăng nhập
       if (userId) {
         cartQuery = `
           SELECT gh.*, ctsp.id_SanPham, sp.Gia, sp.GiaKhuyenMai
@@ -100,18 +99,21 @@ class OrderService {
         throw new Error("Giỏ hàng trống");
       }
 
-      // 2. Kiểm tra tồn kho của tất cả sản phẩm trong giỏ hàng
+      // ✅ SỬA: 2. Kiểm tra tồn kho bằng database functions thay vì cột TonKho
       for (const item of cartItems) {
         const [stockCheck] = await connection.execute(
-          "SELECT TonKho FROM chitietsanpham WHERE id = ?",
-          [item.id_ChiTietSanPham]
+          `SELECT 
+            fn_TinhTonKhoRealTime(?) as TonKhoThucTe,
+            fn_CoTheBan(?, ?) as CoTheBan
+          `,
+          [item.id_ChiTietSanPham, item.id_ChiTietSanPham, item.SoLuong]
         );
 
-        if (stockCheck.length === 0 || stockCheck[0].TonKho < item.SoLuong) {
+        if (stockCheck.length === 0 || stockCheck[0].CoTheBan !== 1) {
           throw new Error(
-            `Sản phẩm trong giỏ hàng không đủ số lượng tồn kho. Chỉ còn ${
-              stockCheck[0]?.TonKho || 0
-            } sản phẩm.`
+            `Sản phẩm trong giỏ hàng không đủ số lượng tồn kho. Tồn kho thực tế: ${
+              stockCheck[0]?.TonKhoThucTe || 0
+            }, yêu cầu: ${item.SoLuong}`
           );
         }
       }
@@ -166,7 +168,6 @@ class OrderService {
       const today = new Date();
       const dateStr = today.toISOString().slice(2, 10).replace(/-/g, ""); // YYMMDD
       // Insert tạm, sau đó update lại MaDonHang chuẩn
-      // Trong hàm createOrder
       const [orderResult] = await connection.execute(
         `INSERT INTO donhang (
     MaDonHang, id_NguoiMua, NgayDatHang, TongTienHang, GiamGia, PhiVanChuyen, 
@@ -175,7 +176,7 @@ class OrderService {
   ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
         [
           null, // MaDonHang sẽ update sau
-          userId || null, // <-- Dòng này: userId sẽ được truyền vào nếu đã đăng nhập
+          userId || null,
           TongTienHang,
           GiamGia,
           PhiVanChuyen,
@@ -199,7 +200,7 @@ class OrderService {
         [MaDonHang, orderId]
       );
 
-      // 8. Lưu chi tiết đơn hàng và cập nhật tồn kho
+      // ✅ SỬA: 8. Lưu chi tiết đơn hàng - Database trigger sẽ tự động quản lý tồn kho
       for (const item of cartItems) {
         // Use correct price (prioritize GiaKhuyenMai)
         const finalPrice = item.GiaKhuyenMai || item.Gia;
@@ -215,13 +216,12 @@ class OrderService {
             finalPrice * item.SoLuong,
           ]
         );
-
-        // Cập nhật giảm tồn kho
-        await connection.execute(
-          `UPDATE chitietsanpham SET TonKho = TonKho - ? WHERE id = ?`,
-          [item.SoLuong, item.id_ChiTietSanPham]
-        );
       }
+
+      // ✅ HOÀN TOÀN BỎ LOGIC TRỪ TỒN KHO MANUAL - DATABASE TRIGGER SẼ XỬ LÝ TỰ ĐỘNG
+      // Database trigger `tr_QuanLyTonKhoTheoTrangThaiDonHang` sẽ tự động:
+      // - Trừ tồn kho khi đơn hàng chuyển từ trạng thái 1 (chờ xác nhận) sang 2 (đã xác nhận)
+      // - Hoàn lại tồn kho khi đơn hàng bị hủy (chuyển sang trạng thái 5)
 
       // 9. Xóa giỏ hàng
       if (userId) {
@@ -329,43 +329,37 @@ class OrderService {
   async cancelOrder(orderId, userId, cancelReason) {
     let connection;
     try {
-      // Lấy connection từ pool
       connection = await db.getConnection();
 
-      // Bắt đầu transaction
       await connection.beginTransaction();
 
+      // Sửa: Kiểm tra đơn hàng tồn tại và thuộc về user (hoặc được tạo bởi user)
       const [orders] = await connection.execute(
-        "SELECT * FROM donhang WHERE id = ? AND id_NguoiMua = ?",
-        [orderId, userId]
+        `SELECT * FROM donhang 
+         WHERE id = ? AND (id_NguoiMua = ? OR (id_NguoiMua IS NULL AND EmailNguoiNhan = (
+           SELECT Email FROM nguoidung WHERE id = ?
+         )))`,
+        [orderId, userId, userId]
       );
+
       if (orders.length === 0) {
-        throw new Error("Đơn hàng không tồn tại");
+        throw new Error(
+          "Đơn hàng không tồn tại hoặc bạn không có quyền hủy đơn hàng này"
+        );
       }
 
       const order = orders[0];
       if (order.TrangThai !== 1) {
-        throw new Error("Không thể hủy đơn hàng ở trạng thái này");
+        throw new Error("Chỉ có thể hủy đơn hàng ở trạng thái chờ xác nhận");
       }
 
+      // ✅ SỬA: Chỉ cập nhật trạng thái, database trigger sẽ tự động hoàn lại tồn kho
       await connection.execute(
         "UPDATE donhang SET TrangThai = 5, LyDoHuy = ? WHERE id = ?",
         [cancelReason, orderId]
       );
 
-      const [orderDetails] = await connection.execute(
-        "SELECT * FROM chitietdonhang WHERE id_DonHang = ?",
-        [orderId]
-      );
-
-      // Cập nhật hoàn lại tồn kho
-      for (const item of orderDetails) {
-        await connection.execute(
-          `UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?`,
-          [item.SoLuong, item.id_ChiTietSanPham]
-        );
-      }
-
+      // ✅ HOÀN LẠI MÃ GIẢM GIÁ (nếu có)
       if (order.MaGiamGia) {
         await connection.execute(
           "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
@@ -415,24 +409,13 @@ class OrderService {
         throw new Error("Không thể hủy đơn hàng ở trạng thái này");
       }
 
+      // ✅ SỬA: Chỉ cập nhật trạng thái, database trigger sẽ tự động hoàn lại tồn kho
       await connection.execute(
         "UPDATE donhang SET TrangThai = 5, LyDoHuy = ? WHERE id = ?",
         [cancelReason, orderId]
       );
 
-      const [orderDetails] = await connection.execute(
-        "SELECT * FROM chitietdonhang WHERE id_DonHang = ?",
-        [orderId]
-      );
-
-      // Cập nhật hoàn lại tồn kho
-      for (const item of orderDetails) {
-        await connection.execute(
-          `UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?`,
-          [item.SoLuong, item.id_ChiTietSanPham]
-        );
-      }
-
+      // ✅ HOÀN LẠI MÃ GIẢM GIÁ (nếu có)
       if (order.MaGiamGia) {
         await connection.execute(
           "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
@@ -523,8 +506,8 @@ class OrderService {
         confirmed: 2,
         processing: 3,
         shipping: 4,
-        delivered: 5,
-        cancelled: 6,
+        delivered: 4, // Cả shipping và delivered đều map thành 4
+        cancelled: 5, // Cancelled map thành 5, không phải 6
       };
       if (statusMap[status]) {
         whereClause += " AND dh.TrangThai = ?";
@@ -562,13 +545,13 @@ class OrderService {
         dh.*,
         httt.Ten as paymentMethod,
         htvc.Ten as shippingMethod,
+        dh.TrangThai as TrangThai,
         CASE dh.TrangThai
           WHEN 1 THEN 'pending'
           WHEN 2 THEN 'confirmed' 
-          WHEN 3 THEN 'processing'
-          WHEN 4 THEN 'shipping'
-          WHEN 5 THEN 'delivered'
-          WHEN 6 THEN 'cancelled'
+          WHEN 3 THEN 'shipping'
+          WHEN 4 THEN 'delivered'
+          WHEN 5 THEN 'cancelled'
           ELSE 'pending'
         END as status
       FROM donhang dh
@@ -592,7 +575,8 @@ class OrderService {
       customerEmail: order.EmailNguoiNhan,
       customerPhone: order.SDTNguoiNhan,
       total: order.TongThanhToan,
-      status: order.status,
+      TrangThai: order.TrangThai, // ✅ Trả về số trạng thái
+      status: order.status, // ✅ Giữ lại string cho backward compatibility
       createdAt: order.NgayDatHang,
       paymentMethod: order.paymentMethod,
       shippingMethod: order.shippingMethod,
@@ -626,13 +610,13 @@ class OrderService {
         dh.*,
         httt.Ten as paymentMethod,
         htvc.Ten as shippingMethod,
+        dh.TrangThai as TrangThai,
         CASE dh.TrangThai
           WHEN 1 THEN 'pending'
           WHEN 2 THEN 'confirmed' 
-          WHEN 3 THEN 'processing'
-          WHEN 4 THEN 'shipping'
-          WHEN 5 THEN 'delivered'
-          WHEN 6 THEN 'cancelled'
+          WHEN 3 THEN 'shipping'
+          WHEN 4 THEN 'delivered'
+          WHEN 5 THEN 'cancelled'
           ELSE 'pending'
         END as status
        FROM donhang dh
@@ -700,7 +684,8 @@ class OrderService {
       shippingAddress: order.DiaChiNhan,
       paymentMethod: order.paymentMethod,
       shippingMethod: order.shippingMethod,
-      status: order.status,
+      TrangThai: order.TrangThai, // ✅ Trả về số trạng thái
+      status: order.status, // ✅ Giữ lại string cho backward compatibility
       createdAt: order.NgayDatHang,
       subtotal: order.TongTienHang,
       discount: order.GiamGia,
@@ -719,14 +704,14 @@ class OrderService {
     try {
       await connection.beginTransaction();
 
-      // Map frontend status to database status
+      // Map frontend status to database status - SỬA CHO ĐÚNG DATABASE SCHEMA
       const statusMap = {
         pending: 1,
         confirmed: 2,
-        processing: 3,
-        shipping: 4,
-        delivered: 5,
-        cancelled: 6,
+        processing: 3, // Đang xử lý -> map thành 3 (đang giao)
+        shipping: 4, // Đang giao -> map thành 4 (đã giao)
+        delivered: 4, // Đã giao -> map thành 4
+        cancelled: 5, // Đã hủy -> map thành 5
       };
 
       const dbStatus = statusMap[status];
@@ -774,7 +759,7 @@ class OrderService {
         chiTiet: orderDetails,
       };
 
-      // Update order status
+      // ✅ SỬA: Chỉ cập nhật trạng thái, database trigger sẽ tự động quản lý tồn kho
       await connection.execute(
         `UPDATE donhang 
          SET TrangThai = ?, 
@@ -787,27 +772,12 @@ class OrderService {
         [dbStatus, note, note, orderId]
       );
 
-      // If cancelling order, restore inventory
-      if (status === "cancelled" && oldStatus !== 6) {
-        const [orderItems] = await connection.execute(
-          "SELECT * FROM chitietdonhang WHERE id_DonHang = ?",
-          [orderId]
+      // ✅ HOÀN LẠI MÃ GIẢM GIÁ NẾU HỦY ĐƠN HÀNG
+      if (status === "cancelled" && oldStatus !== 5 && order.MaGiamGia) {
+        await connection.execute(
+          "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
+          [order.MaGiamGia]
         );
-
-        for (const item of orderItems) {
-          await connection.execute(
-            "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
-            [item.SoLuong, item.id_ChiTietSanPham]
-          );
-        }
-
-        // Restore voucher usage if applicable
-        if (order.MaGiamGia) {
-          await connection.execute(
-            "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
-            [order.MaGiamGia]
-          );
-        }
       }
 
       await connection.commit();
@@ -874,8 +844,7 @@ class OrderService {
             WHEN 2 THEN 'confirmed' 
             WHEN 3 THEN 'processing'
             WHEN 4 THEN 'shipping'
-            WHEN 5 THEN 'delivered'
-            WHEN 6 THEN 'cancelled'
+            WHEN 5 THEN 'cancelled'
             ELSE 'unknown'
           END as status
         FROM donhang 

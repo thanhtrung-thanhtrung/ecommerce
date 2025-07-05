@@ -1,108 +1,78 @@
 const db = require("../config/database");
 
 class InventoryService {
-  // Constants for order status mapping theo database schema - CẬP NHẬT 6 TRẠNG THÁI
+  // Constants cho trạng thái đơn hàng theo database schema - SỬA LẠI CHO ĐÚNG
   static ORDER_STATUS = {
-    PENDING: 1, // Chờ xử lý - KHÔNG trừ tồn kho
+    PENDING: 1, // Chờ xác nhận - KHÔNG trừ tồn kho
     CONFIRMED: 2, // Đã xác nhận - ĐÃ trừ tồn kho
-    PROCESSING: 3, // Đang xử lý - ĐÃ trừ tồn kho
-    SHIPPING: 4, // Đang giao - ĐÃ trừ tồn kho
-    DELIVERED: 5, // Đã giao - ĐÃ trừ tồn kho
-    CANCELLED: 6, // Đã hủy - KHÔNG trừ tồn kho (hoàn lại)
+    SHIPPING: 3, // Đang giao - ĐÃ trừ tồn kho
+    DELIVERED: 4, // Đã giao - ĐÃ trừ tồn kho
+    CANCELLED: 5, // Đã hủy - KHÔNG trừ tồn kho (hoàn lại nếu đã trừ)
   };
 
-  // Kiểm tra trạng thái có cần trừ tồn kho không
+  // Kiểm tra trạng thái có cần trừ tồn kho không - SỬA LẠI
   shouldDeductStock(status) {
     const statusesToDeduct = [
-      this.constructor.ORDER_STATUS.CONFIRMED,
-      this.constructor.ORDER_STATUS.PROCESSING,
-      this.constructor.ORDER_STATUS.SHIPPING,
-      this.constructor.ORDER_STATUS.DELIVERED,
+      this.constructor.ORDER_STATUS.CONFIRMED, // 2
+      this.constructor.ORDER_STATUS.SHIPPING, // 3
+      this.constructor.ORDER_STATUS.DELIVERED, // 4
     ];
     return statusesToDeduct.includes(parseInt(status));
   }
 
-  // Cập nhật tồn kho khi thay đổi trạng thái đơn hàng
+  // ✅ SỬA: Cập nhật tồn kho khi thay đổi trạng thái đơn hàng - KHÔNG CẬP NHẬT TRỰC TIẾP
   async updateStockAfterOrderStatusChange(orderId, oldStatus, newStatus) {
-    const connection = await db.getConnection();
-
     try {
-      await connection.beginTransaction();
-
-      // Lấy chi tiết đơn hàng
-      const [orderItems] = await connection.execute(
-        `SELECT ctdh.id_ChiTietSanPham, ctdh.SoLuong 
+      // Lấy chi tiết đơn hàng để log
+      const [orderItems] = await db.execute(
+        `SELECT ctdh.id_ChiTietSanPham, ctdh.SoLuong,
+                fn_TinhTonKhoRealTime(ctdh.id_ChiTietSanPham) as TonKhoSauKhiThayDoi
          FROM chitietdonhang ctdh 
          WHERE ctdh.id_DonHang = ?`,
         [orderId]
       );
 
       if (orderItems.length === 0) {
-        await connection.rollback();
         throw new Error("Không tìm thấy chi tiết đơn hàng");
       }
 
-      for (const item of orderItems) {
-        const { id_ChiTietSanPham, SoLuong } = item;
+      // ✅ KHÔNG CẬP NHẬT TRỰC TIẾP CỘT TonKho NỮA
+      // Logic tồn kho được tính real-time từ database trigger và functions
+      const shouldDeductOld = this.shouldDeductStock(oldStatus);
+      const shouldDeductNew = this.shouldDeductStock(newStatus);
 
-        // Logic thay đổi trạng thái và ảnh hưởng tồn kho
-        const shouldDeductOld = this.shouldDeductStock(oldStatus);
-        const shouldDeductNew = this.shouldDeductStock(newStatus);
-
-        if (!shouldDeductOld && shouldDeductNew) {
-          // Từ KHÔNG TRỪ (1) sang TRỪ tồn kho (2,3,4)
-          // Kiểm tra tồn kho trước khi trừ
-          const [stockCheck] = await connection.execute(
-            "SELECT TonKho FROM chitietsanpham WHERE id = ?",
-            [id_ChiTietSanPham]
-          );
-
-          if (stockCheck.length === 0 || stockCheck[0].TonKho < SoLuong) {
-            await connection.rollback();
-            throw new Error(
-              `Không đủ tồn kho cho sản phẩm ID: ${id_ChiTietSanPham}. Còn lại: ${
-                stockCheck[0]?.TonKho || 0
-              }, cần: ${SoLuong}`
-            );
-          }
-
-          await connection.execute(
-            "UPDATE chitietsanpham SET TonKho = TonKho - ? WHERE id = ?",
-            [SoLuong, id_ChiTietSanPham]
-          );
-          console.log(
-            `[INVENTORY] Trừ tồn kho: ${SoLuong} cho sản phẩm ${id_ChiTietSanPham} (${oldStatus} -> ${newStatus})`
-          );
-        } else if (shouldDeductOld && !shouldDeductNew) {
-          // Từ TRỪ (2,3,4) sang KHÔNG TRỪ tồn kho (5,6 - hủy đơn)
-          await connection.execute(
-            "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
-            [SoLuong, id_ChiTietSanPham]
-          );
-          console.log(
-            `[INVENTORY] Hoàn lại tồn kho: ${SoLuong} cho sản phẩm ${id_ChiTietSanPham} (${oldStatus} -> ${newStatus})`
-          );
-        }
-        // Nếu cả hai trạng thái đều TRỪ hoặc đều KHÔNG TRỪ thì không làm gì
+      let logMessage = "";
+      if (!shouldDeductOld && shouldDeductNew) {
+        logMessage = `Đơn hàng chuyển từ KHÔNG TRỪ (${oldStatus}) sang TRỪ tồn kho (${newStatus})`;
+      } else if (shouldDeductOld && !shouldDeductNew) {
+        logMessage = `Đơn hàng chuyển từ TRỪ (${oldStatus}) sang KHÔNG TRỪ tồn kho (${newStatus})`;
+      } else {
+        logMessage = `Đơn hàng giữ nguyên trạng thái ảnh hưởng tồn kho (${oldStatus} -> ${newStatus})`;
       }
 
-      await connection.commit();
+      console.log(`[INVENTORY REAL-TIME] ${logMessage} - Đơn hàng #${orderId}`);
+
+      // Log tồn kho sau khi thay đổi
+      orderItems.forEach((item) => {
+        console.log(
+          `[INVENTORY REAL-TIME] Sản phẩm ${item.id_ChiTietSanPham}: Tồn kho hiện tại = ${item.TonKhoSauKhiThayDoi}`
+        );
+      });
+
       return {
         success: true,
-        message: `Cập nhật tồn kho thành công: ${oldStatus} -> ${newStatus}`,
+        message: `Cập nhật trạng thái thành công: ${oldStatus} -> ${newStatus} (Real-time calculation)`,
         details: {
           orderId,
           oldStatus,
           newStatus,
           itemsUpdated: orderItems.length,
+          note: "Tồn kho được tính real-time từ database functions, không cập nhật trực tiếp",
         },
       };
     } catch (error) {
-      await connection.rollback();
       console.error("Error updating stock after order status change:", error);
-      throw new Error("Không thể cập nhật tồn kho: " + error.message);
-    } finally {
-      connection.release();
+      throw new Error("Không thể xử lý cập nhật tồn kho: " + error.message);
     }
   }
 
@@ -146,7 +116,7 @@ class InventoryService {
         ) VALUES (?, NOW(), ?, ?, ?, ?, ?)`,
         [
           maPhieuNhap,
-          tongTien,
+          TongTien,
           id_NhaCungCap,
           userId,
           1, // TrangThai = 1 (Chờ xác nhận)
@@ -156,7 +126,6 @@ class InventoryService {
 
       const phieuNhapId = result.insertId;
 
-      // Thêm chi tiết phiếu nhập
       for (const item of chiTietPhieuNhap) {
         let {
           id_ChiTietSanPham,
@@ -170,7 +139,6 @@ class InventoryService {
         } = item;
         const thanhTien = SoLuong * GiaNhap;
 
-        // Nếu chưa có id_ChiTietSanPham thì tạo mới biến thể sản phẩm
         if (
           !id_ChiTietSanPham &&
           id_SanPham &&
@@ -179,14 +147,13 @@ class InventoryService {
           MaSanPham
         ) {
           const [resultVariant] = await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho)
-             VALUES (?, ?, ?, ?, 0)`,
+            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham)
+             VALUES (?, ?, ?, ?)`,
             [id_SanPham, id_KichCo, id_MauSac, MaSanPham]
           );
           id_ChiTietSanPham = resultVariant.insertId;
         }
 
-        // Thêm các biến thể sản phẩm
         if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
           for (const variant of bienThe) {
             const {
@@ -196,10 +163,9 @@ class InventoryService {
               SoLuong: variantQty,
             } = variant;
 
-            // Thêm biến thể sản phẩm với tồn kho ban đầu = 0
-            await connection.execute(
-              `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho) 
-               VALUES (?, ?, ?, ?, 0)`,
+            const [newVariant] = await connection.execute(
+              `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
+               VALUES (?, ?, ?, ?)`,
               [id_SanPham, variantSize, variantColor, variantCode]
             );
           }
@@ -241,12 +207,18 @@ class InventoryService {
     try {
       await connection.beginTransaction();
 
-      const tongTien = chiTietPhieuNhap.reduce(
-        (sum, item) => sum + item.SoLuong * item.GiaNhap,
-        0
-      );
+      const tongTien = chiTietPhieuNhap.reduce((sum, item) => {
+        return (
+          sum +
+          item.variants.reduce(
+            (variantSum, variant) =>
+              variantSum + variant.SoLuong * item.GiaNhap,
+            0
+          )
+        );
+      }, 0);
 
-      // Tạo phiếu nhập
+      // Insert phiếu nhập
       const [result] = await connection.execute(
         `INSERT INTO phieunhap (
           MaPhieuNhap, NgayNhap, TongTien, id_NhaCungCap, 
@@ -257,16 +229,13 @@ class InventoryService {
 
       const phieuNhapId = result.insertId;
 
-      // Xử lý từng item trong chi tiết phiếu nhập
       for (const item of chiTietPhieuNhap) {
         const { id_SanPham, variants, GiaNhap } = item;
 
-        // Xử lý từng biến thể
         for (const variant of variants) {
           const { id_KichCo, id_MauSac, SoLuong, MaSanPham } = variant;
           let id_ChiTietSanPham = null;
 
-          // Kiểm tra xem biến thể đã tồn tại chưa
           const [existingVariant] = await connection.execute(
             `SELECT id FROM chitietsanpham 
              WHERE id_SanPham = ? AND id_KichCo = ? AND id_MauSac = ?`,
@@ -277,10 +246,9 @@ class InventoryService {
             // Biến thể đã tồn tại
             id_ChiTietSanPham = existingVariant[0].id;
           } else {
-            // Tạo biến thể mới
             const [newVariant] = await connection.execute(
-              `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham, TonKho)
-               VALUES (?, ?, ?, ?, 0)`,
+              `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham)
+               VALUES (?, ?, ?, ?)`,
               [id_SanPham, id_KichCo, id_MauSac, MaSanPham]
             );
             id_ChiTietSanPham = newVariant.insertId;
@@ -353,7 +321,7 @@ class InventoryService {
     }
   }
 
-  // Thống kê tồn kho
+  // ✅ SỬA: Thống kê tồn kho sử dụng functions real-time
   async thongKeTonKho(query = {}) {
     try {
       let whereClause = "WHERE 1=1";
@@ -375,15 +343,7 @@ class InventoryService {
       const sapHet = query.sapHet === "true" || query.sapHet === true;
       const tatCa = query.tatCa === "true" || query.tatCa === true;
 
-      if (sapHet) {
-        // Chỉ lấy sản phẩm sắp hết hàng (≤ 10)
-        whereClause += " AND cts.TonKho <= 10 AND cts.TonKho > 0";
-      } else if (!tatCa) {
-        // Mặc định: chỉ lấy sản phẩm còn hàng (> 0)
-        whereClause += " AND cts.TonKho >= 0";
-      }
-      // Nếu tatCa = true thì không thêm filter nào về tồn kho
-
+      // ✅ SỬA: Query mới sử dụng functions real-time
       const sqlQuery = `
         SELECT 
           cts.id,
@@ -393,7 +353,8 @@ class InventoryService {
           kc.Ten as KichCo,
           ms.Ten as MauSac,
           cts.MaSanPham,
-          cts.TonKho,
+          -- Sử dụng function real-time thay vì cột TonKho cũ
+          fn_TinhTonKhoRealTime(cts.id) as TonKho,
           sp.Gia
         FROM chitietsanpham cts
         JOIN sanpham sp ON cts.id_SanPham = sp.id
@@ -403,10 +364,26 @@ class InventoryService {
         JOIN mausac ms ON cts.id_MauSac = ms.id
         ${whereClause}
         AND sp.TrangThai = 1
-        ORDER BY cts.TonKho ASC, sp.Ten
       `;
 
-      const [results] = await db.execute(sqlQuery, queryParams);
+      const [allResults] = await db.execute(sqlQuery, queryParams);
+
+      // ✅ SỬA: Filter sau khi đã có tồn kho real-time
+      let results = allResults;
+
+      if (sapHet) {
+        // Chỉ lấy sản phẩm sắp hết hàng (≤ 10)
+        results = allResults.filter(
+          (item) => item.TonKho <= 10 && item.TonKho > 0
+        );
+      } else if (!tatCa) {
+        // Mặc định: chỉ lấy sản phẩm còn hàng (>= 0)
+        results = allResults.filter((item) => item.TonKho >= 0);
+      }
+
+      // Sắp xếp theo tồn kho tăng dần
+      results.sort((a, b) => a.TonKho - b.TonKho);
+
       return {
         success: true,
         data: results,
@@ -421,21 +398,24 @@ class InventoryService {
     }
   }
 
-  // Kiểm tra số lượng tồn kho
+  // ✅ SỬA: Kiểm tra số lượng tồn kho sử dụng functions real-time
   async checkStock(productVariantId, requestedQuantity) {
     try {
-      // Sử dụng trực tiếp trường TonKho từ bảng chitietsanpham
+      // Sử dụng functions real-time thay vì cột TonKho
       const [result] = await db.execute(
-        "SELECT TonKho FROM chitietsanpham WHERE id = ?",
-        [productVariantId]
+        `SELECT 
+          fn_TinhTonKhoRealTime(?) as TonKhoThucTe,
+          fn_CoTheBan(?, ?) as CoTheBan
+        `,
+        [productVariantId, productVariantId, requestedQuantity]
       );
 
       if (result.length === 0) {
         throw new Error("Sản phẩm không tồn tại");
       }
 
-      const tonKho = result[0].TonKho || 0;
-      const isAvailable = tonKho >= requestedQuantity;
+      const tonKho = result[0].TonKhoThucTe || 0;
+      const isAvailable = result[0].CoTheBan === 1;
 
       return {
         success: true,
@@ -474,9 +454,9 @@ class InventoryService {
         ]
       );
 
-      // Nếu phiếu nhập được xác nhận (TrangThai = 2), cập nhật tồn kho
+      // Nếu phiếu nhập được xác nhận (TrangThai = 2), log thông tin
       if (TrangThai === 2 && phieuNhap[0].TrangThai !== 2) {
-        await this.updateStockAfterImport(phieuNhapId);
+        await this.logImportConfirmation(phieuNhapId);
       }
 
       return {
@@ -488,24 +468,38 @@ class InventoryService {
     }
   }
 
-  // Cập nhật tồn kho sau khi nhập hàng
-  async updateStockAfterImport(phieuNhapId) {
+  // ✅ SỬA: Log xác nhận phiếu nhập thay vì cập nhật tồn kho trực tiếp
+  async logImportConfirmation(phieuNhapId) {
     try {
-      // Lấy chi tiết phiếu nhập
+      // Lấy chi tiết phiếu nhập để log
       const [chiTietList] = await db.execute(
-        "SELECT id_ChiTietSanPham, SoLuong FROM chitietphieunhap WHERE id_PhieuNhap = ?",
+        `SELECT ctpn.id_ChiTietSanPham, ctpn.SoLuong,
+                fn_TinhTonKhoRealTime(ctpn.id_ChiTietSanPham) as TonKhoSauNhap
+         FROM chitietphieunhap ctpn 
+         WHERE ctpn.id_PhieuNhap = ?`,
         [phieuNhapId]
       );
 
-      // Cập nhật tồn kho cho từng sản phẩm
+      // ✅ KHÔNG CẬP NHẬT TRỰC TIẾP CỘT TonKho NỮA
+      // Tồn kho sẽ được tính real-time từ functions dựa trên dữ liệu phiếu nhập
+      console.log(
+        `[INVENTORY REAL-TIME] Phiếu nhập #${phieuNhapId} đã được xác nhận. Tồn kho được tính real-time từ functions.`
+      );
+
+      // Log chi tiết cho theo dõi
       for (const item of chiTietList) {
-        await db.execute(
-          "UPDATE chitietsanpham SET TonKho = TonKho + ? WHERE id = ?",
-          [item.SoLuong, item.id_ChiTietSanPham]
+        console.log(
+          `[INVENTORY REAL-TIME] Sản phẩm ${item.id_ChiTietSanPham}: +${item.SoLuong} (từ phiếu nhập), tồn kho hiện tại: ${item.TonKhoSauNhap}`
         );
       }
+
+      return {
+        success: true,
+        message: "Phiếu nhập đã được xác nhận. Tồn kho được tính real-time.",
+        itemsAffected: chiTietList.length,
+      };
     } catch (error) {
-      throw new Error("Không thể cập nhật tồn kho: " + error.message);
+      throw new Error("Không thể xử lý phiếu nhập: " + error.message);
     }
   }
 
@@ -696,7 +690,7 @@ class InventoryService {
     }
   }
 
-  // Lấy báo cáo tồn kho chi tiết sử dụng view
+  // Lấy báo cáo tồn kho chi tiết KHÔNG dùng view, KHÔNG dùng cột TonKho cũ
   async getTonKhoReport(query = {}) {
     try {
       let whereClause = "WHERE 1=1";
@@ -704,28 +698,28 @@ class InventoryService {
 
       // Lọc theo sản phẩm
       if (query.sanPham) {
-        whereClause += " AND TenSanPham LIKE ?";
+        whereClause += " AND sp.Ten LIKE ?";
         queryParams.push(`%${query.sanPham}%`);
       }
 
       // Lọc theo tồn kho thấp
       if (query.tonKhoThap) {
-        whereClause += " AND TonKho <= ?";
+        whereClause += " AND fn_TinhTonKhoRealTime(cts.id) <= ?";
         queryParams.push(parseInt(query.tonKhoThap) || 10);
       }
 
       const sqlQuery = `
         SELECT 
-          id_ChiTietSanPham,
-          TenSanPham,
-          KichCo,
-          MauSac,
-          MaSanPham,
-          SoLuongNhap,
-          SoLuongBan,
-          TonKho,
-          (SoLuongNhap - SoLuongBan) as TonKhoTinhToan
-        FROM v_tonkho_sanpham
+          cts.id as id_ChiTietSanPham,
+          sp.Ten as TenSanPham,
+          kc.Ten as KichCo,
+          ms.Ten as MauSac,
+          cts.MaSanPham,
+          fn_TinhTonKhoRealTime(cts.id) as TonKho
+        FROM chitietsanpham cts
+        JOIN sanpham sp ON cts.id_SanPham = sp.id
+        JOIN kichco kc ON cts.id_KichCo = kc.id
+        JOIN mausac ms ON cts.id_MauSac = ms.id
         ${whereClause}
         ORDER BY TonKho ASC, TenSanPham
       `;
@@ -879,12 +873,13 @@ class InventoryService {
         throw new Error("Sản phẩm không tồn tại");
       }
 
-      // Lấy các biến thể hiện có
+      // ✅ SỬA: Lấy các biến thể hiện có với tồn kho real-time
       const [existingVariants] = await db.execute(
         `SELECT 
           cts.id,
           cts.MaSanPham,
-          cts.TonKho,
+          -- Sử dụng function real-time thay vì cột TonKho cũ
+          fn_TinhTonKhoRealTime(cts.id) as TonKho,
           kc.id as id_KichCo,
           kc.Ten as TenKichCo,
           ms.id as id_MauSac,
@@ -919,55 +914,32 @@ class InventoryService {
     }
   }
 
-  // Kiểm tra tồn kho trước khi đặt hàng - KHÔNG TRỪ tồn kho ngay
+  // Kiểm tra tồn kho trước khi đặt hàng - DÙNG REAL-TIME
   async checkStockBeforeOrder(orderItems) {
     try {
       const stockCheck = [];
-      let hasError = false;
 
-      for (const item of orderItems) {
-        const { id_ChiTietSanPham, SoLuong } = item;
-
-        // Tính tồn kho thực tế từ phiếu nhập và đơn hàng đã xác nhận
+      for (const { id_ChiTietSanPham, SoLuong } of orderItems) {
+        // Sử dụng function real-time thay vì query cột TonKho
         const [stockInfo] = await db.execute(
           `SELECT 
+            cts.id,
             cts.MaSanPham,
             sp.Ten as TenSanPham,
-            kc.Ten as KichCo,
-            ms.Ten as MauSac,
-            
-            -- Tồn kho thực tế = Nhập - Bán (chỉ tính đơn đã xác nhận TrangThai IN (2,3,4,5))
-            COALESCE(nhap.TongNhap, 0) as TongNhap,
-            COALESCE(ban.TongBan, 0) as TongBan,
-            (COALESCE(nhap.TongNhap, 0) - COALESCE(ban.TongBan, 0)) as TonKhoThucTe,
-            
-            -- Số lượng đang chờ xử lý (TrangThai = 1)
-            COALESCE(cho.TongCho, 0) as SoLuongChoXuLy
-            
+            kc.Ten as TenKichCo,
+            ms.Ten as TenMauSac,
+            -- Sử dụng function tính tồn kho real-time
+            fn_TinhTonKhoRealTime(cts.id) as TonKhoThucTe,
+            -- Sử dụng function kiểm tra có thể bán
+            fn_CoTheBan(cts.id, ?) as CoTheBan,
+            -- Tính số lượng đang chờ xác nhận
+            COALESCE(cho.TongCho, 0) as SoLuongDangCho
           FROM chitietsanpham cts
           JOIN sanpham sp ON cts.id_SanPham = sp.id
           JOIN kichco kc ON cts.id_KichCo = kc.id
           JOIN mausac ms ON cts.id_MauSac = ms.id
           
-          -- Tổng nhập từ phiếu nhập đã xác nhận
-          LEFT JOIN (
-            SELECT ctpn.id_ChiTietSanPham, SUM(ctpn.SoLuong) as TongNhap
-            FROM chitietphieunhap ctpn
-            JOIN phieunhap pn ON ctpn.id_PhieuNhap = pn.id
-            WHERE pn.TrangThai = 2
-            GROUP BY ctpn.id_ChiTietSanPham
-          ) nhap ON cts.id = nhap.id_ChiTietSanPham
-          
-          -- Tổng bán từ đơn hàng đã xác nhận
-          LEFT JOIN (
-            SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongBan
-            FROM chitietdonhang ctdh
-            JOIN donhang dh ON ctdh.id_DonHang = dh.id
-            WHERE dh.TrangThai IN (2,3,4,5)
-            GROUP BY ctdh.id_ChiTietSanPham
-          ) ban ON cts.id = ban.id_ChiTietSanPham
-          
-          -- Tổng chờ xử lý từ đơn hàng chờ
+          -- Tính số lượng đang chờ xác nhận
           LEFT JOIN (
             SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
             FROM chitietdonhang ctdh
@@ -977,7 +949,7 @@ class InventoryService {
           ) cho ON cts.id = cho.id_ChiTietSanPham
           
           WHERE cts.id = ?`,
-          [id_ChiTietSanPham]
+          [SoLuong, id_ChiTietSanPham]
         );
 
         if (stockInfo.length === 0) {
@@ -989,112 +961,53 @@ class InventoryService {
           continue;
         }
 
-        const stockData = stockInfo[0];
-        const tonKhoHienTai = stockData.TonKhoThucTe || 0;
-        const soLuongChoXuLy = stockData.SoLuongChoXuLy || 0;
-
-        // Tồn kho khả dụng = Tồn kho thực tế - Số lượng đang chờ xử lý
-        const tonKhoKhaDung = tonKhoHienTai - soLuongChoXuLy;
-
-        const isAvailable = tonKhoKhaDung >= SoLuong;
-        if (!isAvailable) hasError = true;
+        const product = stockInfo[0];
+        const canSell = product.CoTheBan === 1;
 
         stockCheck.push({
           id_ChiTietSanPham,
-          MaSanPham: stockData.MaSanPham,
-          TenSanPham: stockData.TenSanPham,
-          KichCo: stockData.KichCo,
-          MauSac: stockData.MauSac,
-          SoLuongYeuCau: SoLuong,
-          TonKhoThucTe: tonKhoHienTai,
-          SoLuongChoXuLy: soLuongChoXuLy,
-          TonKhoKhaDung: tonKhoKhaDung,
-          isAvailable,
-          thieuHang: isAvailable ? 0 : SoLuong - tonKhoKhaDung,
+          TenSanPham: product.TenSanPham,
+          MaSanPham: product.MaSanPham,
+          KichCo: product.TenKichCo,
+          MauSac: product.TenMauSac,
+          TonKhoThucTe: product.TonKhoThucTe,
+          SoLuongCanBan: SoLuong,
+          SoLuongDangCho: product.SoLuongDangCho,
+          CoTheBan: canSell,
+          isAvailable: canSell,
+          message: canSell
+            ? "Có thể đặt hàng"
+            : `Không đủ hàng. Tồn kho: ${product.TonKhoThucTe}, Đang chờ: ${product.SoLuongDangCho}`,
         });
       }
 
+      const allAvailable = stockCheck.every((item) => item.isAvailable);
+
       return {
-        success: !hasError,
-        hasStockIssues: hasError,
+        success: allAvailable,
+        message: allAvailable
+          ? "Tất cả sản phẩm đều có sẵn"
+          : "Một số sản phẩm không đủ hàng",
         stockCheck,
-        message: hasError
-          ? "Có sản phẩm không đủ tồn kho"
-          : "Tồn kho đủ để đặt hàng",
       };
     } catch (error) {
       throw new Error("Không thể kiểm tra tồn kho: " + error.message);
     }
   }
 
+  // ❌ BỎ HOÀN TOÀN - Function này không cần thiết nữa với real-time calculation
   // Đồng bộ tồn kho từ database (tính lại toàn bộ theo logic mới)
   async syncInventoryFromOrders() {
-    const connection = await db.getConnection();
+    console.log(
+      "🔄 Hệ thống đã chuyển sang Real-time calculation. Function sync không cần thiết nữa."
+    );
 
-    try {
-      await connection.beginTransaction();
-
-      console.log("🔄 Bắt đầu đồng bộ tồn kho từ phiếu nhập và đơn hàng...");
-
-      // Bước 1: Reset tồn kho về 0
-      await connection.execute("UPDATE chitietsanpham SET TonKho = 0");
-
-      // Bước 2: Cộng từ phiếu nhập đã xác nhận (TrangThai = 2)
-      await connection.execute(`
-        UPDATE chitietsanpham cts
-        LEFT JOIN (
-          SELECT 
-            ctpn.id_ChiTietSanPham,
-            SUM(ctpn.SoLuong) as TongNhap
-          FROM chitietphieunhap ctpn
-          JOIN phieunhap pn ON ctpn.id_PhieuNhap = pn.id
-          WHERE pn.TrangThai = 2
-          GROUP BY ctpn.id_ChiTietSanPham
-        ) nhap ON cts.id = nhap.id_ChiTietSanPham
-        SET cts.TonKho = COALESCE(nhap.TongNhap, 0)
-      `);
-
-      // Bước 3: Trừ từ đơn hàng đã xác nhận (TrangThai IN (2,3,4,5) - loại trừ hủy đơn)
-      await connection.execute(`
-        UPDATE chitietsanpham cts
-        LEFT JOIN (
-          SELECT 
-            ctdh.id_ChiTietSanPham,
-            SUM(ctdh.SoLuong) as TongBan
-          FROM chitietdonhang ctdh
-          JOIN donhang dh ON ctdh.id_DonHang = dh.id
-          WHERE dh.TrangThai IN (2,3,4,5)
-          GROUP BY ctdh.id_ChiTietSanPham
-        ) ban ON cts.id = ban.id_ChiTietSanPham
-        SET cts.TonKho = GREATEST(0, cts.TonKho - COALESCE(ban.TongBan, 0))
-      `);
-
-      // Thống kê kết quả
-      const [stats] = await connection.execute(`
-        SELECT 
-          COUNT(*) as TongSanPham,
-          SUM(TonKho) as TongTonKho,
-          COUNT(CASE WHEN TonKho = 0 THEN 1 END) as SanPhamHetHang,
-          COUNT(CASE WHEN TonKho <= 10 AND TonKho > 0 THEN 1 END) as SanPhamSapHet
-        FROM chitietsanpham
-      `);
-
-      await connection.commit();
-
-      console.log("✅ Đồng bộ tồn kho hoàn thành!");
-
-      return {
-        success: true,
-        message: "Đồng bộ tồn kho thành công",
-        statistics: stats[0],
-      };
-    } catch (error) {
-      await connection.rollback();
-      console.error("❌ Lỗi đồng bộ tồn kho:", error);
-      throw new Error("Không thể đồng bộ tồn kho: " + error.message);
-    } finally {
-      connection.release();
-    }
+    return {
+      success: true,
+      message:
+        "Hệ thống đã sử dụng Real-time calculation. Không cần đồng bộ cột TonKho nữa.",
+      note: "Tồn kho được tính real-time từ functions fn_TinhTonKhoRealTime() dựa trên phiếu nhập và đơn hàng.",
+    };
   }
 
   // Utility function để parse hình ảnh

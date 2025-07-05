@@ -10,14 +10,42 @@ require("./config/database"); // Import database configuration
 const app = express();
 
 // Enhanced CORS configuration
+const allowedOrigins = [
+  // Development URLs
+  process.env.CLIENT_ORIGIN || "http://localhost:3001",
+  "http://localhost:5714", // clothing-ecommerce frontend
+  "http://localhost:5173", // admin-dashboard frontend (Vite dev server)
+  "http://localhost:5174", // backup Vite port
+
+  // Production Vercel URLs
+  "https://admin-dashboard-seven-snowy-72.vercel.app",
+  "https://shop-frontend-ecru.vercel.app",
+  "https://*.vercel.app", // Allow all Vercel subdomains
+
+  // Environment-based URLs
+  process.env.FRONTEND_URL, // From environment variables
+  process.env.ADMIN_URL,
+];
+
+// Filter out undefined values
+const validOrigins = allowedOrigins.filter(Boolean);
+
 app.use(
   cors({
-    origin: [
-      process.env.CLIENT_ORIGIN || "http://localhost:3001",
-      "http://localhost:5714", // clothing-ecommerce frontend
-      "http://localhost:5173", // admin-dashboard frontend (Vite dev server)
-      "http://localhost:5174", // backup Vite port
-    ],
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, etc.)
+      if (!origin) return callback(null, true);
+
+      if (
+        validOrigins.indexOf(origin) !== -1 ||
+        origin.includes(".vercel.app") ||
+        origin.includes("localhost")
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true, // Allow cookies to be sent cross-origin
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // Allowed HTTP methods
     allowedHeaders: [
@@ -76,6 +104,31 @@ app.use((req, res, next) => {
 // Routes
 app.use("/api", routes);
 
+// Health check endpoint for Railway
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    message: "Backend is running",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+// Root endpoint
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "Shoe Shop Backend API",
+    status: "running",
+    endpoints: [
+      "/api/health",
+      "/api/auth",
+      "/api/products",
+      "/api/orders",
+      "/api/users",
+    ],
+  });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -92,11 +145,12 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000; // Changed from 3000 to 5000 to match API calls
-app.listen(PORT, () => {
-  console.log(`Server đang chạy trên port ${PORT}`);
-  console.log(`API có thể truy cập tại http://localhost:${PORT}/api`);
-  console.log(`Môi trường: ${process.env.NODE_ENV}`);
+const PORT = process.env.PORT || 8080; // Railway thường dùng PORT 8080
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server đang chạy trên port ${PORT}`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`🌐 Health check: http://localhost:${PORT}/`);
+  console.log(`🔌 API endpoints: http://localhost:${PORT}/api`);
 });
 
 module.exports = app;

@@ -79,15 +79,62 @@ const guestOrderTrackingValidator = [
 const updateOrderStatusValidator = [
   param("orderId").isInt({ min: 1 }).withMessage("ID đơn hàng không hợp lệ"),
   body("status")
-    .isIn([
-      "pending",
-      "confirmed",
-      "processing",
-      "shipping",
-      "delivered",
-      "cancelled",
-    ])
-    .withMessage("Trạng thái đơn hàng không hợp lệ"),
+    .custom((value) => {
+      // Chấp nhận cả số và string
+      const validStatuses = [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipping",
+        "delivered",
+        "cancelled",
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+      ];
+
+      // Nếu là số, chuyển thành string tương ứng
+      const statusMap = {
+        1: "pending",
+        2: "confirmed",
+        3: "shipping",
+        4: "delivered",
+        5: "cancelled",
+      };
+
+      if (typeof value === "number" && statusMap[value]) {
+        return true;
+      }
+
+      if (typeof value === "string" && validStatuses.includes(value)) {
+        return true;
+      }
+
+      throw new Error("Trạng thái đơn hàng không hợp lệ");
+    })
+    .customSanitizer((value) => {
+      // Chuyển số thành string nếu cần
+      const statusMap = {
+        1: "pending",
+        2: "confirmed",
+        3: "shipping",
+        4: "delivered",
+        5: "cancelled",
+      };
+      // Nếu value là số thì trả về string key
+      if (typeof value === "number" && statusMap[value]) {
+        return statusMap[value];
+      }
+      // Nếu value là string số thì convert sang số rồi lấy key
+      if (!isNaN(Number(value)) && statusMap[Number(value)]) {
+        return statusMap[Number(value)];
+      }
+      // Nếu value là string hợp lệ thì giữ nguyên
+      return value;
+    }),
   body("note")
     .optional()
     .trim()

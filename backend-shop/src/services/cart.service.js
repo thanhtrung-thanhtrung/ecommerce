@@ -15,7 +15,8 @@ class CartService {
         sp.GiaKhuyenMai,
         kc.Ten as kichCo,
         ms.Ten as mauSac,
-        ctsp.TonKho as SoLuongTon,
+        -- ✅ SỬA: Sử dụng function real-time thay vì cột TonKho cũ
+        fn_TinhTonKhoRealTime(ctsp.id) as SoLuongTon,
         th.Ten as tenThuongHieu
       FROM giohang gh
       JOIN chitietsanpham ctsp ON gh.id_ChiTietSanPham = ctsp.id
@@ -71,15 +72,20 @@ class CartService {
     // Sửa tên trường cho đúng với CSDL
     const { id_ChiTietSanPham, SoLuong } = cartData;
 
-    // Kiểm tra số lượng tồn kho
-    const stockCheck = await InventoryService.checkStock(
-      id_ChiTietSanPham,
-      SoLuong
+    // ✅ SỬA: Kiểm tra số lượng tồn kho bằng functions real-time
+    const [stockCheck] = await db.execute(
+      `SELECT 
+        fn_TinhTonKhoRealTime(?) as TonKhoThucTe,
+        fn_CoTheBan(?, ?) as CoTheBan
+      `,
+      [id_ChiTietSanPham, id_ChiTietSanPham, SoLuong]
     );
-    const stockData = stockCheck.data || stockCheck;
-    if (!stockData.isAvailable) {
+
+    if (stockCheck.length === 0 || stockCheck[0].CoTheBan !== 1) {
       throw new Error(
-        `Số lượng sản phẩm trong kho không đủ. Hiện có ${stockData.tonKho} sản phẩm.`
+        `Số lượng sản phẩm trong kho không đủ. Tồn kho thực tế: ${
+          stockCheck[0]?.TonKhoThucTe || 0
+        }, yêu cầu: ${SoLuong}`
       );
     }
 
@@ -95,17 +101,24 @@ class CartService {
     if (existingItem.length > 0) {
       // Cập nhật số lượng
       const newQuantity = existingItem[0].SoLuong + SoLuong;
-      // Kiểm tra lại số lượng tồn kho với số lượng mới
-      const newStockCheck = await InventoryService.checkStock(
-        id_ChiTietSanPham,
-        newQuantity
+
+      // ✅ SỬA: Kiểm tra lại số lượng tồn kho với số lượng mới bằng functions real-time
+      const [newStockCheck] = await db.execute(
+        `SELECT 
+          fn_TinhTonKhoRealTime(?) as TonKhoThucTe,
+          fn_CoTheBan(?, ?) as CoTheBan
+        `,
+        [id_ChiTietSanPham, id_ChiTietSanPham, newQuantity]
       );
-      const newStockData = newStockCheck.data || newStockCheck;
-      if (!newStockData.isAvailable) {
+
+      if (newStockCheck.length === 0 || newStockCheck[0].CoTheBan !== 1) {
         throw new Error(
-          `Số lượng sản phẩm trong kho không đủ. Hiện có ${newStockData.tonKho} sản phẩm.`
+          `Số lượng sản phẩm trong kho không đủ. Tồn kho thực tế: ${
+            newStockCheck[0]?.TonKhoThucTe || 0
+          }, yêu cầu: ${newQuantity}`
         );
       }
+
       await db.execute("UPDATE giohang SET SoLuong = ? WHERE id = ?", [
         newQuantity,
         existingItem[0].id,
@@ -132,17 +145,24 @@ class CartService {
     if (cartItem.length === 0) {
       throw new Error("Không tìm thấy sản phẩm trong giỏ hàng");
     }
-    // Kiểm tra số lượng tồn kho với số lượng mới
-    const stockCheck = await InventoryService.checkStock(
-      cartItem[0].id_ChiTietSanPham,
-      SoLuong
+
+    // ✅ SỬA: Kiểm tra số lượng tồn kho với số lượng mới bằng functions real-time
+    const [stockCheck] = await db.execute(
+      `SELECT 
+        fn_TinhTonKhoRealTime(?) as TonKhoThucTe,
+        fn_CoTheBan(?, ?) as CoTheBan
+      `,
+      [cartItem[0].id_ChiTietSanPham, cartItem[0].id_ChiTietSanPham, SoLuong]
     );
-    const stockData = stockCheck.data || stockCheck;
-    if (!stockData.isAvailable) {
+
+    if (stockCheck.length === 0 || stockCheck[0].CoTheBan !== 1) {
       throw new Error(
-        `Số lượng sản phẩm trong kho không đủ. Hiện có ${stockData.tonKho} sản phẩm.`
+        `Số lượng sản phẩm trong kho không đủ. Tồn kho thực tế: ${
+          stockCheck[0]?.TonKhoThucTe || 0
+        }, yêu cầu: ${SoLuong}`
       );
     }
+
     // Cập nhật số lượng
     await db.execute("UPDATE giohang SET SoLuong = ? WHERE id = ?", [
       SoLuong,

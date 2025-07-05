@@ -67,8 +67,8 @@ class WishlistService {
         dm.Ten as tenDanhMuc,
         th.Ten as tenThuongHieu,
         sp.SoLuongDaBan,
-        -- Kiểm tra tồn kho
-        COALESCE(SUM(tk.TonKho), 0) as tongTonKho,
+        -- ✅ SỬA: Sử dụng function real-time để kiểm tra tồn kho
+        COALESCE(SUM(fn_TinhTonKhoRealTime(cts.id)), 0) as tongTonKho,
         -- Điểm đánh giá trung bình
         ROUND(AVG(dg.SoSao), 1) as diemDanhGia,
         COUNT(DISTINCT dg.id) as soLuotDanhGia
@@ -77,7 +77,6 @@ class WishlistService {
       LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
       LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
       LEFT JOIN chitietsanpham cts ON sp.id = cts.id_SanPham
-      LEFT JOIN v_tonkho_sanpham tk ON cts.id = tk.id_ChiTietSanPham
       LEFT JOIN danhgia dg ON sp.id = dg.id_SanPham AND dg.TrangThai = 1
       WHERE w.id_NguoiDung = ?
     `;
