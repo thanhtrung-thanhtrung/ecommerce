@@ -1,21 +1,37 @@
 import React, { useEffect } from "react"
 import { useShop } from "../../contexts/ShopContext";
+import { toast } from "react-toastify";
 
 const statusMap = {
   1: "Chờ xác nhận",
   2: "Đã xác nhận",
-  3: "Đang xử lý",
-  4: "Đang giao",
-  5: "Đã giao",
-  6: "Đã hủy",
+  3: "Đang giao",
+  4: "Đã giao",
+  5: "Đã hủy",
 }
 
 const OrdersPage = () => {
-  const { orders, loading, error, fetchUserOrders } = useShop()
+  const { orders, loading, error, fetchUserOrders, cancelOrder } = useShop()
 
   useEffect(() => {
     fetchUserOrders()
   }, [fetchUserOrders])
+
+  // Handle cancel order - chỉ cho phép hủy khi trạng thái = 1 (Chờ xác nhận)
+  const handleCancelOrder = async (orderId, orderCode) => {
+    if (window.confirm(`Bạn có chắc chắn muốn hủy đơn hàng #${orderCode}?`)) {
+      try {
+        await cancelOrder(orderId, "Khách hàng yêu cầu hủy đơn hàng");
+        toast.success("Hủy đơn hàng thành công!");
+        // Tải lại danh sách đơn hàng
+        fetchUserOrders();
+      } catch (error) {
+        console.error("Error cancelling order:", error);
+        toast.error("Lỗi khi hủy đơn hàng: " + (error.message || "Không xác định"));
+      }
+    }
+  };
+
 
   return (
     <div style={{ maxWidth: 700, margin: "40px auto", padding: 20 }}>
@@ -83,6 +99,22 @@ const OrdersPage = () => {
                 })}
               </ul>
             </div>
+            {order.TrangThai === 1 && (
+              <button
+                onClick={() => handleCancelOrder(order.id, order.MaDonHang || order.id)}
+                style={{
+                  marginTop: 12,
+                  backgroundColor: "#ff4d4f",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "8px 16px",
+                  cursor: "pointer",
+                }}
+              >
+                Hủy đơn hàng
+              </button>
+            )}
           </div>
         ))}
       </div>

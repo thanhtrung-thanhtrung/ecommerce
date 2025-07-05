@@ -669,18 +669,45 @@ export const ShopProvider = ({ children }) => {
     // ================= CANCEL ORDER =================
     const cancelOrder = useCallback(async (orderId, reason = "Khách hàng yêu cầu hủy") => {
         try {
+            // Kiểm tra authentication trước
+            if (!isAuthenticated) {
+                throw new Error("Vui lòng đăng nhập để thực hiện chức năng này");
+            }
+
+            const token = getToken();
+            if (!token) {
+                throw new Error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+            }
+
             setLoading(true);
-            const response = await apiCall(`/api/users/orders/${orderId}/cancel`, {
+
+            // Sửa URL từ /api/users/orders/ thành /api/orders/
+            const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/cancel`, {
                 method: "POST",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
                 body: JSON.stringify({ lyDoHuy: reason }),
             });
-            return response;
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(
+                    errorData.message || `HTTP error! status: ${response.status}`
+                );
+            }
+
+            const result = await response.json();
+            return result;
         } catch (error) {
+            console.error("Cancel order error:", error);
             throw error;
         } finally {
             setLoading(false);
         }
-    }, [apiCall]);
+    }, [API_BASE_URL, isAuthenticated, getToken]);
 
     // UI functions
     const toggleMobileMenu = useCallback(() => {

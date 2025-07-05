@@ -38,10 +38,16 @@ const HomePage = () => {
   };
 
   // Use real categories from API instead of hardcoded ones
-  const displayCategories = categories.slice(0, 4).map((category) => ({
+  const categoryImages = [
+    "https://res.cloudinary.com/db7jn3ooa/image/upload/v1751255472/pexels-rdne-5698854_orodfy.jpg", // ảnh 1
+    "https://res.cloudinary.com/db7jn3ooa/image/upload/v1750080727/shoes_shop/products/gdepwxbpyqa2mqv5pqrp.jpg", // ảnh 2
+    "https://res.cloudinary.com/db7jn3ooa/image/upload/v1751251198/shoes_shop/products/sznaiepr6bzgpxeyx8tw.jpg", // ảnh 3
+    "https://res.cloudinary.com/db7jn3ooa/image/upload/v1750381315/shoes_shop/products/upoj3ohzdhchtpu95twm.jpg", // ảnh 4
+  ];
+  const displayCategories = categories.slice(0, 4).map((category, idx) => ({
     id: category.id,
     name: category.Ten,
-    image: "/placeholder.svg?height=300&width=400", // Use placeholder until we have category images
+    image: categoryImages[idx] || "/placeholder.svg?height=300&width=400", // Set cứng ảnh theo vị trí
     link: `/products?category=${category.id}`,
   }));
 
@@ -53,34 +59,7 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen">
-      <section
-        className="relative h-[70vh] bg-cover bg-center flex items-center"
-        style={{
-          backgroundImage:
-            "url('https://res.cloudinary.com/db7jn3ooa/image/upload/v1751255472/pexels-rdne-5698854_orodfy.jpg')",
-        }}
-      >
-        <div className="absolute inset-0 bg-black opacity-20"></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-2xl text-white">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6">
-              Bộ Sưu Tập Giày Mới Nhất
-            </h1>
-            <p className="text-xl mb-8">
-              Khám phá những đôi giày thể thao chất lượng cao từ các thương hiệu
-              hàng đầu thế giới
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link to="/products" className="btn-primary text-center">
-                Mua Ngay
-              </Link>
-              <Link to="/products?sale=true" className="btn-outline text-center">
-                Xem Khuyến Mãi
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -93,7 +72,7 @@ const HomePage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {displayCategories.map((category) => (
+            {displayCategories.map((category, idx) => (
               <Link
                 key={category.id}
                 to={category.link}
@@ -101,7 +80,7 @@ const HomePage = () => {
               >
                 <div className="aspect-w-4 aspect-h-3">
                   <img
-                    src='https://res.cloudinary.com/db7jn3ooa/image/upload/v1750488464/shoes_shop/products/t4fiba9mlh90ta25l3jh.jpg'
+                    src={category.image} // mỗi category sẽ có ảnh riêng
                     alt={category.name}
                     className="w-full h-40 sm:h-64 object-cover group-hover:scale-110 transition-transform duration-300"
                   />

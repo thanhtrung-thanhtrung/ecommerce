@@ -8,7 +8,7 @@ import { CartProvider } from "./contexts/CartContext";
 import { CheckoutProvider } from "./contexts/CheckoutContext";
 
 // Layout Components
-import { Header, Footer } from "./components/Layout";
+import { Header, Footer, Hero } from "./components/Layout";
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -33,55 +33,56 @@ function App() {
     <ShopProvider>
       <CartProvider>
         <CheckoutProvider>
-          <div className="min-h-screen flex flex-col">
+          <div className="min-h-screen flex flex-col ">
             <Header />
+            {/* Hero chỉ hiển thị ở trang chủ và luôn full width */}
+            {window.location.pathname === "/" && <Hero />}
+            <div className="container flex-1 flex flex-col">
+              <main className="flex-1">
+                <Routes>
+                  {/* Public Routes */}
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/products" element={<ProductsPage />} />
+                  <Route path="/products/:id" element={<ProductDetailPage />} />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route
+                    path="/order-success/:orderId"
+                    element={<OrderSuccessPage />}
+                  />
+                  <Route path="/track-order" element={<TrackOrderPage />} />
 
-            <main className="flex-1">
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<HomePage />} />
-                <Route path="/products" element={<ProductsPage />} />
-                <Route path="/products/:id" element={<ProductDetailPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route
-                  path="/order-success/:orderId"
-                  element={<OrderSuccessPage />}
-                />
-                <Route path="/track-order" element={<TrackOrderPage />} />
-
-                {/* Protected Routes */}
-                <Route
-                  path="/profile"
-                  element={
-                    <ProtectedRoute>
-                      <ProfilePage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/user/orders"
-                  element={
-                    <ProtectedRoute>
-                      <OrdersPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/wishlist"
-                  element={
-                    <ProtectedRoute>
-                      <WishlistPage />
-                    </ProtectedRoute>
-                  }
-                />
-              </Routes>
-            </main>
-
-            <Footer />
+                  {/* Protected Routes */}
+                  <Route
+                    path="/profile"
+                    element={
+                      <ProtectedRoute>
+                        <ProfilePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/user/orders"
+                    element={
+                      <ProtectedRoute>
+                        <OrdersPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/wishlist"
+                    element={
+                      <ProtectedRoute>
+                        <WishlistPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Routes>
+              </main>
+            </div>
 
             {/* Toast Container */}
             <ToastContainer
@@ -96,7 +97,8 @@ function App() {
               pauseOnHover
               theme="light"
               toastClassName="text-sm"
-            />
+            />              <Footer />
+
           </div>
         </CheckoutProvider>
       </CartProvider>

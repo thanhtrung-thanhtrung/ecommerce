@@ -321,8 +321,8 @@ const ProductDetailPage = () => {
                       key={size}
                       onClick={() => !isOutOfStock && setSelectedSize(size)}
                       className={`px-4 py-2 border rounded-lg font-medium transition-colors ${selectedSize === size
-                          ? "border-primary-600 bg-primary-600 text-white"
-                          : "border-gray-300 text-gray-700 hover:border-primary-600"
+                        ? "border-primary-600 bg-primary-600 text-white"
+                        : "border-gray-300 text-gray-700 hover:border-primary-600"
                         } ${isOutOfStock ? "opacity-50 cursor-not-allowed" : ""}`}
                       disabled={isOutOfStock}
                     >
@@ -348,11 +348,11 @@ const ProductDetailPage = () => {
                       key={color}
                       onClick={() => !isOutOfStock && setSelectedColor(color)}
                       className={`px-4 py-2 border rounded-lg font-medium transition-colors ${selectedColor === color
-                          ? "border-primary-600 bg-primary-600 text-white"
-                          : "border-gray-300 text-gray-700 hover:border-primary-600"
+                        ? "border-primary-600 bg-primary-600 text-white"
+                        : "border-gray-300 text-gray-700 hover:border-primary-600"
                         } ${isOutOfStock ? "opacity-50 cursor-not-allowed" : ""}`}
                       disabled={isOutOfStock}
-                      
+
                     >
                       {color}
                     </button>
