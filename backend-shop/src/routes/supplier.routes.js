@@ -9,6 +9,10 @@ const {
   getSupplierListValidator,
   deleteSupplierValidator,
 } = require("../validators/supplier.validator");
+const {
+  verifyToken,
+  checkAdminRole,
+} = require("../middlewares/auth.middleware");
 
 // Routes công khai - không cần authentication
 // Lấy danh sách nhà cung cấp hoạt động (cho dropdown)
@@ -31,12 +35,21 @@ router.get(
 // Thống kê nhà cung cấp
 router.get("/thong-ke/tong-quan", supplierController.thongKeNhaCungCap);
 
+// Routes admin - yêu cầu quyền admin
 // Tạo nhà cung cấp mới
-router.post("/", supplierValidator, supplierController.taoNhaCungCap);
+router.post(
+  "/",
+  verifyToken,
+  checkAdminRole(),
+  supplierValidator,
+  supplierController.taoNhaCungCap
+);
 
 // Cập nhật nhà cung cấp
 router.put(
   "/:id",
+  verifyToken,
+  checkAdminRole(),
   updateSupplierValidator,
   supplierController.capNhatNhaCungCap
 );
@@ -44,6 +57,8 @@ router.put(
 // Cập nhật trạng thái nhà cung cấp
 router.patch(
   "/:id/trang-thai",
+  verifyToken,
+  checkAdminRole(),
   updateStatusValidator,
   supplierController.capNhatTrangThai
 );
@@ -51,6 +66,8 @@ router.patch(
 // Xóa nhà cung cấp
 router.delete(
   "/:id",
+  verifyToken,
+  checkAdminRole(),
   deleteSupplierValidator,
   supplierController.xoaNhaCungCap
 );

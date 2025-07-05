@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 const AdminContext = createContext();
 
@@ -12,7 +12,10 @@ export const useAdmin = () => {
 
 export const AdminProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true); // Thêm state cho initial loading
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
   const [dashboardData, setDashboardData] = useState({
     weeklyProgress: [
       { day: "T2", duration: 12 },
@@ -728,12 +731,90 @@ export const AdminProvider = ({ children }) => {
     });
   };
 
+  // Check authentication status on load
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = () => {
+    const token = getToken();
+    const userData = localStorage.getItem('adminUser');
+
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        setUser(user);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        logout();
+      }
+    }
+    setInitialLoading(false); // Đặt lại trạng thái loading ban đầu
+  };
+
+  // Authentication functions
+  const loginAdmin = async (email, password) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, matKhau: password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Đăng nhập thất bại');
+      }
+
+      const data = await response.json();
+
+      // Check if user has admin or staff role
+      if (!data.user || (data.user.maQuyen !== 1 && data.user.maQuyen !== 2)) {
+        throw new Error('Bạn không có quyền truy cập vào trang quản trị');
+      }
+
+      // Store token and user data
+      localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminUser', JSON.stringify(data.user));
+
+      setUser(data.user);
+      setIsAuthenticated(true);
+
+      return data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('token');
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
   const value = {
     loading,
+    initialLoading, // Truyền state loading ban đầu
     sidebarOpen,
     setSidebarOpen,
     dashboardData,
     loadDashboardData,
+
+    // Authentication
+    isAuthenticated,
+    user,
+    loginAdmin,
+    logout,
 
     // Products
     getProducts,

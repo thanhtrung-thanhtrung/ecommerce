@@ -6,24 +6,45 @@ const {
   cancelOrderValidator,
   updateOrderStatusValidator,
 } = require("../validators/order.validator");
-const { verifyToken, optionalAuth } = require("../middlewares/auth.middleware");
+const {
+  verifyToken,
+  optionalAuth,
+  checkAdminRole,
+} = require("../middlewares/auth.middleware");
 
 // ===== ADMIN ROUTES =====
 // Admin route to get all orders with filtering and pagination
-router.get("/admin", orderController.getOrdersAdmin);
+router.get(
+  "/admin",
+  verifyToken,
+  checkAdminRole(),
+  orderController.getOrdersAdmin
+);
 
 // Admin route to get order detail
-router.get("/admin/:orderId", orderController.getOrderDetailAdmin);
+router.get(
+  "/admin/:orderId",
+  verifyToken,
+  checkAdminRole(),
+  orderController.getOrderDetailAdmin
+);
 
 // Admin route to update order status
 router.patch(
   "/admin/:orderId/status",
+  verifyToken,
+  checkAdminRole(),
   updateOrderStatusValidator,
   orderController.updateOrderStatusAdmin
 );
 
 // Admin route to get order statistics
-router.get("/admin/stats/overview", orderController.getOrderStats);
+router.get(
+  "/admin/stats/overview",
+  verifyToken,
+  checkAdminRole(),
+  orderController.getOrderStats
+);
 
 // ===== CUSTOMER ROUTES =====
 // Route xem lịch sử đơn hàng (yêu cầu đăng nhập)

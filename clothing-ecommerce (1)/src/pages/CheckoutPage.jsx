@@ -142,7 +142,7 @@ const CheckoutPage = () => {
       // Construct full address
       const fullAddress = `${values.diaChiGiao}, ${selectedWard?.name || ""}, ${selectedDistrict?.name || ""}, ${selectedProvince?.name || ""}`;
 
-      // Prepare order data với type conversion
+      // Prepare order data với tính toán chính xác khi có mã giảm giá
       const orderData = {
         hoTen: values.hoTen,
         email: values.email,
@@ -150,18 +150,27 @@ const CheckoutPage = () => {
         diaChiGiao: fullAddress,
         id_ThanhToan: paymentMethodId,
         id_VanChuyen: shippingMethodId,
-        tongTien: cartTotal,
-        phiVanChuyen: shippingFee,
-        tongTienSauGiam: totalAmount,
+        // Đảm bảo gửi số, không phải chuỗi
+        tongTien: Number(cartTotal), // Tổng tiền hàng gốc (trước giảm giá)
+        phiVanChuyen: Number(shippingFee), // Phí vận chuyển
+        tongTienSauGiam: Number(totalAmount), // Tổng cuối cùng (đã trừ voucher + phí ship)
+        giamGia: Number(voucherDiscount), // Số tiền được giảm từ voucher
         ...(appliedVoucher && appliedVoucher.Ma && {
           MaGiamGia: appliedVoucher.Ma,
         }),
         ghiChu: values.ghiChu || "",
       };
 
-      console.log("Submitting order:", orderData);
-      console.log("Payment Method ID:", paymentMethodId, "Type:", typeof paymentMethodId);
-      console.log("Shipping Method ID:", shippingMethodId, "Type:", typeof shippingMethodId);
+      // Debug log để kiểm tra dữ liệu gửi đi
+      console.log("🚀 Frontend - Submitting order:", {
+        ...orderData,
+        dataTypes: {
+          tongTien: typeof orderData.tongTien,
+          phiVanChuyen: typeof orderData.phiVanChuyen,
+          tongTienSauGiam: typeof orderData.tongTienSauGiam,
+          giamGia: typeof orderData.giamGia
+        }
+      });
 
       const response = await createOrder(orderData);
 
@@ -173,14 +182,14 @@ const CheckoutPage = () => {
         if (response.data?.paymentUrl) {
           window.location.href = response.data.paymentUrl;
         } else {
-          // Redirect to success page
-          navigate(`/order-success/${response.data?.id || response.data?.maDonHang}`, {
-            state: {
-              orderSuccess: true,
-              orderData: response.data,
-              isGuest: !isAuthenticated
-            },
-          });
+          // Redirect based on authentication status
+          if (isAuthenticated) {
+            // For logged in users, go to orders page
+            navigate("/user/orders");
+          } else {
+            // For guest users, go to home page
+            navigate("/");
+          }
         }
       }
     } catch (error) {

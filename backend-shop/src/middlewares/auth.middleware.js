@@ -71,52 +71,66 @@ const checkRole = (allowedRoles) => {
       // Chuyển đổi allowedRoles thành mảng nếu là string
       const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
-      // Lấy thông tin quyền của user từ database
+      // Lấy thông tin quyền của user từ database qua bảng quyenguoidung
       const [userRoles] = await db.execute(
-        `SELECT r.Ten as roleName 
+        `SELECT q.TenQuyen as roleName 
          FROM nguoidung nd
-         JOIN quyen r ON nd.id_Quyen = r.id
+         JOIN quyenguoidung qnd ON nd.id = qnd.id_NguoiDung
+         JOIN quyen q ON qnd.id_Quyen = q.id
          WHERE nd.id = ? AND nd.TrangThai = 1`,
         [req.user.id]
       );
 
-      if (userRoles.length === 0) {
-        console.error(`No roles found for user ID: ${req.user.id}`);
+      if (!userRoles || userRoles.length === 0) {
+        console.error(`User ${req.user.id} has no roles assigned`);
         return res.status(403).json({
-          message: "Tài khoản không có quyền truy cập",
-          error: "No roles found for user",
+          message: "Bạn không có quyền truy cập tài nguyên này",
+          error: "No roles assigned to user",
         });
       }
 
-      const userRole = userRoles[0].roleName.toLowerCase(); // Chuyển về chữ thường
+      // Lấy danh sách các quyền của user
+      const userRoleNames = userRoles.map((role) => role.roleName);
+      console.log(`User ${req.user.id} has roles:`, userRoleNames);
 
-      // Kiểm tra quyền
-      if (!roles.map((r) => r.toLowerCase()).includes(userRole)) {
+      // Kiểm tra xem user có ít nhất một trong các quyền được phép không
+      const hasRequiredRole = roles.some((role) =>
+        userRoleNames.includes(role)
+      );
+
+      if (!hasRequiredRole) {
         console.error(
-          `Permission denied for user ID: ${
-            req.user.id
-          }, Role: ${userRole}, Required: ${roles.join(", ")}`
+          `User ${req.user.id} with roles [${userRoleNames.join(
+            ", "
+          )}] attempted to access resource requiring roles [${roles.join(
+            ", "
+          )}]`
         );
         return res.status(403).json({
-          message: "Bạn không có quyền thực hiện thao tác này",
-          requiredRoles: roles,
-          currentRole: userRole,
-          error: "Permission denied",
+          message: "Bạn không có quyền truy cập tài nguyên này",
+          error: `Required roles: ${roles.join(", ")}`,
         });
       }
 
-      // Thêm thông tin quyền vào request
-      req.userRole = userRole;
+      console.log(
+        `User ${req.user.id} authorized with roles [${userRoleNames.join(
+          ", "
+        )}]`
+      );
       next();
     } catch (error) {
       console.error("Error in checkRole middleware:", error);
       return res.status(500).json({
-        message: "Lỗi kiểm tra quyền truy cập",
+        message: "Lỗi hệ thống khi kiểm tra quyền",
         error: error.message,
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
     }
   };
+};
+
+// Middleware kiểm tra quyền admin (bao gồm cả Admin và Nhân viên)
+const checkAdminRole = () => {
+  return checkRole(["Admin", "Nhân viên"]);
 };
 
 // Middleware kiểm tra trạng thái tài khoản
@@ -214,6 +228,7 @@ module.exports = {
   verifyToken,
   optionalAuth,
   checkRole,
+  checkAdminRole, // Thêm middleware mới
   checkAccountStatus,
   checkSession,
   checkDeviceAndIP,

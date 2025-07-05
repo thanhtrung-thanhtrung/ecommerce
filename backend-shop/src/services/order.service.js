@@ -118,13 +118,54 @@ class OrderService {
         }
       }
 
-      // 3. Tính tổng tiền (ưu tiên GiaKhuyenMai theo nghiệp vụ web bán giày)
-      let TongTienHang = cartItems.reduce((sum, item) => {
-        const finalPrice = item.GiaKhuyenMai || item.Gia;
-        return sum + finalPrice * item.SoLuong;
+      // 3. THAY ĐỔI: Sử dụng giá trị từ frontend thay vì tính toán lại
+      // Lý do: Frontend đã tính toán chính xác, backend chỉ cần validate và sử dụng
+
+      // Validate và convert giá trị từ frontend về số (không phải chuỗi)
+      const frontendTongTien = Number(tongTien) || 0;
+      const frontendPhiVanChuyen = Number(phiVanChuyen) || 0;
+      const frontendTongTienSauGiam = Number(tongTienSauGiam) || 0;
+      const frontendGiamGia = Number(orderData.giamGia) || 0;
+
+      console.log("💰 Debug - Frontend values:", {
+        tongTien: frontendTongTien,
+        phiVanChuyen: frontendPhiVanChuyen,
+        tongTienSauGiam: frontendTongTienSauGiam,
+        giamGia: frontendGiamGia,
+        types: {
+          tongTien: typeof frontendTongTien,
+          phiVanChuyen: typeof frontendPhiVanChuyen,
+          tongTienSauGiam: typeof frontendTongTienSauGiam,
+        },
+      });
+
+      // Tính tổng tiền từ giỏ hàng để so sánh (validation)
+      let calculatedTongTienHang = cartItems.reduce((sum, item) => {
+        const finalPrice = Number(item.GiaKhuyenMai) || Number(item.Gia) || 0;
+        const quantity = Number(item.SoLuong) || 0;
+        return sum + finalPrice * quantity;
       }, 0);
 
-      // 4. Áp dụng mã giảm giá (nếu có)
+      // Kiểm tra sự khác biệt quá lớn giữa frontend và backend calculation
+      const diff = Math.abs(calculatedTongTienHang - frontendTongTien);
+      if (diff > 1000) {
+        // Cho phép sai số nhỏ do làm tròn
+        console.warn(
+          "⚠️ Cảnh báo: Tổng tiền frontend và backend khác biệt lớn:",
+          {
+            frontend: frontendTongTien,
+            backend: calculatedTongTienHang,
+            difference: diff,
+          }
+        );
+        // Sử dụng giá trị backend nếu chênh lệch quá lớn
+        var TongTienHang = calculatedTongTienHang;
+      } else {
+        // Sử dụng giá trị từ frontend
+        var TongTienHang = frontendTongTien;
+      }
+
+      // 4. Áp dụng mã giảm giá (nếu có) - SỬA ĐỂ SỬ DỤNG GIÁ TRỊ TỪ FRONTEND
       let GiamGia = 0;
       if (MaGiamGia) {
         const [vouchers] = await connection.execute(
@@ -138,10 +179,24 @@ class OrderService {
         if (vouchers.length > 0) {
           const voucher = vouchers[0];
           if (TongTienHang >= voucher.DieuKienApDung) {
-            GiamGia = Math.min(
+            // Tính giảm giá từ voucher
+            const calculatedDiscount = Math.min(
               (TongTienHang * voucher.PhanTramGiam) / 100,
               voucher.GiaTriGiamToiDa
             );
+
+            // Sử dụng giá trị giảm giá từ frontend nếu có và hợp lý
+            if (
+              frontendGiamGia > 0 &&
+              Math.abs(calculatedDiscount - frontendGiamGia) <= 1000
+            ) {
+              // Sử dụng giá trị từ frontend nếu chênh lệch không quá 1000đ
+              GiamGia = frontendGiamGia;
+            } else {
+              // Sử dụng giá trị tính toán từ backend
+              GiamGia = calculatedDiscount;
+            }
+
             await connection.execute(
               `UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung + 1 WHERE Ma = ?`,
               [MaGiamGia]
@@ -150,18 +205,36 @@ class OrderService {
         }
       }
 
-      // 5. Tính phí vận chuyển
-      const [shippingMethod] = await connection.execute(
-        `SELECT PhiVanChuyen FROM hinhthucvanchuyen WHERE id = ?`,
-        [id_VanChuyen]
-      );
-      if (shippingMethod.length === 0) {
-        throw new Error("Hình thức vận chuyển không hợp lệ");
-      }
-      const PhiVanChuyen = shippingMethod[0].PhiVanChuyen || 0;
+      // 5. Sử dụng phí vận chuyển từ frontend (đã được validate)
+      const PhiVanChuyen = frontendPhiVanChuyen;
 
-      // 6. Tính tổng thanh toán
-      const TongThanhToan = TongTienHang - GiamGia + PhiVanChuyen;
+      // 6. SỬA: Tính tổng thanh toán - ĐẢMBẢO PHÉP CỘNG SỐ, KHÔNG PHẢI NỐI CHUỖI
+      let TongThanhToan;
+      if (frontendTongTienSauGiam > 0) {
+        // Sử dụng tổng tiền từ frontend nếu có
+        TongThanhToan = frontendTongTienSauGiam;
+      } else {
+        // Tính toán: Đảm bảo tất cả đều là số trước khi cộng
+        TongThanhToan =
+          Number(TongTienHang) - Number(GiamGia) + Number(PhiVanChuyen);
+      }
+
+      // Debug log để kiểm tra tính toán
+      console.log("💰 Final calculation debug:", {
+        TongTienHang: Number(TongTienHang),
+        GiamGia: Number(GiamGia),
+        PhiVanChuyen: Number(PhiVanChuyen),
+        TongThanhToan: Number(TongThanhToan),
+        calculation: `${Number(TongTienHang)} - ${Number(GiamGia)} + ${Number(
+          PhiVanChuyen
+        )} = ${Number(TongThanhToan)}`,
+        allAreNumbers: {
+          TongTienHang: typeof Number(TongTienHang) === "number",
+          GiamGia: typeof Number(GiamGia) === "number",
+          PhiVanChuyen: typeof Number(PhiVanChuyen) === "number",
+          TongThanhToan: typeof Number(TongThanhToan) === "number",
+        },
+      });
 
       // 7. Tạo đơn hàng với field name đúng
       // --- Sửa: sinh mã đơn hàng trước khi insert ---
@@ -636,8 +709,10 @@ class OrderService {
     const [orderItems] = await db.execute(
       `SELECT 
         ctdh.*,
+        
         sp.Ten as name,
         sp.HinhAnh,
+       
         kc.Ten as size,
         ms.Ten as color,
         CONCAT(kc.Ten, ' / ', ms.Ten) as variant

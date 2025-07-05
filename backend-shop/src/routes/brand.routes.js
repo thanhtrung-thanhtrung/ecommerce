@@ -5,6 +5,10 @@ const {
   updateStatusValidator,
   searchValidator,
 } = require("../validators/brand.validator");
+const {
+  verifyToken,
+  checkAdminRole,
+} = require("../middlewares/auth.middleware");
 const multer = require("multer");
 
 // Configure multer for file uploads
@@ -22,7 +26,7 @@ const upload = multer({
 
 const router = express.Router();
 
-// Lấy danh sách thương hiệu
+// Routes công khai
 router.get("/", brandController.layDanhSachThuongHieu);
 
 // Thống kê thương hiệu - Specific route before dynamic routes
@@ -31,9 +35,12 @@ router.get("/thong-ke/all", brandController.thongKeThuongHieu);
 // Lấy chi tiết thương hiệu - Dynamic route with parameter after specific routes
 router.get("/:id", brandController.layChiTietThuongHieu);
 
+// Routes admin - yêu cầu quyền admin (Admin hoặc Nhân viên)
 // Tạo thương hiệu mới
 router.post(
   "/",
+  verifyToken,
+  checkAdminRole(),
   upload.single("Logo"),
   brandValidator,
   brandController.taoThuongHieu
@@ -42,17 +49,26 @@ router.post(
 // Cập nhật thương hiệu
 router.put(
   "/:id",
+  verifyToken,
+  checkAdminRole(),
   upload.single("Logo"),
   brandValidator,
   brandController.capNhatThuongHieu
 );
 
 // Xóa thương hiệu
-router.delete("/:id", brandController.xoaThuongHieu);
+router.delete(
+  "/:id",
+  verifyToken,
+  checkAdminRole(),
+  brandController.xoaThuongHieu
+);
 
 // Cập nhật trạng thái thương hiệu
 router.patch(
   "/:id/trang-thai",
+  verifyToken,
+  checkAdminRole(),
   updateStatusValidator,
   brandController.capNhatTrangThai
 );

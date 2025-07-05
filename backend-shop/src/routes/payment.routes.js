@@ -6,28 +6,13 @@ const {
   paymentMethodValidator,
   updateStatusValidator,
 } = require("../validators/payment.validator");
+const {
+  verifyToken,
+  checkAdminRole,
+} = require("../middlewares/auth.middleware");
 
 // Route lấy danh sách phương thức thanh toán (public)
 router.get("/methods", paymentController.getPaymentMethods);
-
-// Admin routes
-router.get("/admin", paymentController.getPaymentMethodsAdmin);
-router.post(
-  "/admin",
-  paymentMethodValidator,
-  paymentController.createPaymentMethod
-);
-router.put(
-  "/admin/:id",
-  paymentMethodValidator,
-  paymentController.updatePaymentMethod
-);
-router.patch(
-  "/admin/:id/status",
-  updateStatusValidator,
-  paymentController.updatePaymentStatus
-);
-router.delete("/admin/:id", paymentController.deletePaymentMethod);
 
 // Route tạo thanh toán (không cần xác thực)
 router.post("/create", createPaymentValidator, paymentController.createPayment);
@@ -37,5 +22,44 @@ router.get("/vnpay/ipn", paymentController.handleVNPayIPN);
 router.get("/vnpay/return", paymentController.handleVNPayReturn);
 router.get("/momo/ipn", paymentController.handleMoMoIPN);
 router.get("/zalopay/ipn", paymentController.handleZaloPayIPN);
+
+// Admin routes - yêu cầu quyền admin (Admin hoặc Nhân viên)
+router.get(
+  "/admin",
+  verifyToken,
+  checkAdminRole(),
+  paymentController.getPaymentMethodsAdmin
+);
+
+router.post(
+  "/admin",
+  verifyToken,
+  checkAdminRole(),
+  paymentMethodValidator,
+  paymentController.createPaymentMethod
+);
+
+router.put(
+  "/admin/:id",
+  verifyToken,
+  checkAdminRole(),
+  paymentMethodValidator,
+  paymentController.updatePaymentMethod
+);
+
+router.patch(
+  "/admin/:id/status",
+  verifyToken,
+  checkAdminRole(),
+  updateStatusValidator,
+  paymentController.updatePaymentStatus
+);
+
+router.delete(
+  "/admin/:id",
+  verifyToken,
+  checkAdminRole(),
+  paymentController.deletePaymentMethod
+);
 
 module.exports = router;

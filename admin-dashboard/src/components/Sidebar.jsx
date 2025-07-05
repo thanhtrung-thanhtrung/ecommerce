@@ -22,7 +22,7 @@ import {
 import { useAdmin } from "../contexts/AdminContext";
 
 const Sidebar = () => {
-  const { sidebarOpen, setSidebarOpen } = useAdmin();
+  const { sidebarOpen, setSidebarOpen, user, logout } = useAdmin();
   const location = useLocation();
 
   const menuItems = [
@@ -121,10 +121,18 @@ const Sidebar = () => {
               <FiUser className="w-3 h-3 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-xs font-medium text-white">Admin</p>
-              <p className="text-xs text-slate-400">Online</p>
+              <p className="text-xs font-medium text-white">
+                {user?.hoTen || 'Admin'}
+              </p>
+              <p className="text-xs text-slate-400">
+                {user?.maQuyen === 1 ? 'Admin' : 'Nhân viên'}
+              </p>
             </div>
-            <button className="p-1 text-slate-400 hover:text-red-400">
+            <button
+              onClick={logout}
+              className="p-1 text-slate-400 hover:text-red-400 transition-colors"
+              title="Đăng xuất"
+            >
               <FiLogOut className="w-3 h-3" />
             </button>
           </div>
