@@ -26,11 +26,9 @@ const Brands = () => {
 
   const loadBrands = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/brands");
-      const data = await response.json();
-      if (data.success) {
-        setBrands(data.data);
-      }
+      const response = await getBrands();
+      const data = response?.data || response;
+      setBrands(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching brands:", error);
       setBrands([]);
@@ -195,9 +193,9 @@ const Brands = () => {
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                     Website
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                    Trạng thái
-                  </th>
+                  {/* <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                      Trạng thái
+                    </th> */}
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                     Thao tác
                   </th>
@@ -258,13 +256,13 @@ const Brands = () => {
                         <span className="text-xs text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <span className={`inline-flex w-2 h-2 rounded-full ${brand.TrangThai === 1 || brand.TrangThai === "1"
+                    {/* <td className="px-2 py-2 whitespace-nowrap">
+                        <span className={`inline-flex w-2 h-2 rounded-full ${brand.TrangThai === 1 || brand.TrangThai === "1"
                           ? "bg-green-500"
                           : "bg-red-500"
-                        }`} title={brand.TrangThai === 1 || brand.TrangThai === "1" ? "Hoạt động" : "Không hoạt động"}>
-                      </span>
-                    </td>
+                          }`} title={brand.TrangThai === 1 || brand.TrangThai === "1" ? "Hoạt động" : "Không hoạt động"}>
+                        </span>
+                      </td> */}
                     <td className="px-2 py-2 whitespace-nowrap">
                       <div className="flex space-x-1">
                         <button

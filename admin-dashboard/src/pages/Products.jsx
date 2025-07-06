@@ -136,29 +136,45 @@ const Products = () => {
 
   const loadColors = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/products/colors`)
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/products/colors`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (response.ok) {
-        const data = await response.json()
-        setColors(Array.isArray(data) ? data : data?.data || [])
+        const data = await response.json();
+        setColors(Array.isArray(data) ? data : data?.data || []);
+      } else {
+        throw new Error('Failed to fetch colors');
       }
     } catch (error) {
-      console.error("Error loading colors:", error)
-      setColors([])
+      console.error("Error loading colors:", error);
+      setColors([]);
     }
-  }
+  };
 
   const loadSizes = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/products/sizes`)
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/products/sizes`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (response.ok) {
-        const data = await response.json()
-        setSizes(Array.isArray(data) ? data : data?.data || [])
+        const data = await response.json();
+        setSizes(Array.isArray(data) ? data : data?.data || []);
+      } else {
+        throw new Error('Failed to fetch sizes');
       }
     } catch (error) {
-      console.error("Error loading sizes:", error)
-      setSizes([])
+      console.error("Error loading sizes:", error);
+      setSizes([]);
     }
-  }
+  };
 
   // Form handlers
   const handleInputChange = (field, value) => {

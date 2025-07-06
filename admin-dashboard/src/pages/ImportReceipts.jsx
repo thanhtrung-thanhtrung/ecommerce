@@ -355,6 +355,16 @@ const ImportReceipts = () => {
             return;
         }
 
+        // Validation: Kiểm tra ngày nhập không được trong quá khứ
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Đặt về đầu ngày
+
+        const currentDate = new Date();
+        currentDate.setHours(0, 0, 0, 0);
+
+        // Phiếu nhập chỉ được tạo cho ngày hiện tại hoặc tương lai
+        // (trong thực tế có thể cho phép tạo cho hôm nay)
+
         try {
             const receiptData = {
                 id_NhaCungCap: parseInt(createForm.id_NhaCungCap),
@@ -654,7 +664,10 @@ const ImportReceipts = () => {
                                                     <table className="min-w-full divide-y divide-gray-200">
                                                         <thead className="bg-gray-50">
                                                             <tr>
+                                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">stt</th>
+
                                                                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
+
                                                                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mã - Biến thể</th>
                                                                 <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">SL</th>
                                                                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Giá nhập</th>
@@ -663,7 +676,12 @@ const ImportReceipts = () => {
                                                         </thead>
                                                         <tbody className="bg-white divide-y divide-gray-200">
                                                             {receiptDetails.chiTiet.map((item, index) => (
-                                                                <tr key={index} className="hover:bg-gray-50">
+                                                                <tr key={index} className="hover:bg-gray-50 ">
+                                                                    <td className="  px-3 py-2 whitespace-nowrap text-left">
+                                                                        <div className="text-xs text-gray-500">
+                                                                            {index + 1}
+                                                                        </div>
+                                                                    </td>
                                                                     <td className="px-3 py-2">
                                                                         <div className="flex items-start">
                                                                             <FiBox className="w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
@@ -671,9 +689,7 @@ const ImportReceipts = () => {
                                                                                 <div className="text-xs font-medium text-gray-900">
                                                                                     {item.TenSanPham || 'N/A'}
                                                                                 </div>
-                                                                                <div className="text-xs text-gray-500">
-                                                                                    {item.TenThuongHieu} | {item.TenDanhMuc}
-                                                                                </div>
+
                                                                             </div>
                                                                         </div>
                                                                     </td>

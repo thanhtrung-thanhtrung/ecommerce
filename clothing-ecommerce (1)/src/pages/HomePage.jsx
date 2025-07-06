@@ -4,12 +4,14 @@ import { useShop } from "../contexts/ShopContext";
 import { formatCurrency } from "../utils/helpers";
 
 const HomePage = () => {
-  const { products, loading, fetchProducts, categories, brands } = useShop();
+  const { products, loading, fetchProducts, categories, brands, refreshUser } = useShop();
 
   useEffect(() => {
-    // Fetch featured products
+    // Fetch featured products  
     fetchProducts({ page: 1, limit: 10 });
-  }, [fetchProducts]);
+    refreshUser();
+  }, [fetchProducts, refreshUser]);
+
 
   // Helper function để parse hình ảnh từ JSON
   const getProductImage = (product) => {

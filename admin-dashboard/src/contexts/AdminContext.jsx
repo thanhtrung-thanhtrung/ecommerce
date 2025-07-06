@@ -42,6 +42,33 @@ export const AdminProvider = ({ children }) => {
     return localStorage.getItem('adminToken') || localStorage.getItem('token') || '';
   };
 
+  // Check authentication status on load
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = () => {
+    setInitialLoading(true); // Bắt đầu loading
+    try {
+      const token = getToken();
+      const userData = localStorage.getItem('adminUser');
+
+      if (token && userData) {
+        const user = JSON.parse(userData);
+        setUser(user);
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      logout();
+    } finally {
+      setInitialLoading(false); // Kết thúc loading
+    }
+  };
+
   // Load dashboard data
   const loadDashboardData = async () => {
     try {
@@ -70,6 +97,55 @@ export const AdminProvider = ({ children }) => {
     }
   };
 
+  // Authentication functions
+  const loginAdmin = async (email, password) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, matKhau: password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Đăng nhập thất bại');
+      }
+
+      const data = await response.json();
+
+      // Check if user has admin or staff role
+      if (!data.user || (data.user.maQuyen !== 1 && data.user.maQuyen !== 2)) {
+        throw new Error('Bạn không có quyền truy cập vào trang quản trị');
+      }
+
+      // Store token and user data
+      localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminUser', JSON.stringify(data.user));
+
+      setUser(data.user);
+      setIsAuthenticated(true);
+
+      return data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('token');
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
   // Utility function for API calls
   const apiCall = async (url, options = {}) => {
     setLoading(true);
@@ -86,6 +162,12 @@ export const AdminProvider = ({ children }) => {
       });
 
       if (!response.ok) {
+        // Nếu lỗi 401 (Unauthorized), tự động logout
+        if (response.status === 401) {
+          logout();
+          throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        }
+
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.message || `HTTP error! status: ${response.status}`
@@ -213,10 +295,13 @@ export const AdminProvider = ({ children }) => {
   const createProduct = async (productData) => {
     try {
       setLoading(true);
+      const token = getToken();
 
       const response = await fetch(`${API_BASE_URL}/api/products/admin/create`, {
         method: 'POST',
-        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: productData, // Gửi FormData trực tiếp, không set Content-Type
       });
 
@@ -244,11 +329,14 @@ export const AdminProvider = ({ children }) => {
   const updateProduct = async (productId, formData) => {
     setLoading(true);
     try {
+      const token = getToken();
       const response = await fetch(
         `${API_BASE_URL}/api/products/admin/update/${productId}`,
         {
           method: "PUT",
-          credentials: "include",
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
           body: formData, // FormData for file upload
         }
       );
@@ -272,13 +360,14 @@ export const AdminProvider = ({ children }) => {
   const deleteProduct = async (productId) => {
     setLoading(true);
     try {
+      const token = getToken();
       const response = await fetch(
         `${API_BASE_URL}/api/products/admin/delete/${productId}`,
         {
           method: "DELETE",
-          credentials: "include",
           headers: {
             "Content-Type": "application/json",
+            'Authorization': `Bearer ${token}`,
           },
         }
       );
@@ -389,9 +478,12 @@ export const AdminProvider = ({ children }) => {
   const createBrand = async (brandData) => {
     try {
       setLoading(true);
+      const token = getToken();
       const response = await fetch(`${API_BASE_URL}/api/brands`, {
         method: "POST",
-        credentials: "include", // Use session cookies instead of Authorization header
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: brandData, // FormData object
       });
 
@@ -412,9 +504,12 @@ export const AdminProvider = ({ children }) => {
   const updateBrand = async (brandId, brandData) => {
     try {
       setLoading(true);
+      const token = getToken();
       const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}`, {
         method: "PUT",
-        credentials: "include", // Use session cookies instead of Authorization header
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: brandData, // FormData object
       });
 
@@ -435,11 +530,12 @@ export const AdminProvider = ({ children }) => {
   const deleteBrand = async (brandId) => {
     try {
       setLoading(true);
+      const token = getToken();
       const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}`, {
         method: "DELETE",
-        credentials: "include", // Use session cookies
         headers: {
           "Content-Type": "application/json",
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -461,7 +557,6 @@ export const AdminProvider = ({ children }) => {
     return await apiCall("/api/brands/stats");
   };
 
-  // Vouchers API - Based on the Postman collection
   const getVouchers = async () => {
     return await apiCall("/api/vouchers");
   };
@@ -731,80 +826,9 @@ export const AdminProvider = ({ children }) => {
     });
   };
 
-  // Check authentication status on load
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  const checkAuthStatus = () => {
-    const token = getToken();
-    const userData = localStorage.getItem('adminUser');
-
-    if (token && userData) {
-      try {
-        const user = JSON.parse(userData);
-        setUser(user);
-        setIsAuthenticated(true);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        logout();
-      }
-    }
-    setInitialLoading(false); // Đặt lại trạng thái loading ban đầu
-  };
-
-  // Authentication functions
-  const loginAdmin = async (email, password) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, matKhau: password }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Đăng nhập thất bại');
-      }
-
-      const data = await response.json();
-
-      // Check if user has admin or staff role
-      if (!data.user || (data.user.maQuyen !== 1 && data.user.maQuyen !== 2)) {
-        throw new Error('Bạn không có quyền truy cập vào trang quản trị');
-      }
-
-      // Store token and user data
-      localStorage.setItem('adminToken', data.token);
-      localStorage.setItem('adminUser', JSON.stringify(data.user));
-
-      setUser(data.user);
-      setIsAuthenticated(true);
-
-      return data;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUser');
-    localStorage.removeItem('token');
-    setUser(null);
-    setIsAuthenticated(false);
-  };
-
   const value = {
     loading,
-    initialLoading, // Truyền state loading ban đầu
+    initialLoading, // Thêm vào value
     sidebarOpen,
     setSidebarOpen,
     dashboardData,

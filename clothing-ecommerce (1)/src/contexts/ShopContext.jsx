@@ -571,6 +571,19 @@ export const ShopProvider = ({ children }) => {
         }
     }, [apiCall]);
 
+    const refreshUser = useCallback(async () => {
+        try {
+            const profile = await getProfile();
+            if (profile && profile.id) {
+                setUser(profile);
+                setIsAuthenticated(true);
+            }
+        } catch (error) {
+            setUser(null);
+            setIsAuthenticated(false);
+        }
+    }, [getProfile]);
+
     const updateProfile = useCallback(async (profileData) => {
         try {
             setLoading(true);
@@ -809,6 +822,7 @@ export const ShopProvider = ({ children }) => {
 
         // User profile/account
         getProfile,
+        refreshUser,
         updateProfile,
         changePassword,
         // Orders

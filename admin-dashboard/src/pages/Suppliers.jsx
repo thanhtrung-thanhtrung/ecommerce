@@ -178,7 +178,7 @@ const Suppliers = () => {
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SĐT</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Địa chỉ</th>
-                  <th className="px-2 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">TT</th>
+                  {/* <th className="px-2 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">TT</th> */}
                   <th className="px-2 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Thao tác</th>
                 </tr>
               </thead>
@@ -190,12 +190,12 @@ const Suppliers = () => {
                     <td className="px-3 py-2 text-xs text-gray-600">{s.Email}</td>
                     <td className="px-3 py-2 text-xs text-gray-600">{s.SDT}</td>
                     <td className="px-3 py-2 text-xs text-gray-600 max-w-xs truncate" title={s.DiaChi}>{s.DiaChi}</td>
-                    <td className="px-2 py-2 text-center">
+                    {/* <td className="px-2 py-2 text-center">
                       <span
                         className={`inline-block w-2 h-2 rounded-full ${s.TrangThai ? "bg-green-500" : "bg-red-500"}`}
                         title={s.TrangThai ? "Hoạt động" : "Không hoạt động"}
                       ></span>
-                    </td>
+                    </td> */}
                     <td className="px-2 py-2 text-center">
                       <div className="flex justify-center space-x-1">
                         <button
