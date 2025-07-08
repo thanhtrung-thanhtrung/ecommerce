@@ -17,6 +17,7 @@ const supplierRoutes = require("./supplier.routes");
 const wishlistRoutes = require("./wishlist.routes");
 const revenueRoutes = require("./revenue.routes");
 const emailRoutes = require("./email.routes");
+const testRoutes = require("./test.routes");
 // Định nghĩa các routes
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
@@ -30,6 +31,7 @@ router.use("/shipping", shippingRoutes);
 router.use("/vouchers", voucherRoutes);
 router.use("/wishlists", wishlistRoutes);
 router.use("/email", emailRoutes);
+router.use("/test", testRoutes);
 
 //admin routes
 

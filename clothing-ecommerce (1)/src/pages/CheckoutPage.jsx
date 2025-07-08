@@ -248,7 +248,7 @@ const CheckoutPage = () => {
           hoTen: user?.HoTen || "",
           email: user?.Email || "",
           soDienThoai: user?.SDT || "",
-          diaChiGiao: user?.DiaChi || "",
+          diaChiGiao: "",
           tinh: "",
           quan: "",
           phuong: "",

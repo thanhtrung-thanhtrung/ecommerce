@@ -20,16 +20,10 @@ import Shippings from "./pages/Shippings";
 import Wishlists from "./pages/Wishlists";
 import Inventorys from "./pages/Inventorys";
 import ImportReceipts from "./pages/ImportReceipts";
+import Settings from "./pages/Settings";
 import "./App.css";
 
-const Settings = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-gray-900 mb-4">Cài đặt</h2>
-    <div className="bg-white rounded-lg shadow p-6">
-      <p className="text-gray-600">Trang cài đặt hệ thống sẽ được phát triển ở đây.</p>
-    </div>
-  </div>
-);
+
 
 // Layout component cho các trang đã xác thực
 const AuthenticatedLayout = ({ children }) => (

@@ -9,13 +9,11 @@ class CategoryController {
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
-
       const categoryData = req.body;
       const newCategory = await categoryService.taoDanhMuc(categoryData);
-
       return res.status(201).json({
         success: true,
-        message: "Tạo danh mục thành công",
+        message: "tao danh muc thanh cong ",
         data: newCategory,
       });
     } catch (error) {
@@ -26,6 +24,28 @@ class CategoryController {
           message: error.message || "Có lỗi xảy ra khi tạo danh mục",
         });
     }
+    // try {
+    //   const errors = validationResult(req);
+    //   if (!errors.isEmpty()) {
+    //     return res.status(400).json({ errors: errors.array() });
+    //   }
+
+    //   const categoryData = req.body;
+    //   const newCategory = await categoryService.taoDanhMuc(categoryData);
+
+    //   return res.status(201).json({
+    //     success: true,
+    //     message: "Tạo danh mục thành công",
+    //     data: newCategory,
+    //   });
+    // } catch (error) {
+    //   return res
+    //     .status(error.message === "Tên danh mục đã tồn tại" ? 400 : 500)
+    //     .json({
+    //       success: false,
+    //       message: error.message || "Có lỗi xảy ra khi tạo danh mục",
+    //     });
+    // }
   }
 
   // Cập nhật danh mục
@@ -35,19 +55,17 @@ class CategoryController {
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
-
       const { id } = req.params;
       const categoryData = req.body;
-
-      const updatedCategory = await categoryService.capNhatDanhMuc(
+      const updatedCategoruy = await categoryService.capNhatDanhMuc(
         id,
         categoryData
       );
-
       return res.status(200).json({
         success: true,
         message: "Cập nhật danh mục thành công",
-        data: updatedCategory,
+
+        data: updatedCategoruy,
       });
     } catch (error) {
       return res
@@ -57,6 +75,33 @@ class CategoryController {
           message: error.message || "Có lỗi xảy ra khi cập nhật danh mục",
         });
     }
+    // try {
+    //   const errors = validationResult(req);
+    //   if (!errors.isEmpty()) {
+    //     return res.status(400).json({ errors: errors.array() });
+    //   }
+
+    //   const { id } = req.params;
+    //   const categoryData = req.body;
+
+    //   const updatedCategory = await categoryService.capNhatDanhMuc(
+    //     id,
+    //     categoryData
+    //   );
+
+    //   return res.status(200).json({
+    //     success: true,
+    //     message: "Cập nhật danh mục thành công",
+    //     data: updatedCategory,
+    //   });
+    // } catch (error) {
+    //   return res
+    //     .status(error.message === "Không tìm thấy danh mục" ? 404 : 400)
+    //     .json({
+    //       success: false,
+    //       message: error.message || "Có lỗi xảy ra khi cập nhật danh mục",
+    //     });
+    // }
   }
 
   // Xóa danh mục

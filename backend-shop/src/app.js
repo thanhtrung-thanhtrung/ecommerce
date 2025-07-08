@@ -17,9 +17,11 @@ const allowedOrigins = [
   "http://localhost:5173", // admin-dashboard frontend (Vite dev server)
   "http://localhost:5174", // backup Vite port
 
-  // Production Vercel URLs
+  // Production Vercel URLs - Cập nhật URL mới
   "https://admin-dashboard-seven-snowy-72.vercel.app",
   "https://shop-frontend-ecru.vercel.app",
+  "https://admin-dashboard-git-main-quangduc281s-projects.vercel.app", // Thêm URL git branch
+  "https://admin-dashboard-quangduc281s-projects.vercel.app", // Thêm URL project
   "https://*.vercel.app", // Allow all Vercel subdomains
 
   // Environment-based URLs
@@ -36,14 +38,18 @@ app.use(
       // Allow requests with no origin (mobile apps, etc.)
       if (!origin) return callback(null, true);
 
+      console.log("Checking CORS for origin:", origin); // Debug log
+
       if (
         validOrigins.indexOf(origin) !== -1 ||
         origin.includes(".vercel.app") ||
         origin.includes("localhost")
       ) {
+        console.log("CORS allowed for:", origin); // Debug log
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        console.log("CORS blocked for:", origin); // Debug log
+        callback(new Error(`Not allowed by CORS: ${origin}`));
       }
     },
     credentials: true, // Allow cookies to be sent cross-origin

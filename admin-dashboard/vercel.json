@@ -5,7 +5,13 @@
   "installCommand": "npm install",
   "devCommand": "npm run dev",
   "env": {
-    "DISABLE_ESLINT_PLUGIN": "true"
+    "DISABLE_ESLINT_PLUGIN": "true",
+    "VITE_BACKEND_URL": "https://backend-deploy-production-6aa5.up.railway.app"
+  },
+  "build": {
+    "env": {
+      "VITE_BACKEND_URL": "https://backend-deploy-production-6aa5.up.railway.app"
+    }
   },
   "rewrites": [
     {
@@ -31,5 +37,10 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "src/pages/api/**/*.{js,ts}": {
+      "maxDuration": 30
+    }
+  }
 }

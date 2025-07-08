@@ -59,7 +59,6 @@ class CategoryService {
 
   // Xóa danh mục
   async xoaDanhMuc(id) {
-    // Kiểm tra xem danh mục có sản phẩm không
     const [products] = await db.execute(
       "SELECT COUNT(*) as count FROM sanpham WHERE id_DanhMuc = ?",
       [id]
@@ -78,7 +77,7 @@ class CategoryService {
     return { message: "Xóa danh mục thành công" };
   }
 
-  // Cập nhật trạng thái
+  //Cập nhật trạng thái
   async capNhatTrangThai(id, trangThai) {
     const [result] = await db.execute(
       "UPDATE danhmuc SET TrangThai = ? WHERE id = ?",
@@ -91,11 +90,11 @@ class CategoryService {
 
     return { id, TrangThai: trangThai };
   }
-
   // Lấy chi tiết danh mục
+
   async layChiTietDanhMuc(id) {
     const [categories] = await db.execute(
-      `SELECT dm.*, 
+      `SELECT dm.*,
         COUNT(DISTINCT sp.id) as soSanPham,
         COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
         COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong
@@ -126,35 +125,64 @@ class CategoryService {
     };
   }
 
-  // Lấy danh sách danh mục
-  async layDanhSachDanhMuc(filters = {}) {
-    let query = `
-      SELECT dm.*, 
-        COUNT(DISTINCT sp.id) as soSanPham,
-        COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
-        COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong
-      FROM danhmuc dm
-      LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
-      WHERE 1=1
-    `;
-    const params = [];
+  // // Lấy danh sách danh mục
+  // async layDanhSachDanhMuc(filters = {}) {
+  //   let query = `
+  //     SELECT dm.*,
+  //       COUNT(DISTINCT sp.id) as soSanPham,
+  //       COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
+  //       COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong
+  //     FROM danhmuc dm
+  //     LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
+  //     WHERE 1=1
+  //   `;
+  //   const params = [];
 
-    if (filters.trangThai !== undefined) {
-      query += " AND dm.TrangThai = ?";
-      params.push(filters.trangThai);
+  //   if (filters.trangThai !== undefined) {
+  //     query += " AND dm.TrangThai = ?";
+  //     params.push(filters.trangThai);
+  //   }
+
+  //   if (filters.tuKhoa) {
+  //     query += " AND (dm.Ten LIKE ? OR dm.MoTa LIKE ?)";
+  //     const searchTerm = `%${filters.tuKhoa}%`;
+  //     params.push(searchTerm, searchTerm);
+  //   }
+
+  //   query += " GROUP BY dm.id ORDER BY dm.id DESC";
+
+  //   const [categories] = await db.execute(query, params);
+  //   return categories;
+  // }
+    async layDanhSachDanhMuc(filters = {}) {
+      const baseQuery = `
+        SELECT dm.*, 
+          COUNT(DISTINCT sp.id) as soSanPham,
+          COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
+          COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong
+        FROM danhmuc dm
+        LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
+        WHERE 1=1
+      `;
+      let query = baseQuery;
+      const params = [];
+
+      if (filters.trangThai !== undefined) {
+        query += " AND dm.TrangThai = ?";
+        params.push(filters.trangThai);
+      }
+
+      if (filters.tuKhoa) {
+        query += " AND (dm.Ten LIKE ? OR dm.MoTa LIKE ?)";
+        const searchTerm = `%${filters.tuKhoa}%`;
+        params.push(searchTerm, searchTerm);
+      }
+
+      query += " GROUP BY dm.id ORDER BY dm.id DESC";
+
+      const [categories] = await db.execute(query, params);
+      return categories;
     }
-
-    if (filters.tuKhoa) {
-      query += " AND (dm.Ten LIKE ? OR dm.MoTa LIKE ?)";
-      const searchTerm = `%${filters.tuKhoa}%`;
-      params.push(searchTerm, searchTerm);
-    }
-
-    query += " GROUP BY dm.id ORDER BY dm.id DESC";
-
-    const [categories] = await db.execute(query, params);
-    return categories;
-  }
 
   // Thống kê danh mục
   async thongKeDanhMuc() {

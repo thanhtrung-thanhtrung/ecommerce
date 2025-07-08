@@ -38,7 +38,11 @@ export const AdminProvider = ({ children }) => {
     import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
   // Helper function to get authentication token
+  const isBrowser = typeof window !== 'undefined';
+
   const getToken = () => {
+    // Return empty string if not in browser (during build)
+    if (!isBrowser) return '';
     return localStorage.getItem('adminToken') || localStorage.getItem('token') || '';
   };
 
@@ -148,11 +152,23 @@ export const AdminProvider = ({ children }) => {
 
   // Utility function for API calls
   const apiCall = async (url, options = {}) => {
+    // Skip API calls during build time
+    if (!isBrowser) {
+      return { success: false, message: 'API call skipped during build' };
+    }
+
     setLoading(true);
     try {
       const token = getToken();
+      
+      // Skip authenticated API calls if no token available
+      if (!token && url.includes('/admin')) {
+        console.warn('Skipping admin API call - no token available');
+        return { success: false, message: 'No token available' };
+      }
+
       const response = await fetch(`${API_BASE_URL}${url}`, {
-        credentials: "include", // Include cookies for session
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(token && { Authorization: `Bearer ${token}` }),
@@ -176,7 +192,7 @@ export const AdminProvider = ({ children }) => {
 
       return await response.json();
     } catch (error) {
-      console.error("API call error:", error);
+      console.error('API call error:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -435,6 +451,9 @@ export const AdminProvider = ({ children }) => {
     return await apiCall(url);
   };
 
+  const getallcate = async () => {
+    return await apiCall("/api/categories/danhsach");
+  }
   const getCategoryStats = async () => {
     return await apiCall("/api/categories/thong-ke/all");
   };
@@ -861,7 +880,7 @@ export const AdminProvider = ({ children }) => {
     deleteCategory,
     getCategoryStats,
     updateCategoryStatus,
-
+    getallcate,
     // Brands
     getBrands,
     createBrand,
