@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="Đăng ký tài khoản" id="registration-process">
+    <mxGraphModel dx="1212" dy="715" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Start -->
+        <mxCell id="start" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#000000;strokeColor=#FF0000;" vertex="1" parent="1">
+          <mxGeometry x="300" y="30" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="startLabel" value="Bắt đầu" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="280" y="0" width="80" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Trang đăng ký -->
+        <mxCell id="signupPage" value="Trang đăng ký" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="80" width="120" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Nhập email, mật khẩu -->
+        <mxCell id="enterInfo" value="Nhập email, mật khẩu" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="150" width="160" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Kiểm tra -->
+        <mxCell id="check" value="Kiểm tra" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="270" y="220" width="100" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Không hợp lệ -->
+        <mxCell id="invalid" value="Email đã được đăng ký, sai hoặc thiếu thông tin đăng ký" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="410" y="220" width="250" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Gửi email -->
+        <mxCell id="sendEmail" value="Gửi email" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="220" width="100" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Xác thực email -->
+        <mxCell id="verifyEmail" value="Xác thực email" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="300" width="100" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- End -->
+        <mxCell id="end" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#000000;strokeColor=#FF0000;" vertex="1" parent="1">
+          <mxGeometry x="280" y="370" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="endLabel" value="Kết thúc" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="250" y="400" width="80" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;" edge="1" parent="1" source="start" target="signupPage">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="signupPage" target="enterInfo">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="enterInfo" target="check">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="check" target="sendEmail">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="250" as="targetPoint"/>
+          </mxGeometry>
+          <mxCell value="[Hợp lệ]" style="text;html=1;" vertex="1" parent="1">
+            <mxGeometry x="170" y="235" width="60" height="30" as="geometry"/>
+          </mxCell>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="check" target="invalid">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="450" y="250" as="targetPoint"/>
+          </mxGeometry>
+          <mxCell value="[Không hợp lệ]" style="text;html=1;" vertex="1" parent="1">
+            <mxGeometry x="370" y="235" width="100" height="30" as="geometry"/>
+          </mxCell>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="invalid" target="enterInfo">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="sendEmail" target="verifyEmail">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="verifyEmail" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

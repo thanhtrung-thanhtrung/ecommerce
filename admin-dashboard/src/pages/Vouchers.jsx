@@ -145,15 +145,15 @@ const Vouchers = () => {
     }
   };
 
-  const handleStatusToggle = async (voucherCode, currentStatus) => {
+  const handleStatusToggle = async (method) => {
     try {
-      const newStatus = currentStatus === 1 ? 0 : 1;
-      await updateVoucherStatus(voucherCode, newStatus);
+      const newStatus = method.TrangThai === 1 ? 0 : 1;
+      await updateVoucherStatus(method.id, newStatus);
+      toast.success("Cập nhật trạng thái thành công");
       loadVouchers();
-      toast.success(`${newStatus === 1 ? 'Kích hoạt' : 'Vô hiệu hóa'} voucher thành công!`);
+
     } catch (error) {
-      console.error("Error updating voucher status:", error);
-      toast.error("Lỗi khi cập nhật trạng thái voucher");
+      toast.error(error.message || "Có lỗi xảy ra");
     }
   };
 
@@ -253,6 +253,7 @@ const Vouchers = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">stt</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Mã Voucher
                   </th>
@@ -277,8 +278,9 @@ const Vouchers = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredVouchers.map((voucher) => (
+                {filteredVouchers.map((voucher, index) => (
                   <tr key={voucher.Ma} className="hover:bg-gray-50">
+                    <td className="px2 py2 ">{index + 1}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{voucher.Ma}</div>
                     </td>
@@ -348,7 +350,7 @@ const Vouchers = () => {
             </h2>
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Mã Voucher *
                   </label>
@@ -360,7 +362,7 @@ const Vouchers = () => {
                     required
                     disabled={!!editingVoucher}
                   />
-                </div>
+                </div> */}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

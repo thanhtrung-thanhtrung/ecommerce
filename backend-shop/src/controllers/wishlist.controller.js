@@ -235,7 +235,13 @@ class WishlistController {
       next(error);
     }
   }
-
+   async hienThiWishlist(req,res){
+    const hienThi = await WishlistService.hienThiWishlist();
+    res.status(200).json({
+      success: true,
+      data: hienThi,
+    });
+   }
   // Thống kê wishlist (cho admin)
   async thongKeWishlist(req, res, next) {
     try {

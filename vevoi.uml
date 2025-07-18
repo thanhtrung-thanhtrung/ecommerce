@@ -1,0 +1,970 @@
+đăng nhập
+@startuml
+actor "Khách hàng" as Customer  #White
+participant "LoginPage.jsx" as GiaoDiệnĐăngNhập #White
+participant "auth.router.js" as Router #White
+participant "validators" as BộKiểmTraDữLiệu #White
+participant "auth.controller.js" as BộĐiềuKhiểnĐăngKý #White
+participant "services" as DịchVụXửLý #White
+
+Customer -> GiaoDiệnĐăngNhập: Nhập thông tin đăng ký\nNhấn nút Đăng ký
+GiaoDiệnĐăngNhập -> Router: Gửi request đăng ký
+Router -> BộKiểmTraDữLiệu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BộKiểmTraDữLiệu --> Router: Trả về lỗi
+    Router --> GiaoDiệnĐăngNhập: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BộKiểmTraDữLiệu --> Router: Dữ liệu hợp lệ
+    Router -> BộĐiềuKhiểnĐăngKý: Chuyển tiếp request
+    BộĐiềuKhiểnĐăngKý -> DịchVụXửLý: Tạo tài khoản mới
+    DịchVụXửLý --> BộĐiềuKhiểnĐăngKý: Trả về kết quả
+    BộĐiềuKhiểnĐăngKý --> Router: Trả về kết quả
+    Router --> GiaoDiệnĐăngNhập: Hiển thị thông báo thành công/thất bại
+end
+@enduml
+
+đăng nhập
+@startuml
+actor "Khách hàng" as KhachHang #White
+participant "LoginPage.jsx" as GiaoDienDangNhap #White
+participant "auth.router.js" as Router  #White
+participant "auth.controller.js" as DieuKhienDangNhap #White
+participant "services" as DichVuDangNhap    #White
+
+KhachHang -> GiaoDienDangNhap: Nhập email, mật khẩu
+GiaoDienDangNhap -> Router: Gửi request đăng nhập
+alt Dữ liệu không hợp lệ
+    Router --> GiaoDienDangNhap: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    Router -> DieuKhienDangNhap: Chuyển tiếp request
+    DieuKhienDangNhap -> DichVuDangNhap: Kiểm tra tài khoản, mật khẩu
+    alt Đăng nhập thất bại
+        DichVuDangNhap --> DieuKhienDangNhap: Trả về lỗi đăng nhập
+        DieuKhienDangNhap --> Router: Trả về lỗi
+        Router --> GiaoDienDangNhap: Hiển thị thông báo lỗi
+    else Đăng nhập thành công
+        DichVuDangNhap --> DieuKhienDangNhap: Trả về thông tin đăng nhập thành công
+        DieuKhienDangNhap --> Router: Trả về kết quả
+        Router --> GiaoDienDangNhap: Chuyển hướng đến trang chính
+    end
+end
+@enduml
+đăng xuất
+@startuml
+actor "Khách hàng" as KhachHang   #White
+participant "HomePage.jsx" as TrangChu  #White
+participant "auth.controller.js" as DieuKhienDangNhap       #White
+
+KhachHang -> TrangChu: Yêu cầu đăng xuất
+TrangChu -> TrangChu: confirmLogout()
+alt Hủy đăng xuất
+    TrangChu --> KhachHang: Trả về thông báo hủy đăng xuất
+else Xác nhận đăng xuất
+    TrangChu -> DieuKhienDangNhap: Logout()
+    DieuKhienDangNhap --> TrangChu: Trả về thông báo thành công
+    TrangChu --> KhachHang: Trả về thông báo thành công
+end
+@enduml
+cập nhật thông tin tài khoản 
+@startuml
+actor "Khách hàng" as KhachHang #White
+participant "ProfilePage.jsx" as GiaoDienThayDoiThongTin    #White
+participant "auth.controller.js" as DieuKhienTaiKhoan   #White
+participant "services" as DichVuTaiKhoan        #White  
+
+KhachHang -> GiaoDienThayDoiThongTin: Nhập thông tin mới\nNhấn nút Lưu thay đổi
+GiaoDienThayDoiThongTin -> DieuKhienTaiKhoan: Gửi thông tin mới
+alt Dữ liệu không hợp lệ
+    DieuKhienTaiKhoan --> GiaoDienThayDoiThongTin: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    DieuKhienTaiKhoan -> DichVuTaiKhoan: Cập nhật thông tin tài khoản
+    DichVuTaiKhoan --> DieuKhienTaiKhoan: Trả về kết quả
+    DieuKhienTaiKhoan --> GiaoDienThayDoiThongTin: Hiển thị thông báo thành công/thất bại
+end
+@enduml
+
+đổi mật khẩu
+    @startuml
+    actor "Khách hàng" as KhachHang #White
+    participant "ProfilePage.jsx" as GiaoDienDoiMatKhau #White
+    participant "auth.controller.js" as DieuKhienTaiKhoan #White
+    participant "services" as DichVuTaiKhoan #White
+
+    KhachHang -> GiaoDienDoiMatKhau: Nhập mật khẩu cũ, mật khẩu mới, xác nhận mật khẩu
+    GiaoDienDoiMatKhau -> DieuKhienTaiKhoan: Gửi thông tin đổi mật khẩu
+    alt Dữ liệu không hợp lệ
+        DieuKhienTaiKhoan --> GiaoDienDoiMatKhau: Hiển thị thông báo lỗi
+    else Dữ liệu hợp lệ
+        DieuKhienTaiKhoan -> DichVuTaiKhoan: Kiểm tra mật khẩu cũ, cập nhật mật khẩu mới
+        alt Mật khẩu cũ không đúng
+            DichVuTaiKhoan --> DieuKhienTaiKhoan: Trả về lỗi
+            DieuKhienTaiKhoan --> GiaoDienDoiMatKhau: Hiển thị thông báo lỗi
+        else Đổi mật khẩu thành công
+            DichVuTaiKhoan --> DieuKhienTaiKhoan: Trả về kết quả thành công
+            DieuKhienTaiKhoan --> GiaoDienDoiMatKhau: Hiển thị thông báo thành công
+        end
+    end
+    @enduml
+lọc sản phẩm
+@startuml
+actor "Người dùng" as NguoiDung #White
+participant "ProductsPage.jsx" as GiaoDienSanPham #White
+participant "product.controller.js" as DieuKhienSanPham #White
+participant "services" as DichVuSanPham #White
+
+NguoiDung -> GiaoDienSanPham: Chọn bộ lọc (danh mục, thương hiệu, giá, từ khóa...)
+GiaoDienSanPham -> DieuKhienSanPham: Gửi yêu cầu lọc sản phẩm
+DieuKhienSanPham -> DichVuSanPham: Xử lý tiêu chí lọc, truy vấn dữ liệu
+DichVuSanPham --> DieuKhienSanPham: Trả về danh sách sản phẩm đã lọc
+DieuKhienSanPham --> GiaoDienSanPham: Trả về kết quả lọc
+GiaoDienSanPham --> NguoiDung: Hiển thị danh sách sản phẩm phù hợp
+@enduml
+
+tìm kiếm sản phẩm
+@startuml
+actor "Người dùng" as NguoiDung #White 
+participant "ProductsPage.jsx" as GiaoDienSanPham #White
+participant "product.controller.js" as DieuKhienSanPham #White
+participant "services" as DichVuSanPham #White
+
+NguoiDung -> GiaoDienSanPham: Nhập từ khóa tìm kiếm
+GiaoDienSanPham -> DieuKhienSanPham: Gửi yêu cầu tìm kiếm sản phẩm
+DieuKhienSanPham -> DichVuSanPham: Truy vấn sản phẩm theo từ khóa
+DichVuSanPham --> DieuKhienSanPham: Trả về danh sách sản phẩm phù hợp
+DieuKhienSanPham --> GiaoDienSanPham: Trả về kết quả tìm kiếm
+GiaoDienSanPham --> NguoiDung: Hiển thị danh sách sản phẩm tìm được
+@enduml
+
+đánh giá sản phẩm
+@startuml
+actor "Khách hàng" as KhachHang #White
+participant "ProductReviews.jsx" as GiaoDienDanhGia #White
+participant "reviews.router.js" as RouterDanhGia #White
+participant "reviews.controller.js" as DieuKhienDanhGia #White
+participant "services" as DichVuDanhGia #White
+
+KhachHang -> GiaoDienDanhGia: Nhập nội dung, số sao đánh giá
+GiaoDienDanhGia -> RouterDanhGia: Gửi request đánh giá sản phẩm
+alt Dữ liệu không hợp lệ
+    RouterDanhGia --> GiaoDienDanhGia: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    RouterDanhGia -> DieuKhienDanhGia: Chuyển tiếp request
+    DieuKhienDanhGia -> DichVuDanhGia: Lưu đánh giá vào database
+    DichVuDanhGia --> DieuKhienDanhGia: Trả về kết quả
+    DieuKhienDanhGia --> RouterDanhGia: Trả về kết quả
+    RouterDanhGia --> GiaoDienDanhGia: Hiển thị thông báo thành công/thất bại
+end
+GiaoDienDanhGia --> KhachHang: Hiển thị đánh giá mới
+@enduml
+
+yêu thích sản phẩm
+@startuml
+actor "Khách hàng" as KhachHang #White
+participant "Wishlists.jsx" as GiaoDienWishlist #White
+participant "wishlists.router.js" as RouterWishlist #White
+participant "wishlists.controller.js" as DieuKhienWishlist #White
+participant "services" as DichVuWishlist
+
+KhachHang -> GiaoDienWishlist: Nhấn thêm/xóa sản phẩm yêu thích
+GiaoDienWishlist -> RouterWishlist: Gửi request thêm/xóa wishlist
+alt Dữ liệu không hợp lệ
+    RouterWishlist --> GiaoDienWishlist: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    RouterWishlist -> DieuKhienWishlist: Chuyển tiếp request
+    DieuKhienWishlist -> DichVuWishlist: Xử lý thêm/xóa sản phẩm yêu thích
+    DichVuWishlist --> DieuKhienWishlist: Trả về kết quả
+    DieuKhienWishlist --> RouterWishlist: Trả về kết quả
+    RouterWishlist --> GiaoDienWishlist: Hiển thị thông báo thành công/thất bại
+end
+GiaoDienWishlist --> KhachHang: Cập nhật trạng thái sản phẩm yêu thích
+@enduml
+@startuml
+actor "Người dùng" as NguoiDung #White 
+participant "Giao diện" as GiaoDien #White
+participant "router" as Router #White
+participant "controller" as DieuKhien #White
+participant "service" as DichVu #White
+
+NguoiDung -> GiaoDien: Thực hiện thao tác (đăng nhập, đăng ký, đổi mật khẩu, cập nhật thông tin, lọc/tìm kiếm, wishlist, đánh giá...)
+GiaoDien -> Router: Gửi request với dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    Router --> GiaoDien: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    Router -> DieuKhien: Chuyển tiếp request
+    DieuKhien -> DichVu: Xử lý nghiệp vụ, truy vấn database
+    DichVu --> DieuKhien: Trả về kết quả
+    DieuKhien --> Router: Trả về kết quả
+    Router --> GiaoDien: Hiển thị kết quả cho người dùng
+end
+GiaoDien --> NguoiDung: Hiển thị thông báo/kết quả cuối cùng
+@enduml
+@startuml
+actor "Quản trị viên" as Admin
+participant "Inventorys.jsx" as GiaoDienThongKeTonKho
+participant "inventory.router.js" as RouterTonKho
+participant "validators" as BoKiemTraDuLieu
+participant "inventory.controller.js" as DieuKhienTonKho
+participant "services" as DichVuTonKho
+thong kê số lượng tồn kho
+Admin -> GiaoDienThongKeTonKho: Yêu cầu thống kê số lượng tồn kho
+GiaoDienThongKeTonKho -> RouterTonKho: Gửi request thống kê
+RouterTonKho -> BoKiemTraDuLieu: Kiểm tra tham số, xác thực quyền
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterTonKho: Trả về lỗi
+    RouterTonKho --> GiaoDienThongKeTonKho: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterTonKho: Dữ liệu hợp lệ
+    RouterTonKho -> DieuKhienTonKho: Chuyển tiếp request
+    DieuKhienTonKho -> DichVuTonKho: Truy vấn số lượng tồn kho từ database
+    DichVuTonKho --> DieuKhienTonKho: Trả về kết quả thống kê
+    DieuKhienTonKho --> RouterTonKho: Trả về kết quả
+    RouterTonKho --> GiaoDienThongKeTonKho: Hiển thị kết quả thống kê
+end
+GiaoDienThongKeTonKho --> Admin: Hiển thị báo cáo tồn kho
+@enduml
+@startuml
+actor "Khách hàng" as KhachHang
+participant "ProductDetailPage.jsx" as GiaoDienSanPham
+participant "cart.router.js" as RouterGioHang
+participant "validators" as BoKiemTraDuLieu
+participant "cart.controller.js" as DieuKhienGioHang
+participant "services" as DichVuGioHang
+
+KhachHang -> GiaoDienSanPham: Chọn sản phẩm, số lượng, biến thể
+GiaoDienSanPham -> RouterGioHang: Gửi request thêm vào giỏ hàng
+RouterGioHang -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterGioHang: Trả về lỗi
+    RouterGioHang --> GiaoDienSanPham: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterGioHang: Dữ liệu hợp lệ
+    RouterGioHang -> DieuKhienGioHang: Chuyển tiếp request
+    DieuKhienGioHang -> DichVuGioHang: Thêm sản phẩm vào giỏ hàng
+    DichVuGioHang --> DieuKhienGioHang: Trả về kết quả
+    DieuKhienGioHang --> RouterGioHang: Trả về kết quả
+    RouterGioHang --> GiaoDienSanPham: Hiển thị thông báo thành công
+end
+GiaoDienSanPham --> KhachHang: Cập nhật trạng thái giỏ hàng
+@enduml
+
+@startuml
+actor "Khách hàng" as KhachHang
+participant "CartPage.jsx" as GiaoDienGioHang
+participant "cart.router.js" as RouterGioHang
+participant "validators" as BoKiemTraDuLieu
+participant "cart.controller.js" as DieuKhienGioHang
+participant "services" as DichVuGioHang
+
+KhachHang -> GiaoDienGioHang: Chọn sản phẩm cần xóa
+GiaoDienGioHang -> RouterGioHang: Gửi request xóa sản phẩm khỏi giỏ hàng
+RouterGioHang -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterGioHang: Trả về lỗi
+    RouterGioHang --> GiaoDienGioHang: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterGioHang: Dữ liệu hợp lệ
+    RouterGioHang -> DieuKhienGioHang: Chuyển tiếp request
+    DieuKhienGioHang -> DichVuGioHang: Xóa sản phẩm khỏi giỏ hàng
+    DichVuGioHang --> DieuKhienGioHang: Trả về kết quả
+    DieuKhienGioHang --> RouterGioHang: Trả về kết quả
+    RouterGioHang --> GiaoDienGioHang: Hiển thị thông báo thành công
+end
+GiaoDienGioHang --> KhachHang: Cập nhật trạng thái giỏ hàng
+@enduml
+
+@startuml
+actor "Khách hàng" as KhachHang
+participant "CheckoutPage.jsx" as GiaoDienDatHang
+participant "order.router.js" as RouterDonHang
+participant "validators" as BoKiemTraDuLieu
+participant "order.controller.js" as DieuKhienDonHang
+participant "services" as DichVuDonHang
+
+KhachHang -> GiaoDienDatHang: Nhập thông tin nhận hàng, chọn sản phẩm, xác nhận đặt hàng
+GiaoDienDatHang -> RouterDonHang: Gửi request đặt hàng
+RouterDonHang -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Trả về lỗi
+    RouterDonHang --> GiaoDienDatHang: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Dữ liệu hợp lệ
+    RouterDonHang -> DieuKhienDonHang: Chuyển tiếp request
+    DieuKhienDonHang -> DichVuDonHang: Tạo đơn hàng
+    DichVuDonHang --> DieuKhienDonHang: Trả về kết quả
+    DieuKhienDonHang --> RouterDonHang: Trả về kết quả
+    RouterDonHang --> GiaoDienDatHang: Hiển thị thông báo thành công
+end
+GiaoDienDatHang --> KhachHang: Hiển thị trạng thái đơn hàng
+@enduml
+
+@startuml
+actor "Khách hàng" as KhachHang
+participant "PaymentPage.jsx" as GiaoDienThanhToan
+participant "payment.router.js" as RouterThanhToan
+participant "validators" as BoKiemTraDuLieu
+participant "payment.controller.js" as DieuKhienThanhToan
+participant "services" as DichVuThanhToan
+
+KhachHang -> GiaoDienThanhToan: Chọn phương thức thanh toán, xác nhận thanh toán
+GiaoDienThanhToan -> RouterThanhToan: Gửi request thanh toán
+RouterThanhToan -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterThanhToan: Trả về lỗi
+    RouterThanhToan --> GiaoDienThanhToan: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterThanhToan: Dữ liệu hợp lệ
+    RouterThanhToan -> DieuKhienThanhToan: Chuyển tiếp request
+    DieuKhienThanhToan -> DichVuThanhToan: Xử lý thanh toán
+    DichVuThanhToan --> DieuKhienThanhToan: Trả về kết quả
+    DieuKhienThanhToan --> RouterThanhToan: Trả về kết quả
+    RouterThanhToan --> GiaoDienThanhToan: Hiển thị thông báo thành công/thất bại
+end
+GiaoDienThanhToan --> KhachHang: Hiển thị trạng thái thanh toán
+@enduml
+
+@startuml
+actor "Khách hàng" as KhachHang
+participant "OrderDetailPage.jsx" as GiaoDienDonHang
+participant "order.router.js" as RouterDonHang
+participant "validators" as BoKiemTraDuLieu
+participant "order.controller.js" as DieuKhienDonHang
+participant "services" as DichVuDonHang
+
+KhachHang -> GiaoDienDonHang: Yêu cầu hủy đơn hàng
+GiaoDienDonHang -> RouterDonHang: Gửi request hủy đơn hàng
+RouterDonHang -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Trả về lỗi
+    RouterDonHang --> GiaoDienDonHang: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Dữ liệu hợp lệ
+    RouterDonHang -> DieuKhienDonHang: Chuyển tiếp request
+    DieuKhienDonHang -> DichVuDonHang: Hủy đơn hàng
+    DichVuDonHang --> DieuKhienDonHang: Trả về kết quả
+    DieuKhienDonHang --> RouterDonHang: Trả về kết quả
+    RouterDonHang --> GiaoDienDonHang: Hiển thị thông báo thành công
+end
+GiaoDienDonHang --> KhachHang: Hiển thị trạng thái đơn hàng
+@enduml
+@startuml
+actor "Quản trị viên" as Admin
+participant "Categories.jsx" as GiaoDienDanhMuc
+participant "category.router.js" as RouterDanhMuc
+participant "validators" as BoKiemTraDuLieu
+participant "category.controller.js" as DieuKhienDanhMuc
+participant "services" as DichVuDanhMuc
+
+Admin -> GiaoDienDanhMuc: Thêm danh mục mới
+GiaoDienDanhMuc -> RouterDanhMuc: Gửi request thêm danh mục
+RouterDanhMuc -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDanhMuc: Trả về lỗi
+    RouterDanhMuc --> GiaoDienDanhMuc: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDanhMuc: Dữ liệu hợp lệ
+    RouterDanhMuc -> DieuKhienDanhMuc: Chuyển tiếp request
+    DieuKhienDanhMuc -> DichVuDanhMuc: Thêm danh mục vào database
+    DichVuDanhMuc --> DieuKhienDanhMuc: Trả về kết quả
+    DieuKhienDanhMuc --> RouterDanhMuc: Trả về kết quả
+    RouterDanhMuc --> GiaoDienDanhMuc: Hiển thị thông báo thành công
+end
+GiaoDienDanhMuc --> Admin: Cập nhật danh sách danh mục
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Categories.jsx" as GiaoDienDanhMuc
+participant "category.router.js" as RouterDanhMuc
+participant "validators" as BoKiemTraDuLieu
+participant "category.controller.js" as DieuKhienDanhMuc
+participant "services" as DichVuDanhMuc
+
+Admin -> GiaoDienDanhMuc: Sửa danh mục
+GiaoDienDanhMuc -> RouterDanhMuc: Gửi request sửa danh mục
+RouterDanhMuc -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDanhMuc: Trả về lỗi
+    RouterDanhMuc --> GiaoDienDanhMuc: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDanhMuc: Dữ liệu hợp lệ
+    RouterDanhMuc -> DieuKhienDanhMuc: Chuyển tiếp request
+    DieuKhienDanhMuc -> DichVuDanhMuc: Sửa danh mục trong database
+    DichVuDanhMuc --> DieuKhienDanhMuc: Trả về kết quả
+    DieuKhienDanhMuc --> RouterDanhMuc: Trả về kết quả
+    RouterDanhMuc --> GiaoDienDanhMuc: Hiển thị thông báo thành công
+end
+GiaoDienDanhMuc --> Admin: Cập nhật danh sách danh mục
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Categories.jsx" as GiaoDienDanhMuc
+participant "category.router.js" as RouterDanhMuc
+participant "validators" as BoKiemTraDuLieu
+participant "category.controller.js" as DieuKhienDanhMuc
+participant "services" as DichVuDanhMuc
+
+Admin -> GiaoDienDanhMuc: Xóa danh mục
+GiaoDienDanhMuc -> RouterDanhMuc: Gửi request xóa danh mục
+RouterDanhMuc -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDanhMuc: Trả về lỗi
+    RouterDanhMuc --> GiaoDienDanhMuc: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDanhMuc: Dữ liệu hợp lệ
+    RouterDanhMuc -> DieuKhienDanhMuc: Chuyển tiếp request
+    DieuKhienDanhMuc -> DichVuDanhMuc: Xóa danh mục trong database
+    DichVuDanhMuc --> DieuKhienDanhMuc: Trả về kết quả
+    DieuKhienDanhMuc --> RouterDanhMuc: Trả về kết quả
+    RouterDanhMuc --> GiaoDienDanhMuc: Hiển thị thông báo thành công
+end
+GiaoDienDanhMuc --> Admin: Cập nhật danh sách danh mục
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Categories.jsx" as GiaoDienDanhMuc
+participant "category.router.js" as RouterDanhMuc
+participant "validators" as BoKiemTraDuLieu
+participant "category.controller.js" as DieuKhienDanhMuc
+participant "services" as DichVuDanhMuc
+
+Admin -> GiaoDienDanhMuc: Thay đổi trạng thái danh mục
+GiaoDienDanhMuc -> RouterDanhMuc: Gửi request thay đổi trạng thái
+RouterDanhMuc -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDanhMuc: Trả về lỗi
+    RouterDanhMuc --> GiaoDienDanhMuc: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDanhMuc: Dữ liệu hợp lệ
+    RouterDanhMuc -> DieuKhienDanhMuc: Chuyển tiếp request
+    DieuKhienDanhMuc -> DichVuDanhMuc: Thay đổi trạng thái danh mục trong database
+    DichVuDanhMuc --> DieuKhienDanhMuc: Trả về kết quả
+    DieuKhienDanhMuc --> RouterDanhMuc: Trả về kết quả
+    RouterDanhMuc --> GiaoDienDanhMuc: Hiển thị thông báo thành công
+end
+GiaoDienDanhMuc --> Admin: Cập nhật trạng thái danh mục
+@enduml
+@startuml
+actor "Quản trị viên" as Admin
+participant "Brands.jsx" as GiaoDienThuongHieu
+participant "brand.router.js" as RouterThuongHieu
+participant "validators" as BoKiemTraDuLieu
+participant "brand.controller.js" as DieuKhienThuongHieu
+participant "services" as DichVuThuongHieu
+
+Admin -> GiaoDienThuongHieu: Thêm thương hiệu mới
+GiaoDienThuongHieu -> RouterThuongHieu: Gửi request thêm thương hiệu
+RouterThuongHieu -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterThuongHieu: Trả về lỗi
+    RouterThuongHieu --> GiaoDienThuongHieu: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterThuongHieu: Dữ liệu hợp lệ
+    RouterThuongHieu -> DieuKhienThuongHieu: Chuyển tiếp request
+    DieuKhienThuongHieu -> DichVuThuongHieu: Thêm thương hiệu vào database
+    DichVuThuongHieu --> DieuKhienThuongHieu: Trả về kết quả
+    DieuKhienThuongHieu --> RouterThuongHieu: Trả về kết quả
+    RouterThuongHieu --> GiaoDienThuongHieu: Hiển thị thông báo thành công
+end
+GiaoDienThuongHieu --> Admin: Cập nhật danh sách thương hiệu
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Brands.jsx" as GiaoDienThuongHieu
+participant "brand.router.js" as RouterThuongHieu
+participant "validators" as BoKiemTraDuLieu
+participant "brand.controller.js" as DieuKhienThuongHieu
+participant "services" as DichVuThuongHieu
+
+Admin -> GiaoDienThuongHieu: Sửa thương hiệu
+GiaoDienThuongHieu -> RouterThuongHieu: Gửi request sửa thương hiệu
+RouterThuongHieu -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterThuongHieu: Trả về lỗi
+    RouterThuongHieu --> GiaoDienThuongHieu: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterThuongHieu: Dữ liệu hợp lệ
+    RouterThuongHieu -> DieuKhienThuongHieu: Chuyển tiếp request
+    DieuKhienThuongHieu -> DichVuThuongHieu: Sửa thương hiệu trong database
+    DichVuThuongHieu --> DieuKhienThuongHieu: Trả về kết quả
+    DieuKhienThuongHieu --> RouterThuongHieu: Trả về kết quả
+    RouterThuongHieu --> GiaoDienThuongHieu: Hiển thị thông báo thành công
+end
+GiaoDienThuongHieu --> Admin: Cập nhật danh sách thương hiệu
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Brands.jsx" as GiaoDienThuongHieu
+participant "brand.router.js" as RouterThuongHieu
+participant "validators" as BoKiemTraDuLieu
+participant "brand.controller.js" as DieuKhienThuongHieu
+participant "services" as DichVuThuongHieu
+
+Admin -> GiaoDienThuongHieu: Xóa thương hiệu
+GiaoDienThuongHieu -> RouterThuongHieu: Gửi request xóa thương hiệu
+RouterThuongHieu -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterThuongHieu: Trả về lỗi
+    RouterThuongHieu --> GiaoDienThuongHieu: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterThuongHieu: Dữ liệu hợp lệ
+    RouterThuongHieu -> DieuKhienThuongHieu: Chuyển tiếp request
+    DieuKhienThuongHieu -> DichVuThuongHieu: Xóa thương hiệu trong database
+    DichVuThuongHieu --> DieuKhienThuongHieu: Trả về kết quả
+    DieuKhienThuongHieu --> RouterThuongHieu: Trả về kết quả
+    RouterThuongHieu --> GiaoDienThuongHieu: Hiển thị thông báo thành công
+end
+GiaoDienThuongHieu --> Admin: Cập nhật danh sách thương hiệu
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Vouchers.jsx" as GiaoDienVoucher
+participant "voucher.router.js" as RouterVoucher
+participant "validators" as BoKiemTraDuLieu
+participant "voucher.controller.js" as DieuKhienVoucher
+participant "services" as DichVuVoucher
+
+Admin -> GiaoDienVoucher: Thêm mã giảm giá
+GiaoDienVoucher -> RouterVoucher: Gửi request thêm mã giảm giá
+RouterVoucher -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterVoucher: Trả về lỗi
+    RouterVoucher --> GiaoDienVoucher: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterVoucher: Dữ liệu hợp lệ
+    RouterVoucher -> DieuKhienVoucher: Chuyển tiếp request
+    DieuKhienVoucher -> DichVuVoucher: Thêm mã giảm giá vào database
+    DichVuVoucher --> DieuKhienVoucher: Trả về kết quả
+    DieuKhienVoucher --> RouterVoucher: Trả về kết quả
+    RouterVoucher --> GiaoDienVoucher: Hiển thị thông báo thành công
+end
+GiaoDienVoucher --> Admin: Cập nhật danh sách mã giảm giá
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Vouchers.jsx" as GiaoDienVoucher
+participant "voucher.router.js" as RouterVoucher
+participant "validators" as BoKiemTraDuLieu
+participant "voucher.controller.js" as DieuKhienVoucher
+participant "services" as DichVuVoucher
+
+Admin -> GiaoDienVoucher: Sửa mã giảm giá
+GiaoDienVoucher -> RouterVoucher: Gửi request sửa mã giảm giá
+RouterVoucher -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterVoucher: Trả về lỗi
+    RouterVoucher --> GiaoDienVoucher: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterVoucher: Dữ liệu hợp lệ
+    RouterVoucher -> DieuKhienVoucher: Chuyển tiếp request
+    DieuKhienVoucher -> DichVuVoucher: Sửa mã giảm giá trong database
+    DichVuVoucher --> DieuKhienVoucher: Trả về kết quả
+    DieuKhienVoucher --> RouterVoucher: Trả về kết quả
+    RouterVoucher --> GiaoDienVoucher: Hiển thị thông báo thành công
+end
+GiaoDienVoucher --> Admin: Cập nhật danh sách mã giảm giá
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Vouchers.jsx" as GiaoDienVoucher
+participant "voucher.router.js" as RouterVoucher
+participant "validators" as BoKiemTraDuLieu
+participant "voucher.controller.js" as DieuKhienVoucher
+participant "services" as DichVuVoucher
+
+Admin -> GiaoDienVoucher: Xóa mã giảm giá
+GiaoDienVoucher -> RouterVoucher: Gửi request xóa mã giảm giá
+RouterVoucher -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterVoucher: Trả về lỗi
+    RouterVoucher --> GiaoDienVoucher: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterVoucher: Dữ liệu hợp lệ
+    RouterVoucher -> DieuKhienVoucher: Chuyển tiếp request
+    DieuKhienVoucher -> DichVuVoucher: Xóa mã giảm giá trong database
+    DichVuVoucher --> DieuKhienVoucher: Trả về kết quả
+    DieuKhienVoucher --> RouterVoucher: Trả về kết quả
+    RouterVoucher --> GiaoDienVoucher: Hiển thị thông báo thành công
+end
+GiaoDienVoucher --> Admin: Cập nhật danh sách mã giảm giá
+@enduml
+@startuml
+actor "Quản trị viên" as Admin
+participant "Products.jsx" as GiaoDienSanPham
+participant "product.router.js" as RouterSanPham
+participant "validators" as BoKiemTraDuLieu
+participant "product.controller.js" as DieuKhienSanPham
+participant "services" as DichVuSanPham
+
+Admin -> GiaoDienSanPham: Thêm sản phẩm mới
+GiaoDienSanPham -> RouterSanPham: Gửi request thêm sản phẩm
+RouterSanPham -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterSanPham: Trả về lỗi
+    RouterSanPham --> GiaoDienSanPham: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterSanPham: Dữ liệu hợp lệ
+    RouterSanPham -> DieuKhienSanPham: Chuyển tiếp request
+    DieuKhienSanPham -> DichVuSanPham: Thêm sản phẩm vào database
+    DichVuSanPham --> DieuKhienSanPham: Trả về kết quả
+    DieuKhienSanPham --> RouterSanPham: Trả về kết quả
+    RouterSanPham --> GiaoDienSanPham: Hiển thị thông báo thành công
+end
+GiaoDienSanPham --> Admin: Cập nhật danh sách sản phẩm
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Products.jsx" as GiaoDienSanPham
+participant "product.router.js" as RouterSanPham
+participant "validators" as BoKiemTraDuLieu
+participant "product.controller.js" as DieuKhienSanPham
+participant "services" as DichVuSanPham
+
+Admin -> GiaoDienSanPham: Sửa sản phẩm
+GiaoDienSanPham -> RouterSanPham: Gửi request sửa sản phẩm
+RouterSanPham -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterSanPham: Trả về lỗi
+    RouterSanPham --> GiaoDienSanPham: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterSanPham: Dữ liệu hợp lệ
+    RouterSanPham -> DieuKhienSanPham: Chuyển tiếp request
+    DieuKhienSanPham -> DichVuSanPham: Sửa sản phẩm trong database
+    DichVuSanPham --> DieuKhienSanPham: Trả về kết quả
+    DieuKhienSanPham --> RouterSanPham: Trả về kết quả
+    RouterSanPham --> GiaoDienSanPham: Hiển thị thông báo thành công
+end
+GiaoDienSanPham --> Admin: Cập nhật danh sách sản phẩm
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Products.jsx" as GiaoDienSanPham
+participant "product.router.js" as RouterSanPham
+participant "validators" as BoKiemTraDuLieu
+participant "product.controller.js" as DieuKhienSanPham
+participant "services" as DichVuSanPham
+
+Admin -> GiaoDienSanPham: Xóa sản phẩm
+GiaoDienSanPham -> RouterSanPham: Gửi request xóa sản phẩm
+RouterSanPham -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterSanPham: Trả về lỗi
+    RouterSanPham --> GiaoDienSanPham: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterSanPham: Dữ liệu hợp lệ
+    RouterSanPham -> DieuKhienSanPham: Chuyển tiếp request
+    DieuKhienSanPham -> DichVuSanPham: Xóa sản phẩm trong database
+    DichVuSanPham --> DieuKhienSanPham: Trả về kết quả
+    DieuKhienSanPham --> RouterSanPham: Trả về kết quả
+    RouterSanPham --> GiaoDienSanPham: Hiển thị thông báo thành công
+end
+GiaoDienSanPham --> Admin: Cập nhật danh sách sản phẩm
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Payments.jsx" as GiaoDienThanhToan
+participant "payment.router.js" as RouterThanhToan
+participant "validators" as BoKiemTraDuLieu
+participant "payment.controller.js" as DieuKhienThanhToan
+participant "services" as DichVuThanhToan
+
+Admin -> GiaoDienThanhToan: Thêm phương thức thanh toán
+GiaoDienThanhToan -> RouterThanhToan: Gửi request thêm phương thức
+RouterThanhToan -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterThanhToan: Trả về lỗi
+    RouterThanhToan --> GiaoDienThanhToan: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterThanhToan: Dữ liệu hợp lệ
+    RouterThanhToan -> DieuKhienThanhToan: Chuyển tiếp request
+    DieuKhienThanhToan -> DichVuThanhToan: Thêm phương thức vào database
+    DichVuThanhToan --> DieuKhienThanhToan: Trả về kết quả
+    DieuKhienThanhToan --> RouterThanhToan: Trả về kết quả
+    RouterThanhToan --> GiaoDienThanhToan: Hiển thị thông báo thành công
+end
+GiaoDienThanhToan --> Admin: Cập nhật danh sách phương thức
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Payments.jsx" as GiaoDienThanhToan
+participant "payment.router.js" as RouterThanhToan
+participant "validators" as BoKiemTraDuLieu
+participant "payment.controller.js" as DieuKhienThanhToan
+participant "services" as DichVuThanhToan
+
+Admin -> GiaoDienThanhToan: Sửa phương thức thanh toán
+GiaoDienThanhToan -> RouterThanhToan: Gửi request sửa phương thức
+RouterThanhToan -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterThanhToan: Trả về lỗi
+    RouterThanhToan --> GiaoDienThanhToan: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterThanhToan: Dữ liệu hợp lệ
+    RouterThanhToan -> DieuKhienThanhToan: Chuyển tiếp request
+    DieuKhienThanhToan -> DichVuThanhToan: Sửa phương thức trong database
+    DichVuThanhToan --> DieuKhienThanhToan: Trả về kết quả
+    DieuKhienThanhToan --> RouterThanhToan: Trả về kết quả
+    RouterThanhToan --> GiaoDienThanhToan: Hiển thị thông báo thành công
+end
+GiaoDienThanhToan --> Admin: Cập nhật danh sách phương thức
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Payments.jsx" as GiaoDienThanhToan
+participant "payment.router.js" as RouterThanhToan
+participant "validators" as BoKiemTraDuLieu
+participant "payment.controller.js" as DieuKhienThanhToan
+participant "services" as DichVuThanhToan
+
+Admin -> GiaoDienThanhToan: Xóa phương thức thanh toán
+GiaoDienThanhToan -> RouterThanhToan: Gửi request xóa phương thức
+RouterThanhToan -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterThanhToan: Trả về lỗi
+    RouterThanhToan --> GiaoDienThanhToan: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterThanhToan: Dữ liệu hợp lệ
+    RouterThanhToan -> DieuKhienThanhToan: Chuyển tiếp request
+    DieuKhienThanhToan -> DichVuThanhToan: Xóa phương thức trong database
+    DichVuThanhToan --> DieuKhienThanhToan: Trả về kết quả
+    DieuKhienThanhToan --> RouterThanhToan: Trả về kết quả
+    RouterThanhToan --> GiaoDienThanhToan: Hiển thị thông báo thành công
+end
+GiaoDienThanhToan --> Admin: Cập nhật danh sách phương thức
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Shippings.jsx" as GiaoDienVanChuyen
+participant "shipping.router.js" as RouterVanChuyen
+participant "validators" as BoKiemTraDuLieu
+participant "shipping.controller.js" as DieuKhienVanChuyen
+participant "services" as DichVuVanChuyen
+
+Admin -> GiaoDienVanChuyen: Thêm hình thức vận chuyển
+GiaoDienVanChuyen -> RouterVanChuyen: Gửi request thêm hình thức
+RouterVanChuyen -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterVanChuyen: Trả về lỗi
+    RouterVanChuyen --> GiaoDienVanChuyen: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterVanChuyen: Dữ liệu hợp lệ
+    RouterVanChuyen -> DieuKhienVanChuyen: Chuyển tiếp request
+    DieuKhienVanChuyen -> DichVuVanChuyen: Thêm hình thức vào database
+    DichVuVanChuyen --> DieuKhienVanChuyen: Trả về kết quả
+    DieuKhienVanChuyen --> RouterVanChuyen: Trả về kết quả
+    RouterVanChuyen --> GiaoDienVanChuyen: Hiển thị thông báo thành công
+end
+GiaoDienVanChuyen --> Admin: Cập nhật danh sách hình thức
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Shippings.jsx" as GiaoDienVanChuyen
+participant "shipping.router.js" as RouterVanChuyen
+participant "validators" as BoKiemTraDuLieu
+participant "shipping.controller.js" as DieuKhienVanChuyen
+participant "services" as DichVuVanChuyen
+
+Admin -> GiaoDienVanChuyen: Sửa hình thức vận chuyển
+GiaoDienVanChuyen -> RouterVanChuyen: Gửi request sửa hình thức
+RouterVanChuyen -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterVanChuyen: Trả về lỗi
+    RouterVanChuyen --> GiaoDienVanChuyen: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterVanChuyen: Dữ liệu hợp lệ
+    RouterVanChuyen -> DieuKhienVanChuyen: Chuyển tiếp request
+    DieuKhienVanChuyen -> DichVuVanChuyen: Sửa hình thức trong database
+    DichVuVanChuyen --> DieuKhienVanChuyen: Trả về kết quả
+    DieuKhienVanChuyen --> RouterVanChuyen: Trả về kết quả
+    RouterVanChuyen --> GiaoDienVanChuyen: Hiển thị thông báo thành công
+end
+GiaoDienVanChuyen --> Admin: Cập nhật danh sách hình thức
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Shippings.jsx" as GiaoDienVanChuyen
+participant "shipping.router.js" as RouterVanChuyen
+participant "validators" as BoKiemTraDuLieu
+participant "shipping.controller.js" as DieuKhienVanChuyen
+participant "services" as DichVuVanChuyen
+
+Admin -> GiaoDienVanChuyen: Xóa hình thức vận chuyển
+GiaoDienVanChuyen -> RouterVanChuyen: Gửi request xóa hình thức
+RouterVanChuyen -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterVanChuyen: Trả về lỗi
+    RouterVanChuyen --> GiaoDienVanChuyen: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterVanChuyen: Dữ liệu hợp lệ
+    RouterVanChuyen -> DieuKhienVanChuyen: Chuyển tiếp request
+    DieuKhienVanChuyen -> DichVuVanChuyen: Xóa hình thức trong database
+    DichVuVanChuyen --> DieuKhienVanChuyen: Trả về kết quả
+    DieuKhienVanChuyen --> RouterVanChuyen: Trả về kết quả
+    RouterVanChuyen --> GiaoDienVanChuyen: Hiển thị thông báo thành công
+end
+GiaoDienVanChuyen --> Admin: Cập nhật danh sách hình thức
+@enduml
+@startuml
+actor "Quản trị viên" as Admin
+participant "Orders.jsx" as GiaoDienDonHang
+participant "order.router.js" as RouterDonHang
+participant "validators" as BoKiemTraDuLieu
+participant "order.controller.js" as DieuKhienDonHang
+participant "services" as DichVuDonHang
+
+Admin -> GiaoDienDonHang: Thêm đơn hàng mới
+GiaoDienDonHang -> RouterDonHang: Gửi request thêm đơn hàng
+RouterDonHang -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Trả về lỗi
+    RouterDonHang --> GiaoDienDonHang: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Dữ liệu hợp lệ
+    RouterDonHang -> DieuKhienDonHang: Chuyển tiếp request
+    DieuKhienDonHang -> DichVuDonHang: Thêm đơn hàng vào database
+    DichVuDonHang --> DieuKhienDonHang: Trả về kết quả
+    DieuKhienDonHang --> RouterDonHang: Trả về kết quả
+    RouterDonHang --> GiaoDienDonHang: Hiển thị thông báo thành công
+end
+GiaoDienDonHang --> Admin: Cập nhật danh sách đơn hàng
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Orders.jsx" as GiaoDienDonHang
+participant "order.router.js" as RouterDonHang
+participant "validators" as BoKiemTraDuLieu
+participant "order.controller.js" as DieuKhienDonHang
+participant "services" as DichVuDonHang
+
+Admin -> GiaoDienDonHang: Xem chi tiết đơn hàng
+GiaoDienDonHang -> RouterDonHang: Gửi request xem chi tiết
+RouterDonHang -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Trả về lỗi
+    RouterDonHang --> GiaoDienDonHang: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Dữ liệu hợp lệ
+    RouterDonHang -> DieuKhienDonHang: Chuyển tiếp request
+    DieuKhienDonHang -> DichVuDonHang: Lấy chi tiết đơn hàng từ database
+    DichVuDonHang --> DieuKhienDonHang: Trả về kết quả
+    DieuKhienDonHang --> RouterDonHang: Trả về kết quả
+    RouterDonHang --> GiaoDienDonHang: Hiển thị chi tiết đơn hàng
+end
+GiaoDienDonHang --> Admin: Hiển thị thông tin đơn hàng
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Orders.jsx" as GiaoDienDonHang
+participant "order.router.js" as RouterDonHang
+participant "validators" as BoKiemTraDuLieu
+participant "order.controller.js" as DieuKhienDonHang
+participant "services" as DichVuDonHang
+
+Admin -> GiaoDienDonHang: Duyệt đơn hàng
+GiaoDienDonHang -> RouterDonHang: Gửi request duyệt đơn hàng
+RouterDonHang -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Trả về lỗi
+    RouterDonHang --> GiaoDienDonHang: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterDonHang: Dữ liệu hợp lệ
+    RouterDonHang -> DieuKhienDonHang: Chuyển tiếp request
+    DieuKhienDonHang -> DichVuDonHang: Duyệt đơn hàng trong database
+    DichVuDonHang --> DieuKhienDonHang: Trả về kết quả
+    DieuKhienDonHang --> RouterDonHang: Trả về kết quả
+    RouterDonHang --> GiaoDienDonHang: Hiển thị thông báo thành công
+end
+GiaoDienDonHang --> Admin: Cập nhật trạng thái đơn hàng
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Accounts.jsx" as GiaoDienTaiKhoan
+participant "account.router.js" as RouterTaiKhoan
+participant "validators" as BoKiemTraDuLieu
+participant "account.controller.js" as DieuKhienTaiKhoan
+participant "services" as DichVuTaiKhoan
+
+Admin -> GiaoDienTaiKhoan: Thêm tài khoản mới
+GiaoDienTaiKhoan -> RouterTaiKhoan: Gửi request thêm tài khoản
+RouterTaiKhoan -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterTaiKhoan: Trả về lỗi
+    RouterTaiKhoan --> GiaoDienTaiKhoan: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterTaiKhoan: Dữ liệu hợp lệ
+    RouterTaiKhoan -> DieuKhienTaiKhoan: Chuyển tiếp request
+    DieuKhienTaiKhoan -> DichVuTaiKhoan: Thêm tài khoản vào database
+    DichVuTaiKhoan --> DieuKhienTaiKhoan: Trả về kết quả
+    DieuKhienTaiKhoan --> RouterTaiKhoan: Trả về kết quả
+    RouterTaiKhoan --> GiaoDienTaiKhoan: Hiển thị thông báo thành công
+end
+GiaoDienTaiKhoan --> Admin: Cập nhật danh sách tài khoản
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "Analytics.jsx" as GiaoDienBaoCao
+participant "analytics.router.js" as RouterBaoCao
+participant "validators" as BoKiemTraDuLieu
+participant "analytics.controller.js" as DieuKhienBaoCao
+participant "services" as DichVuBaoCao
+
+Admin -> GiaoDienBaoCao: Lập báo cáo doanh thu
+GiaoDienBaoCao -> RouterBaoCao: Gửi request lập báo cáo
+RouterBaoCao -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterBaoCao: Trả về lỗi
+    RouterBaoCao --> GiaoDienBaoCao: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterBaoCao: Dữ liệu hợp lệ
+    RouterBaoCao -> DieuKhienBaoCao: Chuyển tiếp request
+    DieuKhienBaoCao -> DichVuBaoCao: Lập báo cáo doanh thu từ database
+    DichVuBaoCao --> DieuKhienBaoCao: Trả về kết quả
+    DieuKhienBaoCao --> RouterBaoCao: Trả về kết quả
+    RouterBaoCao --> GiaoDienBaoCao: Hiển thị báo cáo doanh thu
+end
+GiaoDienBaoCao --> Admin: Hiển thị báo cáo
+@enduml
+
+@startuml
+actor "Quản trị viên" as Admin
+participant "ImportReceipts.jsx" as GiaoDienPhieuNhap
+participant "inventory.router.js" as RouterPhieuNhap
+participant "validators" as BoKiemTraDuLieu
+participant "inventory.controller.js" as DieuKhienPhieuNhap
+participant "services" as DichVuPhieuNhap
+
+Admin -> GiaoDienPhieuNhap: Tạo phiếu nhập kho
+GiaoDienPhieuNhap -> RouterPhieuNhap: Gửi request tạo phiếu nhập
+RouterPhieuNhap -> BoKiemTraDuLieu: Kiểm tra dữ liệu đầu vào
+alt Dữ liệu không hợp lệ
+    BoKiemTraDuLieu --> RouterPhieuNhap: Trả về lỗi
+    RouterPhieuNhap --> GiaoDienPhieuNhap: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+    BoKiemTraDuLieu --> RouterPhieuNhap: Dữ liệu hợp lệ
+    RouterPhieuNhap -> DieuKhienPhieuNhap: Chuyển tiếp request
+    DieuKhienPhieuNhap -> DichVuPhieuNhap: Tạo phiếu nhập kho trong database
+    DichVuPhieuNhap --> DieuKhienPhieuNhap: Trả về kết quả
+    DieuKhienPhieuNhap --> RouterPhieuNhap: Trả về kết quả
+    RouterPhieuNhap --> GiaoDienPhieuNhap: Hiển thị thông báo thành công
+end
+GiaoDienPhieuNhap --> Admin: Cập nhật danh sách phiếu nhập
+@enduml
+

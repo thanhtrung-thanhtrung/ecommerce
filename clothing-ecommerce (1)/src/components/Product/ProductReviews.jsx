@@ -15,44 +15,31 @@ const ProductReviews = ({ productId }) => {
   const [comment, setComment] = useState("")
 
   useEffect(() => {
-    // Simulate fetching reviews
-    setTimeout(() => {
-      const mockReviews = [
-        {
-          id: 1,
-          userId: 101,
-          userName: "Nguyễn Văn A",
-          rating: 5,
-          comment: "Sản phẩm rất tốt, đúng như mô tả. Chất lượng vải tốt, form đẹp.",
-          date: "2023-10-15T08:30:00",
-          likes: 3,
-          isVerified: true,
-        },
-        {
-          id: 2,
-          userId: 102,
-          userName: "Trần Thị B",
-          rating: 4,
-          comment: "Giày đẹp, đi vừa vặn, giao hàng nhanh. Chỉ tiếc là màu sắc hơi khác so với hình.",
-          date: "2023-10-10T14:20:00",
-          likes: 1,
-          isVerified: true,
-        },
-        {
-          id: 3,
-          userId: 103,
-          userName: "Lê Văn C",
-          rating: 3,
-          comment: "Sản phẩm tạm ổn, nhưng giao hàng hơi chậm.",
-          date: "2023-09-28T19:45:00",
-          likes: 0,
-          isVerified: false,
-        },
-      ]
-      setReviews(mockReviews)
-      setIsLoading(false)
-    }, 1000)
+    const fetchReviews = async () => {
+      setIsLoading(true)
+      try {
+        const response = await fetch(`http://localhost:5000/api/reviews?id_SanPham=${productId}`)
+        const result = await response.json()
+
+        if (result && result.success) {
+          setReviews(result.data || [])
+          // Check if user has already reviewed
+          const userReview = result.data.find(review => review.id_NguoiDung === 999) // Replace 999 with actual user ID
+          setUserReview(userReview || null)
+        } else {
+          setReviews([])
+        }
+      } catch (error) {
+        console.error("Error fetching reviews:", error)
+        setReviews([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchReviews()
   }, [productId])
+
 
   const handleSubmitReview = (e) => {
     e.preventDefault()
@@ -193,7 +180,7 @@ const ProductReviews = ({ productId }) => {
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center">
-                      <span className="font-medium text-gray-800">{review.userName}</span>
+                      <span className="font-medium text-gray-800">{review.HoTen}</span>
                       {review.isVerified && (
                         <span className="ml-2 bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded">
                           Đã mua hàng
@@ -204,15 +191,15 @@ const ProductReviews = ({ productId }) => {
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Star
                           key={star}
-                          className={`h-4 w-4 ${star <= review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
+                          className={`h-4 w-4 ${star <= review.SoSao ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
                             }`}
                         />
                       ))}
-                      <span className="ml-2 text-xs text-gray-500">{formatRelativeTime(review.date)}</span>
+                      <span className="ml-2 text-xs text-gray-500">{formatRelativeTime(review.NgayDanhGia)}</span>
                     </div>
                   </div>
                 </div>
-                <p className="mt-2 text-gray-700">{review.comment}</p>
+                <p className="mt-2 text-gray-700">{review.NoiDung}</p>
                 <div className="flex items-center mt-3 space-x-4">
                   <button
                     onClick={() => handleLikeReview(review.id)}

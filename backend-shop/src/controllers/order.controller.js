@@ -181,24 +181,34 @@ class OrderController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          message: "Dữ liệu không hợp lệ",
+          errors: errors.array(),
+        });
       }
 
       const { orderId } = req.params;
       const { status, note } = req.body;
 
+      // Status đã được validator chuyển về số
       const order = await orderService.updateOrderStatusAdmin(
         orderId,
         status,
         note
       );
+
       res.json({
+        success: true,
         message: "Cập nhật trạng thái đơn hàng thành công",
-        order,
+        data: order,
       });
     } catch (error) {
       console.error("Error updating order status:", error);
-      res.status(400).json({ message: error.message });
+      res.status(400).json({
+        success: false,
+        message: error.message || "Lỗi khi cập nhật trạng thái đơn hàng",
+      });
     }
   }
 

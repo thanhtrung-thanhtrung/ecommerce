@@ -16,6 +16,8 @@ const Shippings = () => {
   const [shippingMethods, setShippingMethods] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingMethod, setEditingMethod] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
   const [formData, setFormData] = useState({
     Ten: '',
     MoTa: '',
@@ -40,6 +42,20 @@ const Shippings = () => {
   useEffect(() => {
     loadShippingMethods();
   }, []);
+  const filterSearch = shippingMethods.filter(method =>
+    method.ThoiGianDuKien.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Reset form data
+  useEffect(() => {
+    resetForm();
+  }, [showModal]);
+
 
   // Handle form submit
   const handleSubmit = async (e) => {
@@ -132,6 +148,17 @@ const Shippings = () => {
           <p className="text-sm text-gray-600">{shippingMethods.length} phương thức</p>
         </div>
         <div className="flex space-x-2">
+          <div className="mb-2 w-full max-w-xs">
+            <input
+              type="text"
+              placeholder="Tìm kiếm tên phương thức..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+          </div>
+
+
           <button
             onClick={loadShippingMethods}
             className="bg-gray-500 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1.5 hover:bg-gray-600 text-sm"
@@ -196,7 +223,7 @@ const Shippings = () => {
                   </td>
                 </tr>
               ) : (
-                shippingMethods.map((method, index) => (
+                filterSearch.map((method, index) => (
                   <tr key={method.id} className="hover:bg-gray-50">
                     <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-500 text-center">{index + 1}</td>
                     <td className="px-3 py-2 whitespace-nowrap">

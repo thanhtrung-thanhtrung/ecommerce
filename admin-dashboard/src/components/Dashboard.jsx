@@ -8,7 +8,9 @@ import {
   FiPackage,
   FiUsers,
   FiShoppingCart,
+  FiCheckCircle, FiTruck, FiXCircle
 } from "react-icons/fi";
+
 import {
   BarChart,
   Bar,
@@ -22,6 +24,15 @@ import {
 } from "recharts";
 import { useAdmin } from "../contexts/AdminContext";
 import { toast } from "react-toastify";
+import axios from "axios";
+
+const orderStatuses = {
+  1: { key: 1, label: "Chờ xác nhận", color: "yellow", icon: FiClock },
+  2: { key: 2, label: "Đã xác nhận", color: "blue", icon: FiCheckCircle },
+  3: { key: 3, label: "Đang giao", color: "purple", icon: FiTruck },
+  4: { key: 4, label: "Đã giao", color: "green", icon: FiCheckCircle },
+  5: { key: 5, label: "Đã hủy", color: "red", icon: FiXCircle },
+};
 
 const Dashboard = () => {
   const {
@@ -49,6 +60,7 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
+      // Gọi các API
       const orderStatsResponse = await getOrderStats();
       const ordersResponse = await getOrders({ page: 1, limit: 3 });
       const productsResponse = await getProductsAdmin({ page: 1, limit: 1 });
@@ -63,81 +75,75 @@ const Dashboard = () => {
         loaiThongKe: "ngay",
       });
 
+      // Cập nhật thống kê tổng quan
+      const overview = orderStatsResponse?.overview || {};
+
       setStats({
-        totalOrders: orderStatsResponse?.totalOrders || 0,
-        totalRevenue: parseFloat(orderStatsResponse?.revenue?.total || 0),
-        totalProducts: productsResponse?.pagination?.total || 0,
-        completedOrders: orderStatsResponse?.revenue?.completedOrders || 0,
-        pendingOrders:
-          orderStatsResponse?.statusBreakdown?.find((s) => s.status === "pending")
-            ?.count || 0,
-        cancelledOrders:
-          orderStatsResponse?.statusBreakdown?.find((s) => s.status === "cancelled")
-            ?.count || 0,
+        totalOrders: parseInt(overview.totalOrders || 0),
+        totalRevenue: parseFloat(overview.totalRevenue || 0),
+        totalProducts: parseInt(productsResponse?.pagination?.total || 0),
+        completedOrders: parseInt(overview.deliveredOrders || 0),
+        pendingOrders: parseInt(overview.pendingOrders || 0),
+        cancelledOrders: parseInt(overview.cancelledOrders || 0),
       });
 
+      // Đơn hàng gần đây
       setRecentOrders(ordersResponse?.orders?.slice(0, 3) || []);
 
-      if (revenueResponse?.success && revenueResponse?.data?.doanhThuTheoThoiGian && revenueResponse.data.doanhThuTheoThoiGian.length > 0) {
+      // Doanh thu theo ngày
+      if (
+        revenueResponse?.success &&
+        Array.isArray(revenueResponse?.data?.doanhThuTheoThoiGian)
+      ) {
         const formattedChartData = revenueResponse.data.doanhThuTheoThoiGian.map((item, index) => {
           let dayLabel = `Ngày ${index + 1}`;
           try {
-            if (item.ngay && item.ngay !== 'Invalid Date') {
-              const date = new Date(item.ngay);
+            if (item.thoiGian) {
+              const date = new Date(item.thoiGian);
               if (!isNaN(date.getTime())) {
                 dayLabel = date.toLocaleDateString("vi-VN", { weekday: "short" });
               }
             }
-          } catch (error) {
-            console.error("Error parsing date:", item.ngay, error);
+          } catch {
+            // fallback giữ lại label
           }
 
           return {
             day: dayLabel,
-            revenue: Math.round(parseFloat(item.tongThanhToan || 0) / 1000000000),
+            revenue: Math.round(parseFloat(item.tongThanhToan || 0) / 1_000_000_000), // tỷ VNĐ
             orders: parseInt(item.soDonHang || 0),
           };
         });
+
         setChartData(formattedChartData);
       } else {
-        const mockChartData = [
-          { day: "T2", revenue: 15 },
-          { day: "T3", revenue: 25 },
-          { day: "T4", revenue: 18 },
-          { day: "T5", revenue: 32 },
-          { day: "T6", revenue: 28 },
-          { day: "T7", revenue: 45 },
-          { day: "CN", revenue: 38 },
-        ];
-        setChartData(mockChartData);
+        setChartData([]);
       }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       toast.error("Lỗi khi tải dữ liệu dashboard");
-
+      const statusInfo = orderStatuses[order.TrangThai] || orderStatuses[1];
+      <span
+        className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-${statusInfo.color}-100 text-${statusInfo.color}-800`}
+      >
+        {statusInfo.label}
+      </span>
+      // fallback
       setStats({
-        totalOrders: 145,
-        totalRevenue: 25000000,
-        totalProducts: 89,
-        completedOrders: 132,
-        pendingOrders: 8,
-        cancelledOrders: 5,
+        totalOrders: 0,
+        totalRevenue: 0,
+        totalProducts: 0,
+        completedOrders: 0,
+        pendingOrders: 0,
+        cancelledOrders: 0,
       });
 
-      const mockChartData = [
-        { day: "T2", revenue: 15 },
-        { day: "T3", revenue: 25 },
-        { day: "T4", revenue: 18 },
-        { day: "T5", revenue: 32 },
-        { day: "T6", revenue: 28 },
-        { day: "T7", revenue: 45 },
-        { day: "CN", revenue: 38 },
-      ];
-      setChartData(mockChartData);
+      setChartData([]);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     loadDashboardData();
@@ -184,6 +190,58 @@ const Dashboard = () => {
       bgColor: "bg-emerald-50",
     },
   ];
+
+  const OrderList = () => {
+    const [orders, setOrders] = useState([]);
+
+    useEffect(() => {
+      const fetchOrders = async () => {
+        try {
+          const response = await axios.get("/api/orders");
+          if (response?.data?.success) {
+            setOrders(response.data.data);
+          }
+        } catch (error) {
+          console.error("Lỗi khi lấy danh sách đơn hàng:", error);
+        }
+      };
+
+      fetchOrders();
+    }, []);
+
+    return (
+      <div className="p-6">
+        <h2 className="text-xl font-bold mb-4">Danh sách đơn hàng</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {orders.map((order) => {
+            const status = orderStatuses[order.TrangThai];
+            const StatusIcon = status?.icon || FiClock;
+
+            return (
+              <div
+                key={order.id}
+                className="border rounded-xl shadow-md p-4 bg-white"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-lg font-semibold">
+                    Mã đơn: #{order.id}
+                  </h3>
+                  <div
+                    className={`flex items-center gap-2 text-${status.color}-600`}
+                  >
+                    <StatusIcon className="w-5 h-5" />
+                    <span className="font-medium">{status.label}</span>
+                  </div>
+                </div>
+                <p>Ngày đặt: {new Date(order.NgayDat).toLocaleDateString()}</p>
+                <p>Tổng tiền: {order.TongTien?.toLocaleString()}₫</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="p-4">
@@ -301,27 +359,17 @@ const Dashboard = () => {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-semibold text-green-600">
-                      {formatCurrency(order.total)}
-                    </p>
-                    <span
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${order.status === "completed"
-                        ? "bg-green-100 text-green-800"
-                        : order.status === "pending"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : order.status === "cancelled"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-blue-100 text-blue-800"
-                        }`}
-                    >
-                      {order.status === "completed"
-                        ? "Hoàn thành"
-                        : order.status === "pending"
-                          ? "Chờ xử lý"
-                          : order.status === "cancelled"
-                            ? "Đã hủy"
-                            : "Đang xử lý"}
-                    </span>
+                    {/* Sửa trạng thái dùng order.TrangThai và mapping qua orderStatuses */}
+                    {(() => {
+                      const statusInfo = orderStatuses[order.TrangThai] || orderStatuses[1];
+                      return (
+                        <span
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-${statusInfo.color}-100 text-${statusInfo.color}-800`}
+                        >
+                          {statusInfo.label}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               ))
@@ -409,6 +457,9 @@ const Dashboard = () => {
           <p className="text-xs text-gray-600">Mã giảm giá</p>
         </button>
       </div>
+
+      {/* Order List Component - Uncomment to use */}
+      {/* <OrderList /> */}
     </div>
   );
 };

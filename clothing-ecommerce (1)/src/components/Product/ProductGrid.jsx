@@ -6,14 +6,35 @@ import { useShop } from "../../contexts/ShopContext";
 import { useCartContext } from "../../contexts/CartContext";
 import { formatCurrency } from "../../utils/helpers";
 import { toast } from "react-toastify";
+import { useEffect, useState, useCallback } from "react";
 
 const ProductGrid = ({ products }) => {
-  const { isAuthenticated, addToWishlist, removeFromWishlist, wishlistItems = [] } = useShop();
+  const { isAuthenticated, addToWishlist, removeFromWishlist, wishlistItems } = useShop();
 
-  // Use CartContext for cart operations
+  const [wishlistStats, setWishlistStats] = useState([]);
   const { addToCart } = useCartContext();
 
-  // Helper function to parse and get main image from HinhAnh JSON
+
+
+  const showWishlist = useCallback(async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/wishlists/show");
+      const result = await response.json();
+
+      if (result && result.success) {
+        setWishlistStats(result.data || []);
+      } else {
+        setWishlistStats([]);
+      }
+    } catch (error) {
+      console.error("Lỗi khi gọi API wishlist:", error);
+      setWishlistStats([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    showWishlist();
+  }, [showWishlist]);
   const getProductImage = (product) => {
     try {
       // Ưu tiên sử dụng images đã được parse từ ShopContext
@@ -172,10 +193,18 @@ const ProductGrid = ({ products }) => {
                     isInWishlist ? "Xóa khỏi yêu thích" : "Thêm vào yêu thích"
                   }
                 >
-                  <Heart
-                    className={`h-4 w-4 ${isInWishlist ? "fill-red-500 text-red-500" : ""
-                      }`}
-                  />
+                  <div className="flex items-center space-x-1">
+                    <Heart
+                      className={`h-4 w-4 ${isInWishlist ? "fill-red-500 text-red-500" : ""}`}
+                    />
+                    <span className="text-xs text-gray-500">
+                      {
+                        wishlistStats.find((item) => item.id_SanPham === product.id)
+                          ?.so_luot_yeu_thich || 0
+                      }
+                    </span>
+                  </div>
+
                 </button>
               </div>
             </div>

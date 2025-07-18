@@ -679,6 +679,48 @@ export const ShopProvider = ({ children }) => {
         }
     }, [apiCall]);
 
+
+    const showWishlist = useCallback(async () => {
+        const response = await apiCall("/api/wishlists/show");
+        if (response && response.success) {
+            setWishlist(response.data || []);
+            return response.data || [];
+        } else {
+            setWishlist([]);
+
+            return [];
+        }
+    }, [apiCall]);
+    const getReview = useCallback(async (productId) => {
+        try {
+            setLoading(true);
+            const response = await apiCall(`/api/reviews?productId=${productId}`);
+            if (response && Array.isArray(response)) {
+
+                return response.map(review => ({
+                    id: review.id,
+                    id_SanPham: review.id_SanPham,
+
+                    id_NguoiDung: review.id_NguoiDung,
+                    NoiDung: review.NoiDung,
+                    SoSao: review.SoSao,
+                    TrangThai: review.TrangThai,
+                    NgayDanhGia: review.NgayDanhGia,
+                }));
+            } else {
+                return [];
+
+            }
+        } catch (error) {
+            console.error("Error fetching reviews:", error);
+
+            return [];
+        } finally {
+            setLoading(false);
+        }
+    }, [apiCall]);
+
+
     // ================= CANCEL ORDER =================
     const cancelOrder = useCallback(async (orderId, reason = "Khách hàng yêu cầu hủy") => {
         try {
@@ -806,38 +848,24 @@ export const ShopProvider = ({ children }) => {
         // Category functions
         fetchCategories,
         getCategoryById,
-
-        // Brand functions
         fetchBrands,
         getBrandById,
-
-        // Order functions
         fetchOrders,
-
-        // Wishlist functions
         addToWishlist,
         removeFromWishlist,
         fetchWishlist,
-        wishlistItems: wishlist, // Alias for compatibility
-
-        // User profile/account
+        wishlistItems: wishlist,
         getProfile,
         refreshUser,
         updateProfile,
         changePassword,
-        // Orders
-        fetchUserOrders,
         cancelOrder,
-        // Wishlist
         clearWishlist,
-
-        // UI functions
         toggleMobileMenu,
         closeMobileMenu,
-
-        // Helper functions
         parseProductImages,
         parseThongSoKyThuat,
+        getReview
     };
 
     return (

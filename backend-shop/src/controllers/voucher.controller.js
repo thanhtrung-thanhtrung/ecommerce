@@ -38,11 +38,18 @@ class VoucherController {
         maVoucher,
         TrangThai
       );
-      res.status(200).json(result);
+      return res.status(200).json({
+        success: true,
+        message: "Cập nhật trạng thái voucher thành công",
+        data: result,
+      }); 
     } catch (error) {
-      next(error);
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Có lỗi xảy ra khi cập nhật trạng thái voucher",
+      });
     }
-  }
+  } 
 
   async timKiemVoucher(req, res, next) {
     try {

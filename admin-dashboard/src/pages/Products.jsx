@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiImage, FiUpload, FiRefreshCw, FiSave, FiX } from "react-icons/fi"
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiImage, FiUpload, FiRefreshCw, FiSave, FiX, FiEye } from "react-icons/fi"
 import { toast } from "react-toastify"
 import { useAdmin } from "../contexts/AdminContext"
 
@@ -26,6 +26,10 @@ const Products = () => {
   const [colors, setColors] = useState([])
   const [sizes, setSizes] = useState([])
   const [showModal, setShowModal] = useState(false)
+  const [showVariantsModal, setShowVariantsModal] = useState(false)
+  const [selectedProductVariants, setSelectedProductVariants] = useState([])
+  const [loadingVariants, setLoadingVariants] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState(null)
   const [editingProduct, setEditingProduct] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -52,10 +56,8 @@ const Products = () => {
     },
   })
 
-  // Product variants - mặc định số lượng = 0 khi thêm mới
   const [variants, setVariants] = useState([{ id_KichCo: "", id_MauSac: "", MaSanPham: "", SoLuong: 0 }])
 
-  // Images
   const [selectedImages, setSelectedImages] = useState({
     anhChinh: null,
     anhPhu: [],
@@ -66,7 +68,6 @@ const Products = () => {
     anhPhu: [],
   })
 
-  // Load data functions
   useEffect(() => {
     loadInitialData()
   }, [])
@@ -82,6 +83,48 @@ const Products = () => {
       console.error("Error loading initial data:", error)
     }
   }
+
+  const handleView = (product) => {
+    setSelectedProduct(product);
+    setShowModal(true);
+  };
+
+  // Handle view product variants
+  const handleViewVariants = async (productId) => {
+    setLoadingVariants(true);
+    setShowVariantsModal(true);
+
+    try {
+      const variantsData = await getProductVariants(productId);
+      console.log("Variants data received:", variantsData); // Debug log
+
+      // Xử lý dữ liệu dựa trên cấu trúc response thực tế
+      let variants = [];
+
+      if (Array.isArray(variantsData)) {
+        // API trả về array trực tiếp
+        variants = variantsData;
+      } else if (variantsData?.data && Array.isArray(variantsData.data)) {
+        // API trả về object wrapper với data property
+        variants = variantsData.data;
+      } else if (variantsData?.success && Array.isArray(variantsData.data)) {
+        // API trả về object với success flag
+        variants = variantsData.data;
+      } else {
+        // Fallback: nếu không phải array, coi như không có dữ liệu
+        variants = [];
+      }
+
+      console.log("Processed variants:", variants); // Debug log
+      setSelectedProductVariants(variants);
+    } catch (error) {
+      console.error("Error loading product variants:", error);
+      toast.error("Lỗi khi tải biến thể sản phẩm: " + error.message);
+      setSelectedProductVariants([]);
+    } finally {
+      setLoadingVariants(false);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -176,7 +219,6 @@ const Products = () => {
     }
   };
 
-  // Form handlers
   const handleInputChange = (field, value) => {
     if (field.includes(".")) {
       const [parent, child] = field.split(".")
@@ -194,7 +236,6 @@ const Products = () => {
   }
 
   const addVariant = () => {
-    // Khi thêm variant mới, mặc định số lượng = 0
     setVariants((prev) => [...prev, { id_KichCo: "", id_MauSac: "", MaSanPham: "", SoLuong: 0 }])
   }
 
@@ -226,12 +267,9 @@ const Products = () => {
     }))
   }
 
-  // Validation
-  // Validation nghiệp vụ
   const validateForm = () => {
     const errors = []
 
-    // Validation cơ bản
     if (!formData.Ten?.trim()) errors.push("Tên sản phẩm không được để trống")
     if (!formData.MoTa?.trim()) errors.push("Mô tả không được để trống")
     if (!formData.Gia || Number.parseFloat(formData.Gia) <= 0) errors.push("Giá bán phải lớn hơn 0")
@@ -240,7 +278,6 @@ const Products = () => {
     if (!formData.id_NhaCungCap) errors.push("Vui lòng chọn nhà cung cấp")
     if (!selectedImages.anhChinh && !editingProduct) errors.push("Vui lòng chọn ảnh chính")
 
-    // Validation nghiệp vụ - Giá khuyến mãi
     const giaGoc = Number.parseFloat(formData.Gia) || 0
     const giaKhuyenMai = Number.parseFloat(formData.GiaKhuyenMai) || 0
 
@@ -249,7 +286,6 @@ const Products = () => {
         errors.push("Giá khuyến mãi phải nhỏ hơn giá gốc")
       }
 
-      // Kiểm tra tỷ lệ giảm giá hợp lý (không quá 70%)
       const tiLeGiam = ((giaGoc - giaKhuyenMai) / giaGoc) * 100
       if (tiLeGiam > 70) {
         errors.push("Tỷ lệ giảm giá không được vượt quá 70%")
@@ -260,13 +296,11 @@ const Products = () => {
       }
     }
 
-    // Validation variants
     const validVariants = variants.filter((v) => v.id_KichCo && v.id_MauSac && v.MaSanPham?.trim())
     if (validVariants.length === 0) {
       errors.push("Phải có ít nhất một biến thể hợp lệ")
     }
 
-    // Kiểm tra trùng lặp mã sản phẩm trong variants
     const maSanPhamSet = new Set()
     const duplicateCodes = []
     validVariants.forEach((variant, index) => {
@@ -284,7 +318,6 @@ const Products = () => {
       errors.push(`Mã sản phẩm bị trùng lặp: ${duplicateCodes.join(", ")}`)
     }
 
-    // Kiểm tra trùng lặp size-màu trong variants
     const sizeColorSet = new Set()
     const duplicateSizeColor = []
     validVariants.forEach((variant, index) => {
@@ -302,33 +335,27 @@ const Products = () => {
       errors.push(`Kết hợp size-màu bị trùng lặp: ${duplicateSizeColor.join(", ")}`)
     }
 
-    // Validation mã sản phẩm format
     validVariants.forEach((variant, index) => {
       const maSP = variant.MaSanPham?.trim()
       if (maSP) {
-        // Kiểm tra format: chỉ chứa chữ in hoa, số và dấu gạch ngang
         if (!/^[A-Z0-9\-]+$/.test(maSP)) {
           errors.push(`Mã sản phẩm biến thể ${index + 1}: chỉ được chứa chữ in hoa, số và dấu gạch ngang`)
         }
 
-        // Kiểm tra độ dài
         if (maSP.length < 3 || maSP.length > 20) {
           errors.push(`Mã sản phẩm biến thể ${index + 1}: phải từ 3-20 ký tự`)
         }
 
-        // Kiểm tra không được bắt đầu hoặc kết thúc bằng dấu gạch ngang
         if (maSP.startsWith('-') || maSP.endsWith('-')) {
           errors.push(`Mã sản phẩm biến thể ${index + 1}: không được bắt đầu/kết thúc bằng dấu gạch ngang`)
         }
 
-        // Kiểm tra không được có nhiều dấu gạch ngang liên tiếp
         if (maSP.includes('--')) {
           errors.push(`Mã sản phẩm biến thể ${index + 1}: không được có dấu gạch ngang liên tiếp`)
         }
       }
     })
 
-    // Validation thông số kỹ thuật
     const { ChatLieu, KieuGiay, XuatXu } = formData.ThongSoKyThuat
     if (ChatLieu && ChatLieu.length > 100) {
       errors.push("Chất liệu không được vượt quá 100 ký tự")
@@ -340,7 +367,6 @@ const Products = () => {
       errors.push("Xuất xứ không được vượt quá 100 ký tự")
     }
 
-    // Validation tên sản phẩm
     if (formData.Ten?.trim().length < 3) {
       errors.push("Tên sản phẩm phải có ít nhất 3 ký tự")
     }
@@ -348,7 +374,6 @@ const Products = () => {
       errors.push("Tên sản phẩm không được vượt quá 255 ký tự")
     }
 
-    // Validation mô tả
     if (formData.MoTa?.trim().length < 10) {
       errors.push("Mô tả phải có ít nhất 10 ký tự")
     }
@@ -356,12 +381,10 @@ const Products = () => {
       errors.push("Mô tả không được vượt quá 1000 ký tự")
     }
 
-    // Validation mô tả chi tiết
     if (formData.MoTaChiTiet?.trim() && formData.MoTaChiTiet.trim().length > 5000) {
       errors.push("Mô tả chi tiết không được vượt quá 5000 ký tự")
     }
 
-    // Validation giá - kiểm tra giá hợp lý
     if (giaGoc > 0) {
       if (giaGoc < 1000) {
         errors.push("Giá sản phẩm tối thiểu là 1,000 VNĐ")
@@ -371,7 +394,6 @@ const Products = () => {
       }
     }
 
-    // Validation số lượng variants hợp lý
     if (validVariants.length > 50) {
       errors.push("Số lượng biến thể không được vượt quá 50")
     }
@@ -379,7 +401,6 @@ const Products = () => {
     return errors
   }
 
-  // Submit form
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -393,7 +414,6 @@ const Products = () => {
     try {
       const formDataToSend = new FormData()
 
-      // Basic info
       formDataToSend.append("Ten", formData.Ten.trim())
       formDataToSend.append("MoTa", formData.MoTa.trim())
       formDataToSend.append("MoTaChiTiet", formData.MoTaChiTiet?.trim() || "")
@@ -407,30 +427,25 @@ const Products = () => {
       formDataToSend.append("id_ThuongHieu", Number.parseInt(formData.id_ThuongHieu).toString())
       formDataToSend.append("id_NhaCungCap", Number.parseInt(formData.id_NhaCungCap).toString())
 
-      // Process variants - đảm bảo có ít nhất một variant hợp lệ
       const processedVariants = variants
         .filter((v) => v.id_KichCo && v.id_MauSac && v.MaSanPham?.trim())
         .map((variant) => ({
-          ...(variant.id && { id: variant.id }), // Chỉ thêm id nếu đang edit
+          ...(variant.id && { id: variant.id }),
           id_KichCo: Number.parseInt(variant.id_KichCo),
           id_MauSac: Number.parseInt(variant.id_MauSac),
           MaSanPham: variant.MaSanPham.trim().toUpperCase(),
-          SoLuong: editingProduct ? Number.parseInt(variant.SoLuong) || 0 : 0, // Khi thêm mới = 0, khi sửa = giá trị hiện tại
+          SoLuong: editingProduct ? Number.parseInt(variant.SoLuong) || 0 : 0,
         }))
 
-      // Kiểm tra lại số lượng variants sau khi filter
       if (processedVariants.length === 0) {
         toast.error("Phải có ít nhất một biến thể hợp lệ (có đủ size, màu và mã sản phẩm)")
         return
       }
 
-      // Log để debug
       console.log("Processed variants:", processedVariants)
 
-      // Append variants as JSON string
       formDataToSend.append("bienThe", JSON.stringify(processedVariants))
 
-      // Images
       if (selectedImages.anhChinh) {
         formDataToSend.append("anhChinh", selectedImages.anhChinh)
       }
@@ -438,13 +453,11 @@ const Products = () => {
         formDataToSend.append("anhPhu", file)
       })
 
-      // Log FormData để debug
       console.log("FormData entries:")
       for (let [key, value] of formDataToSend.entries()) {
         console.log(key, value)
       }
 
-      // API call
       if (editingProduct) {
         await updateProduct(editingProduct.id, formDataToSend)
         toast.success("Cập nhật sản phẩm thành công!")
@@ -495,9 +508,7 @@ const Products = () => {
       id_NhaCungCap: product.id_NhaCungCap?.toString() || "",
     })
 
-    // Load existing variants với số lượng hiện tại từ kho
     try {
-      // Nếu có getProductVariants thì dùng để lấy số lượng chính xác từ kho
       let productVariants = product.bienThe || []
 
       if (getProductVariants && product.id) {
@@ -506,7 +517,6 @@ const Products = () => {
           productVariants = variantsData?.data || variantsData || product.bienThe || []
         } catch (error) {
           console.error("Error loading product variants:", error)
-          // Fallback to product.bienThe if API call fails
         }
       }
 
@@ -517,7 +527,7 @@ const Products = () => {
             id_KichCo: bt.id_KichCo?.toString() || "",
             id_MauSac: bt.id_MauSac?.toString() || "",
             MaSanPham: bt.MaSanPham || "",
-            SoLuong: bt.SoLuong || 0, // Số lượng hiện tại trong kho
+            SoLuong: bt.SoLuong || 0,
             TenMauSac: bt.TenMauSac || "",
             TenKichCo: bt.TenKichCo || "",
           })),
@@ -548,6 +558,37 @@ const Products = () => {
     setSelectedImages({ anhChinh: null, anhPhu: [] })
     setShowModal(true)
   }
+  const loadVariantsByProductId = async (productId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/products/admin/${productId}/variants`);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+      const data = await res.json(); // vì response là JSON array
+
+      if (Array.isArray(data)) {
+        setVariants(
+          data.map((bt) => ({
+            id: bt.id || null,
+            id_KichCo: bt.id_KichCo?.toString() || "",
+            id_MauSac: bt.id_MauSac?.toString() || "",
+            MaSanPham: bt.MaSanPham || "",
+            SoLuong: bt.SoLuong || 0, // nếu không có thì mặc định 0
+            TenMauSac: bt.tenMauSac || "",
+            TenKichCo: bt.tenKichCo || "",
+          }))
+        );
+      } else {
+        setVariants([]);
+      }
+    } catch (error) {
+      console.error("Lỗi khi fetch biến thể sản phẩm:", error);
+      setVariants([]);
+    }
+  };
+
+
+
+
 
   const handleDelete = async (id) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) {
@@ -575,7 +616,6 @@ const Products = () => {
       ThongSoKyThuat: { ChatLieu: "", KieuGiay: "", XuatXu: "" },
     })
     setEditingProduct(null)
-    // Reset variants với số lượng mặc định = 0 cho thêm mới
     setVariants([{ id_KichCo: "", id_MauSac: "", MaSanPham: "", SoLuong: 0 }])
     setSelectedImages({ anhChinh: null, anhPhu: [] })
     setExistingImages({ anhChinh: null, anhPhu: [] })
@@ -618,7 +658,6 @@ const Products = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-2">
       <div className="max-w-7xl mx-auto">
-        {/* Compact Header */}
         <div className="bg-white rounded-lg shadow-sm p-3 mb-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
@@ -777,12 +816,74 @@ const Products = () => {
                           >
                             <FiTrash2 className="w-3.5 h-3.5" />
                           </button>
+
+
+                          <button
+                            onClick={() => handleViewVariants(product.id)}
+                            className="text-green-600 hover:text-green-800 p-1.5 rounded-lg hover:bg-green-50 transition-colors inline-flex items-center"
+                            title="Xem biến thể sản phẩm"
+                          >
+                            <FiEye className="w-3.5 h-3.5" />
+                          </button>
+
+                          <tr key={product.id}>
+
+
+
+
+
+                          </tr>
+
+
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          {showModal && selectedProduct && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+              <div className="bg-white w-full max-w-3xl rounded-lg p-6 shadow-lg overflow-y-auto max-h-[90vh] relative">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
+                >
+                  &times;
+                </button>
+                <h2 className="text-xl font-bold mb-4">Chỉnh sửa sản phẩm</h2>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium">Tên sản phẩm</label>
+                    <input
+                      className="w-full border rounded px-3 py-2"
+                      value={selectedProduct.Ten || ""}
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium">Giá bán</label>
+                    <input
+                      className="w-full border rounded px-3 py-2"
+                      value={selectedProduct.Gia || ""}
+                      readOnly
+                    />
+                  </div>
+
+                  {/* Các trường khác tương tự */}
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium">Mô tả chi tiết</label>
+                    <textarea
+                      className="w-full border rounded px-3 py-2"
+                      rows={4}
+                      value={selectedProduct.MoTaChiTiet || ""}
+                      readOnly
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1129,8 +1230,8 @@ const Products = () => {
                             />
                           </div>
 
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                          {/* <div>
+                            <label className="hiden block text-xs font-medium text-gray-700 mb-1">
                               Số lượng {editingProduct && "(Hiện tại trong kho)"}
 
                             </label>
@@ -1141,31 +1242,21 @@ const Products = () => {
                               min="0"
                               className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 ${editingProduct ? "bg-gray-100 cursor-not-allowed" : ""
                                 }`}
-                              placeholder="0"
+                              placeholder=""
                               readOnly={editingProduct} // Không cho phép sửa số lượng khi edit
                               disabled={editingProduct}
                             />
-                          </div>
+                          </div> */}
                         </div>
 
-                        {/* Hiển thị thông tin hiện có nếu đang edit */}
-                        {editingProduct && variant.id && (
-                          <div className="mt-2 text-xs text-gray-500 bg-blue-50 p-3 rounded-lg">
-                            <span className="font-medium">Hiện có:</span> {variant.TenMauSac} - Size {variant.TenKichCo}{" "}
-                            - Mã: {variant.MaSanPham} - Tồn kho: {variant.SoLuong}
-                            <div className="mt-1 text-orange-600 font-medium">
-                              * Số lượng tồn kho không thể chỉnh sửa ở đây
-                            </div>
-                          </div>
-                        )}
 
                         {/* Hiển thị thông báo cho variant mới khi thêm sản phẩm */}
-                        {!editingProduct && (
+                        {/* {!editingProduct && (
                           <div className="mt-2 text-xs text-gray-500 bg-green-50 p-3 rounded-lg">
                             <span className="font-medium">Lưu ý:</span> Số lượng mặc định sẽ được đặt là 0 khi tạo sản
                             phẩm mới
                           </div>
-                        )}
+                        )} */}
                       </div>
                     ))}
                   </div>
@@ -1351,6 +1442,71 @@ const Products = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal hiển thị chi tiết biến thể sản phẩm */}
+        {showVariantsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-900">
+                  Chi tiết biến thể sản phẩm
+                </h2>
+                <button
+                  onClick={() => setShowVariantsModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <FiX className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4">
+                {loadingVariants ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-2 text-gray-600">Đang tải biến thể...</span>
+                  </div>
+                ) : selectedProductVariants.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FiImage className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Không có biến thể</h3>
+                    <p className="text-sm text-gray-500">Sản phẩm này chưa có biến thể nào</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-sm text-gray-600 mb-2">
+                      Tổng: <span className="font-medium">{selectedProductVariants.length}</span> biến thể
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full table-auto border border-gray-200 text-sm">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border px-3 py-2 text-left">ID</th>
+                            <th className="border px-3 py-2 text-left">Kích cỡ</th>
+                            <th className="border px-3 py-2 text-left">Màu sắc</th>
+                            <th className="border px-3 py-2 text-left">Mã sản phẩm</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedProductVariants.map((variant, index) => (
+                            <tr key={variant.id || index} className="hover:bg-gray-50">
+                              <td className="border px-3 py-2">#{variant.id || 'N/A'}</td>
+                              <td className="border px-3 py-2">{variant.tenKichCo || 'N/A'}</td>
+                              <td className="border px-3 py-2">{variant.tenMauSac || 'N/A'}</td>
+                              <td className="border px-3 py-2">{variant.MaSanPham || 'N/A'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+
             </div>
           </div>
         )}

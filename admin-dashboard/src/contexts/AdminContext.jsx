@@ -418,7 +418,6 @@ export const AdminProvider = ({ children }) => {
     });
   };
 
-  // Lấy biến thể sản phẩm cho trang admin
   const getProductVariants = async (productId) => {
     return await apiCall(`/api/products/admin/${productId}/variants`);
 

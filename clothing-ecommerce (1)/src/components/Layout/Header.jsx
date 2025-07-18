@@ -38,7 +38,6 @@ const Header = () => {
     setSearchHistory(history.slice(0, 5)); // Limit to 5 recent searches
   }, []);
 
-  // Popular search terms (could be fetched from API)
   const popularSearches = [
     "Nike Air Force 1",
     "Adidas Stan Smith",
@@ -47,7 +46,6 @@ const Header = () => {
     "Puma Suede",
   ];
 
-  // Debounce search suggestions
   useEffect(() => {
     if (searchQuery.trim().length > 2) {
       const timeoutId = setTimeout(() => {
@@ -59,12 +57,11 @@ const Header = () => {
     } else {
       clearSearchSuggestions();
       if (isSearchFocused) {
-        setShowSuggestions(true); // Show history and popular searches when focused
+        setShowSuggestions(true);
       }
     }
   }, [searchQuery, getSearchSuggestions, clearSearchSuggestions, isSearchFocused]);
 
-  // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -173,7 +170,7 @@ const Header = () => {
           </Link>
 
           {/* Enhanced Search bar - Desktop */}
-          <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
+          <div className="hidden md:flex flex-1 max-w-lg mx-4 relative"> {/* max-w-lg để search bar ngắn lại */}
             <form onSubmit={handleSearch} className="w-full">
               <div className="relative" ref={searchRef}>
                 <div
@@ -189,7 +186,7 @@ const Header = () => {
                     value={searchQuery}
                     onChange={(e) => setLocalSearchQuery(e.target.value)}
                     onFocus={handleSearchFocus}
-                    className="w-full pl-10 pr-12 py-3 rounded-lg focus:outline-none bg-transparent"
+                    className="w-full pl-10 pr-12 py-2 rounded-lg focus:outline-none bg-transparent text-sm" // py-2 và text-sm cho input thấp hơn
                   />
                   {searchQuery && (
                     <button
@@ -202,7 +199,7 @@ const Header = () => {
                   )}
                   <button
                     type="submit"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors"
                   >
                     <Search className="h-4 w-4" />
                   </button>
@@ -710,3 +707,4 @@ const Header = () => {
 };
 
 export default Header;
+// {categories.filter(brands => brands.TrangThai === 1).slice(0, 8).map((category) => (

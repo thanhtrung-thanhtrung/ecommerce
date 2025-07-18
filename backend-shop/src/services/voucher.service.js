@@ -72,7 +72,7 @@ class VoucherService {
       throw new Error("Không tìm thấy voucher");
     }
 
-    return { Ma: maVoucher, TrangThai: trangThai };
+    return { maVoucher, TrangThai: trangThai };
   }
 
   // Lấy chi tiết voucher

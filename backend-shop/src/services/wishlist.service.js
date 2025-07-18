@@ -276,6 +276,18 @@ class WishlistService {
       })),
     };
   }
-}
+  async hienThiWishlist() {
+    const [wishlist] = await db.execute(
+      `SELECT id_SanPham, COUNT(*) AS so_luot_yeu_thich
+FROM wishlist
+GROUP BY id_SanPham;
+ `
+    )
+    return  wishlist.map(item => ({
+    id_SanPham: item.id_SanPham,
+    so_luot_yeu_thich: item.so_luot_yeu_thich
+  }));
 
+}
+}
 module.exports = new WishlistService();

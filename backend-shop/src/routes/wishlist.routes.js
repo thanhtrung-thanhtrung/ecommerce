@@ -20,6 +20,7 @@ router.get(
   checkMultipleProductsValidator,
   WishlistController.kiemTraNhieuSanPham
 );
+router.get("/show", WishlistController.hienThiWishlist);
 
 // Thống kê wishlist (admin only)
 router.get("/statistics", WishlistController.thongKeWishlist);

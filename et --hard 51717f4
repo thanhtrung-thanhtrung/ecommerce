@@ -1,0 +1,25 @@
+[33mf61b174[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m lan1
+[33m2dac991[m mua ha
+[33mfe7afac[m mua xua
+[33m51717f4[m deploy 1
+[33m6231d32[m Update backend URL and add authentication header
+[33m383c7a9[m Update backend URL for production
+[33m7d067ba[m Fix suppliers import case sensitivity
+[33m127c2a3[m deploy
+[33m484b213[m phieu nhap
+[33meb7e7f2[m lan12
+[33m39dc40e[m lanthu11
+[33m05fd5d3[m lanthu9
+[33ma19f451[m lan9
+[33mbbfccc2[m lan8
+[33m1567e32[m lan8
+[33macdb71b[m lanthu7
+[33mf23b807[m lan 6
+[33m7dd2cc4[m lan 5
+[33m6cb6b10[m 'lan4'
+[33mc1b8550[m Merge pull request #1 from thanhtrung-thanhtrung/mastera
+[33mf11200d[m[33m ([m[1;31morigin/master[m[33m)[m lan 3
+[33me53b9dc[m 'lan2'
+[33mb16ac0e[m lan 2
+[33m1e1f22d[m lan 2
+[33m219b30c[m Initial commit: E-commerce project with frontend and backend

@@ -305,3 +305,4 @@ class ShippingService {
 }
 
 module.exports = new ShippingService();
+

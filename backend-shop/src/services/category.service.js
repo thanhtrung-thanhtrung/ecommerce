@@ -154,8 +154,8 @@ class CategoryService {
   //   const [categories] = await db.execute(query, params);
   //   return categories;
   // }
-    async layDanhSachDanhMuc(filters = {}) {
-      const baseQuery = `
+  async layDanhSachDanhMuc(filters = {}) {
+    const baseQuery = `
         SELECT dm.*, 
           COUNT(DISTINCT sp.id) as soSanPham,
           COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
@@ -164,25 +164,25 @@ class CategoryService {
         LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
         WHERE 1=1
       `;
-      let query = baseQuery;
-      const params = [];
+    let query = baseQuery;
+    const params = [];
 
-      if (filters.trangThai !== undefined) {
-        query += " AND dm.TrangThai = ?";
-        params.push(filters.trangThai);
-      }
-
-      if (filters.tuKhoa) {
-        query += " AND (dm.Ten LIKE ? OR dm.MoTa LIKE ?)";
-        const searchTerm = `%${filters.tuKhoa}%`;
-        params.push(searchTerm, searchTerm);
-      }
-
-      query += " GROUP BY dm.id ORDER BY dm.id DESC";
-
-      const [categories] = await db.execute(query, params);
-      return categories;
+    if (filters.trangThai !== undefined) {
+      query += " AND dm.TrangThai = ?";
+      params.push(filters.trangThai);
     }
+
+    if (filters.tuKhoa) {
+      query += " AND (dm.Ten LIKE ? OR dm.MoTa LIKE ?)";
+      const searchTerm = `%${filters.tuKhoa}%`;
+      params.push(searchTerm, searchTerm);
+    }
+
+    query += " GROUP BY dm.id ORDER BY dm.id DESC";
+
+    const [categories] = await db.execute(query, params);
+    return categories;
+  }
 
   // Thống kê danh mục
   async thongKeDanhMuc() {

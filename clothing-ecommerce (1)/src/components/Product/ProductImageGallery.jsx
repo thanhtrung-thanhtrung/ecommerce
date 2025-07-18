@@ -75,9 +75,8 @@ const ProductImageGallery = ({ images, productName, product }) => {
         )}
       </div>
 
-      {/* Thumbnails - chỉ hiển thị khi có nhiều hơn 1 ảnh thật */}
       {hasRealImages && displayImages.length > 1 && (
-        <div className="flex space-x-4 overflow-x-auto pb-2">
+        <div className="flex space-x-4 overflow-x-auto ">
           {displayImages.map((image, index) => (
             <button
               key={index}
@@ -85,7 +84,7 @@ const ProductImageGallery = ({ images, productName, product }) => {
                 setSelectedImage(index);
                 setImageLoading(true);
               }}
-              className={`relative w-20 h-20 flex-shrink-0 border rounded-md overflow-hidden transition-all ${selectedImage === index ? "ring-2 ring-primary-600" : "hover:ring-1 ring-gray-300"
+              className={`relative w-10 h-10 flex-shrink-0 border rounded-md overflow-hidden transition-all ${selectedImage === index ? "ring-2 ring-primary-600" : "hover:ring-1 ring-gray-300"
                 }`}
             >
               <img

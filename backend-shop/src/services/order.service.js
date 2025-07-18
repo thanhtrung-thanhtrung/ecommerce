@@ -779,22 +779,13 @@ class OrderService {
     try {
       await connection.beginTransaction();
 
-      // Map frontend status to database status - SỬA CHO ĐÚNG DATABASE SCHEMA
-      const statusMap = {
-        pending: 1,
-        confirmed: 2,
-        processing: 3, // Đang xử lý -> map thành 3 (đang giao)
-        shipping: 4, // Đang giao -> map thành 4 (đã giao)
-        delivered: 4, // Đã giao -> map thành 4
-        cancelled: 5, // Đã hủy -> map thành 5
-      };
+      const dbStatus = parseInt(status);
 
-      const dbStatus = statusMap[status];
-      if (!dbStatus) {
+      if (![1, 2, 3, 4, 5].includes(dbStatus)) {
         throw new Error("Trạng thái không hợp lệ");
       }
 
-      // Check if order exists and get full order details for email
+      // Get full order details including items
       const [orders] = await connection.execute(
         `SELECT dh.*, 
                 httt.Ten as tenHinhThucThanhToan, 
@@ -815,7 +806,7 @@ class OrderService {
       const order = orders[0];
       const oldStatus = order.TrangThai;
 
-      // Get order details for email
+      // Get order items for inventory check
       const [orderDetails] = await connection.execute(
         `SELECT ctdh.*, ctsp.id_SanPham, sp.Ten as tenSanPham, sp.HinhAnh,
                 kc.Ten as tenKichCo, ms.Ten as tenMauSac
@@ -828,13 +819,107 @@ class OrderService {
         [orderId]
       );
 
+      // 🔥 KIỂM TRA TỒN KHO KHI DUYỆT ĐÔN HÀNG (chuyển từ status 1 sang 2)
+      if (dbStatus === 2 && oldStatus === 1) {
+        console.log(
+          `🔍 Checking inventory for order ${orderId} before confirmation...`
+        );
+
+        const insufficientItems = [];
+
+        for (const item of orderDetails) {
+          // Kiểm tra tồn kho thực tế
+          const [stockCheck] = await connection.execute(
+            `SELECT 
+              fn_TinhTonKhoRealTime(?) as TonKhoThucTe,
+              fn_CoTheBan(?, ?) as CoTheBan
+            `,
+            [item.id_ChiTietSanPham, item.id_ChiTietSanPham, item.SoLuong]
+          );
+
+          if (stockCheck.length === 0 || stockCheck[0].CoTheBan !== 1) {
+            insufficientItems.push({
+              tenSanPham: item.tenSanPham,
+              kichCo: item.tenKichCo,
+              mauSac: item.tenMauSac,
+              soLuongYeuCau: item.SoLuong,
+              tonKhoThucTe: stockCheck[0]?.TonKhoThucTe || 0,
+            });
+          }
+        }
+
+        // Nếu có sản phẩm không đủ hàng, tự động hủy đơn và thông báo
+        if (insufficientItems.length > 0) {
+          console.log(
+            `❌ Order ${orderId} has insufficient inventory:`,
+            insufficientItems
+          );
+
+          // Tự động chuyển đơn hàng sang trạng thái hủy
+          const cancelReason = `[Tự động hủy] Không đủ hàng trong kho. Chi tiết: ${insufficientItems
+            .map(
+              (item) =>
+                `${item.tenSanPham} (${item.kichCo}/${item.mauSac}): yêu cầu ${item.soLuongYeuCau}, tồn kho ${item.tonKhoThucTe}`
+            )
+            .join("; ")}`;
+
+          await connection.execute(
+            `UPDATE donhang 
+             SET TrangThai = 5, 
+                 LyDoHuy = ?,
+                 GhiChu = CONCAT(IFNULL(GhiChu, ''), '\n[Hệ thống] ', ?),
+                 NgayCapNhat = NOW()
+             WHERE id = ?`,
+            [cancelReason, cancelReason, orderId]
+          );
+
+          // Hoàn lại mã giảm giá nếu có
+          if (order.MaGiamGia) {
+            await connection.execute(
+              "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
+              [order.MaGiamGia]
+            );
+          }
+
+          await connection.commit();
+          connection.release();
+
+          // Gửi email thông báo hủy đơn hàng
+          if (order.EmailNguoiNhan) {
+            try {
+              const orderDataForEmail = { ...order, chiTiet: orderDetails };
+              await emailService.sendOrderCancellationDueToInventory(
+                orderDataForEmail,
+                insufficientItems,
+                cancelReason
+              );
+            } catch (emailError) {
+              console.error(
+                `❌ Lỗi gửi email hủy đơn cho #${orderId}:`,
+                emailError.message
+              );
+            }
+          }
+
+          // 🔥 TÌM VÀ TỰ ĐỘNG HỦY CÁC ĐƠN HÀNG KHÁC CÙNG SẢN PHẨM KHÔNG ĐỦ HÀNG
+          await this.cancelSimilarInsufficientOrders(
+            insufficientItems,
+            orderId
+          );
+
+          throw new Error(
+            `Đơn hàng đã được tự động hủy do không đủ hàng trong kho. ${insufficientItems.length} sản phẩm không đủ số lượng.`
+          );
+        }
+      }
+
       // Prepare order data for email
       const orderDataForEmail = {
         ...order,
         chiTiet: orderDetails,
       };
 
-      // ✅ SỬA: Chỉ cập nhật trạng thái, database trigger sẽ tự động quản lý tồn kho
+      // Cập nhật trạng thái, database trigger sẽ tự động quản lý tồn kho
       await connection.execute(
         `UPDATE donhang 
          SET TrangThai = ?, 
@@ -847,8 +932,8 @@ class OrderService {
         [dbStatus, note, note, orderId]
       );
 
-      // ✅ HOÀN LẠI MÃ GIẢM GIÁ NẾU HỦY ĐƠN HÀNG
-      if (status === "cancelled" && oldStatus !== 5 && order.MaGiamGia) {
+      // Hoàn lại mã giảm giá nếu hủy đơn hàng
+      if (dbStatus === 5 && oldStatus !== 5 && order.MaGiamGia) {
         await connection.execute(
           "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
           [order.MaGiamGia]
@@ -858,37 +943,28 @@ class OrderService {
       await connection.commit();
       connection.release();
 
-      // 🎯 GỬI EMAIL TỰ ĐỘNG KHI CẬP NHẬT TRẠNG THÁI
-      // Chỉ gửi email nếu trạng thái thực sự thay đổi và có email khách hàng
+      // Gửi email thông báo cập nhật trạng thái thành công
       if (oldStatus !== dbStatus && order.EmailNguoiNhan) {
         try {
+          const statusForEmail =
+            {
+              1: "pending",
+              2: "confirmed",
+              3: "processing",
+              4: "delivered",
+              5: "cancelled",
+            }[dbStatus] || "pending";
+
           await emailService.sendOrderStatusUpdate(
             orderDataForEmail,
-            status,
+            statusForEmail,
             note
           );
         } catch (emailError) {
-          // Log lỗi email nhưng không throw để không ảnh hưởng đến việc cập nhật đơn hàng
           console.error(
             `❌ Lỗi gửi email cho đơn hàng #${orderId}:`,
             emailError.message
           );
-
-          // Có thể lưu log vào database để theo dõi
-          try {
-            await db.execute(
-              `INSERT INTO email_logs (order_id, email_type, recipient, status, error_message, created_at) 
-               VALUES (?, ?, ?, 'failed', ?, NOW())`,
-              [
-                orderId,
-                "order_status_update",
-                order.EmailNguoiNhan,
-                emailError.message,
-              ]
-            );
-          } catch (logError) {
-            console.error("Lỗi ghi log email:", logError.message);
-          }
         }
       }
 
@@ -901,65 +977,232 @@ class OrderService {
     }
   }
 
-  // Get order statistics for admin dashboard
+  // 🔥 HÀM MỚI: Tự động hủy các đơn hàng khác có cùng sản phẩm không đủ hàng
+  async cancelSimilarInsufficientOrders(insufficientItems, excludeOrderId) {
+    try {
+      console.log(`🔍 Looking for similar orders to cancel...`);
+
+      for (const item of insufficientItems) {
+        // Tìm các đơn hàng khác đang chờ xác nhận và có cùng sản phẩm
+        const [similarOrders] = await db.execute(
+          `SELECT DISTINCT dh.id, dh.EmailNguoiNhan, dh.TenNguoiNhan
+           FROM donhang dh
+           JOIN chitietdonhang ctdh ON dh.id = ctdh.id_DonHang
+           JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
+           JOIN sanpham sp ON ctsp.id_SanPham = sp.id
+           JOIN kichco kc ON ctsp.id_KichCo = kc.id
+           JOIN mausac ms ON ctsp.id_MauSac = ms.id
+           WHERE dh.TrangThai = 1 
+           AND dh.id != ?
+           AND sp.Ten = ?
+           AND kc.Ten = ?
+           AND ms.Ten = ?`,
+          [excludeOrderId, item.tenSanPham, item.kichCo, item.mauSac]
+        );
+
+        console.log(
+          `Found ${similarOrders.length} similar orders for ${item.tenSanPham}`
+        );
+
+        // Hủy từng đơn hàng tương tự
+        for (const similarOrder of similarOrders) {
+          const cancelReason = `[Tự động hủy] Sản phẩm ${item.tenSanPham} (${item.kichCo}/${item.mauSac}) không đủ hàng trong kho. Tồn kho hiện tại: ${item.tonKhoThucTe}, yêu cầu: ${item.soLuongYeuCau}`;
+
+          await db.execute(
+            `UPDATE donhang 
+             SET TrangThai = 5, 
+                 LyDoHuy = ?,
+                 GhiChu = CONCAT(IFNULL(GhiChu, ''), '\n[Hệ thống] ', ?),
+                 NgayCapNhat = NOW()
+             WHERE id = ? AND TrangThai = 1`,
+            [cancelReason, cancelReason, similarOrder.id]
+          );
+
+          console.log(
+            `✅ Auto-cancelled order ${similarOrder.id} due to insufficient inventory`
+          );
+
+          // Gửi email thông báo (không chặn luồng chính)
+          if (similarOrder.EmailNguoiNhan) {
+            this.sendCancellationEmailAsync(
+              similarOrder.id,
+              cancelReason
+            ).catch((err) => {
+              console.error(
+                `❌ Email error for order ${similarOrder.id}:`,
+                err.message
+              );
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error cancelling similar orders:", error);
+      // Không throw error để không ảnh hưởng đến luồng chính
+    }
+  }
+
+  // 🔥 HÀM ASYNC GỬI EMAIL (không chặn luồng chính)
+  async sendCancellationEmailAsync(orderId, reason) {
+    try {
+      const orderDetail = await this.getOrderDetailAdmin(orderId);
+      await emailService.sendOrderCancellationDueToInventory(
+        orderDetail,
+        [],
+        reason
+      );
+    } catch (error) {
+      console.error(
+        `Failed to send cancellation email for order ${orderId}:`,
+        error
+      );
+    }
+  }
+
+  // 🔥 HÀM MỚI: Thống kê đơn hàng cho admin dashboard
   async getOrderStats(period = "week") {
     try {
-      // Get total orders count
-      const [totalOrders] = await db.execute(
-        "SELECT COUNT(*) as total FROM donhang"
-      );
+      const stats = {};
 
-      // Get orders by status
+      // Thống kê tổng quan
+      const [overviewStats] = await db.execute(`
+        SELECT 
+          COUNT(*) as totalOrders,
+          SUM(CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END) as pendingOrders,
+          SUM(CASE WHEN TrangThai = 2 THEN 1 ELSE 0 END) as confirmedOrders,
+          SUM(CASE WHEN TrangThai = 3 THEN 1 ELSE 0 END) as shippingOrders,
+          SUM(CASE WHEN TrangThai = 4 THEN 1 ELSE 0 END) as deliveredOrders,
+          SUM(CASE WHEN TrangThai = 5 THEN 1 ELSE 0 END) as cancelledOrders,
+          COALESCE(SUM(CASE WHEN TrangThai NOT IN (5) THEN TongThanhToan ELSE 0 END), 0) as totalRevenue,
+          COALESCE(AVG(CASE WHEN TrangThai NOT IN (5) THEN TongThanhToan ELSE NULL END), 0) as averageOrderValue
+        FROM donhang
+      `);
+
+      stats.overview = overviewStats[0];
+
+      // Thống kê theo thời gian dựa trên period
+      let dateCondition = "";
+      switch (period) {
+        case "today":
+          dateCondition = "WHERE DATE(NgayDatHang) = CURDATE()";
+          break;
+        case "week":
+          dateCondition =
+            "WHERE NgayDatHang >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+          break;
+        case "month":
+          dateCondition =
+            "WHERE NgayDatHang >= DATE_SUB(NOW(), INTERVAL 1 MONTH)";
+          break;
+        case "year":
+          dateCondition =
+            "WHERE NgayDatHang >= DATE_SUB(NOW(), INTERVAL 1 YEAR)";
+          break;
+        default:
+          dateCondition =
+            "WHERE NgayDatHang >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+      }
+
+      // Doanh thu theo ngày trong khoảng thời gian
+      const [revenueByDate] = await db.execute(`
+        SELECT 
+          DATE(NgayDatHang) as date,
+          COUNT(*) as orders,
+          COALESCE(SUM(CASE WHEN TrangThai NOT IN (5) THEN TongThanhToan ELSE 0 END), 0) as revenue
+        FROM donhang 
+        ${dateCondition}
+        GROUP BY DATE(NgayDatHang)
+        ORDER BY date ASC
+      `);
+
+      stats.revenueByDate = revenueByDate;
+
+      // Top sản phẩm bán chạy
+      const [topProducts] = await db.execute(`
+        SELECT 
+          sp.Ten as productName,
+          sp.HinhAnh as productImage,
+          SUM(ctdh.SoLuong) as totalSold,
+          COALESCE(SUM(ctdh.ThanhTien), 0) as totalRevenue
+        FROM chitietdonhang ctdh
+        JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
+        JOIN sanpham sp ON ctsp.id_SanPham = sp.id
+        JOIN donhang dh ON ctdh.id_DonHang = dh.id
+        WHERE dh.TrangThai NOT IN (5) ${dateCondition.replace("WHERE", "AND")}
+        GROUP BY sp.id
+        ORDER BY totalSold DESC
+        LIMIT 5
+      `);
+
+      stats.topProducts = topProducts;
+
+      // Thống kê trạng thái đơn hàng
       const [statusStats] = await db.execute(`
         SELECT 
           TrangThai,
           COUNT(*) as count,
           CASE TrangThai
-            WHEN 1 THEN 'pending'
-            WHEN 2 THEN 'confirmed' 
-            WHEN 3 THEN 'processing'
-            WHEN 4 THEN 'shipping'
-            WHEN 5 THEN 'cancelled'
-            ELSE 'unknown'
-          END as status
+            WHEN 1 THEN 'Chờ xác nhận'
+            WHEN 2 THEN 'Đã xác nhận'
+            WHEN 3 THEN 'Đang giao'
+            WHEN 4 THEN 'Đã giao'
+            WHEN 5 THEN 'Đã hủy'
+            ELSE 'Khác'
+          END as statusName
         FROM donhang 
+        ${dateCondition}
         GROUP BY TrangThai
+        ORDER BY TrangThai ASC
       `);
 
-      // Get revenue stats
-      const [revenueStats] = await db.execute(`
+      stats.statusDistribution = statusStats;
+
+      // Thống kê theo phương thức thanh toán
+      const [paymentStats] = await db.execute(`
         SELECT 
-          SUM(TongThanhToan) as totalRevenue,
-          AVG(TongThanhToan) as averageOrderValue,
-          COUNT(*) as totalOrders
-        FROM donhang 
-        WHERE TrangThai = 5
+          httt.Ten as paymentMethod,
+          COUNT(*) as orderCount,
+          COALESCE(SUM(CASE WHEN dh.TrangThai NOT IN (5) THEN dh.TongThanhToan ELSE 0 END), 0) as totalRevenue
+        FROM donhang dh
+        JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
+        ${dateCondition}
+        GROUP BY httt.id
+        ORDER BY totalRevenue DESC
       `);
 
-      // Get recent orders trend (last 7 days)
-      const [trendStats] = await db.execute(`
+      stats.paymentMethods = paymentStats;
+
+      // Thống kê khách hàng mới
+      const [newCustomers] = await db.execute(`
         SELECT 
-          DATE(NgayDatHang) as date,
-          COUNT(*) as orders,
-          SUM(TongThanhToan) as revenue
-        FROM donhang 
-        WHERE NgayDatHang >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-        GROUP BY DATE(NgayDatHang)
+          DATE(NgayTao) as date,
+          COUNT(*) as newCustomers
+        FROM nguoidung 
+        WHERE NgayTao >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        GROUP BY DATE(NgayTao)
         ORDER BY date ASC
       `);
 
-      return {
-        totalOrders: totalOrders[0].total,
-        statusBreakdown: statusStats,
-        revenue: {
-          total: revenueStats[0].totalRevenue || 0,
-          average: revenueStats[0].averageOrderValue || 0,
-          completedOrders: revenueStats[0].totalOrders || 0,
-        },
-        trend: trendStats,
-      };
+      stats.newCustomers = newCustomers;
+
+      // Tỉ lệ hủy đơn
+      const [cancellationRate] = await db.execute(`
+        SELECT 
+          COUNT(*) as totalOrders,
+          SUM(CASE WHEN TrangThai = 5 THEN 1 ELSE 0 END) as cancelledOrders,
+          ROUND(
+            (SUM(CASE WHEN TrangThai = 5 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 
+            2
+          ) as cancellationRate
+        FROM donhang 
+        ${dateCondition}
+      `);
+
+      stats.cancellationRate = cancellationRate[0];
+
+      return stats;
     } catch (error) {
-      console.error("Error getting order stats:", error);
+      console.error("Error getting order statistics:", error);
       throw error;
     }
   }
