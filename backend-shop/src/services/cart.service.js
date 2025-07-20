@@ -69,10 +69,9 @@ class CartService {
   }
 
   async addToCart(cartData, userId = null, sessionId = null) {
-    // Sửa tên trường cho đúng với CSDL
     const { id_ChiTietSanPham, SoLuong } = cartData;
 
-    // ✅ SỬA: Kiểm tra số lượng tồn kho bằng functions real-time
+    //Kiểm tra số lượng tồn kho bằng functions real-time
     const [stockCheck] = await db.execute(
       `SELECT 
         fn_TinhTonKhoRealTime(?) as TonKhoThucTe,

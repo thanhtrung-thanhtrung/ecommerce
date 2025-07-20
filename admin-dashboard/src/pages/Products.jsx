@@ -685,7 +685,7 @@ const Products = () => {
         </div>
 
         {/* Compact Search */}
-        <div className="bg-white rounded-lg shadow-sm p-3 mb-4">
+        {/* <div className="bg-white rounded-lg shadow-sm p-3 mb-4">
           <div className="relative max-w-md">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -696,7 +696,7 @@ const Products = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Compact Products Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">

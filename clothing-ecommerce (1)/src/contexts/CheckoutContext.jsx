@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { toast } from "react-toastify";
 import { getAuthInfo } from "../utils/sessionUtils";
+import vnpayService from "../services/vnpayAPI";
 
 const CheckoutContext = createContext();
 
@@ -35,22 +36,23 @@ export const CheckoutProvider = ({ children }) => {
   const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [selectedWard, setSelectedWard] = useState(null);
 
+  // User data
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
-  // 👉 Cập nhật user khi context khởi tạo
+  // Initialize auth state
   useEffect(() => {
-    const { user: storedUser, isAuthenticated: auth } = getAuthInfo();
-    setUser(storedUser);
-    setIsAuthenticated(auth);
+    const { token, user: authUser, isAuthenticated: authStatus } = getAuthInfo();
+    setUser(authUser);
+    setIsAuthenticated(authStatus);
   }, []);
 
   const refreshUser = useCallback(() => {
-    const { user: storedUser, isAuthenticated: auth } = getAuthInfo();
-    setUser(storedUser);
-    setIsAuthenticated(auth);
+    const { token, user: authUser, isAuthenticated: authStatus } = getAuthInfo();
+    setUser(authUser);
+    setIsAuthenticated(authStatus);
   }, []);
 
   const apiCall = useCallback(
@@ -167,7 +169,7 @@ export const CheckoutProvider = ({ children }) => {
   const fetchDistricts = useCallback(async (provinceId) => {
     try {
       setLoading(true);
-      const res = await fetch(`https://open.oapi.vn/location/districts/${provinceId}?page=0&size=200`);
+      const res = await fetch(`https://open.oapi.vn/location/districts/${provinceId}?page=0&size=500`);
       const data = await res.json();
       setDistricts(data?.data || []);
       return data?.data || [];
@@ -194,10 +196,17 @@ export const CheckoutProvider = ({ children }) => {
     }
   }, []);
 
+  // Enhanced createOrder with VNPay support
   const createOrder = useCallback(
     async (orderData) => {
       try {
         setSubmitting(true);
+
+        // Get selected payment method info
+        const selectedPayment = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
+        const isVNPayPayment = selectedPayment?.Ten?.toLowerCase().includes('vnpay') ||
+          selectedPayment?.Ten?.toLowerCase().includes('vnp');
+
         const payload = {
           hoTen: orderData.hoTen,
           email: orderData.email,
@@ -211,23 +220,72 @@ export const CheckoutProvider = ({ children }) => {
           phiVanChuyen: orderData.phiVanChuyen || shippingFee,
           tongTienSauGiam: orderData.tongTienSauGiam,
         };
-        const response = await apiCall("/api/orders", {
+
+        console.log("🚀 Creating order:", { payload, isVNPayPayment, userType: isAuthenticated ? "Logged" : "Guest" });
+
+        // Create order first (cho cả VNPay và COD)
+        const orderResponse = await apiCall("/api/orders", {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        if (response.success) {
-          toast.success("Đặt hàng thành công!");
-          return response;
+
+        if (!orderResponse.success) {
+          throw new Error(orderResponse.message || "Đặt hàng thất bại");
         }
-        throw new Error(response.message || "Đặt hàng thất bại");
+
+        console.log("✅ Order created successfully:", orderResponse.data);
+
+        // For VNPay payment, create payment URL after order is created
+        if (isVNPayPayment) {
+          try {
+            console.log("🔄 Creating VNPay payment for order:", orderResponse.data.id);
+
+            const paymentResponse = await apiCall("/api/payments/create", {
+              method: "POST",
+              body: JSON.stringify({
+                orderId: orderResponse.data.id,
+                paymentMethodId: selectedPaymentMethod
+              }),
+            });
+
+            if (paymentResponse.success && paymentResponse.paymentUrl) {
+              console.log("✅ VNPay URL created:", paymentResponse.paymentUrl);
+              toast.info("Đang chuyển hướng đến VNPay...");
+              return {
+                success: true,
+                data: {
+                  paymentUrl: paymentResponse.paymentUrl,
+                  orderId: paymentResponse.orderId,
+                  isVNPayPayment: true,
+                  orderData: orderResponse.data
+                }
+              };
+            } else {
+              throw new Error(paymentResponse.message || "Không thể tạo link thanh toán VNPay");
+            }
+          } catch (paymentError) {
+            // ✅ SỬA: Thông báo rõ ràng hơn cho user
+            console.error("❌ VNPay payment URL creation failed:", paymentError);
+            toast.error(`Đơn hàng đã được tạo (ID: ${orderResponse.data.id}) nhưng không thể chuyển đến VNPay. Vui lòng liên hệ hỗ trợ hoặc chọn phương thức thanh toán khác.`);
+
+            // Trả về thông tin đơn hàng để user có thể xử lý
+            throw new Error(`Đơn hàng đã được tạo (ID: ${orderResponse.data.id}) nhưng không thể chuyển đến VNPay. Lỗi: ${paymentError.message}`);
+          }
+        } else {
+          // For COD payment
+          console.log("✅ COD order completed:", orderResponse.data);
+          toast.success("Đặt hàng thành công!");
+          return orderResponse;
+        }
       } catch (error) {
+        console.error("❌ Create order error:", error);
         toast.error(error.message || "Lỗi khi đặt hàng");
         throw error;
       } finally {
         setSubmitting(false);
       }
     },
-    [apiCall, selectedPaymentMethod, selectedShippingMethod, shippingFee]
+    [apiCall, selectedPaymentMethod, selectedShippingMethod, shippingFee, paymentMethods, isAuthenticated]
   );
 
   const handlePaymentMethodChange = useCallback((methodId) => {
@@ -282,6 +340,16 @@ export const CheckoutProvider = ({ children }) => {
     setSubmitting(false);
   }, []);
 
+  // VNPay specific functions
+  const checkPaymentStatus = useCallback(async (orderId) => {
+    try {
+      return await vnpayService.checkPaymentStatus(orderId);
+    } catch (error) {
+      console.error("Error checking payment status:", error);
+      throw error;
+    }
+  }, []);
+
   useEffect(() => {
     const initializeCheckout = async () => {
       try {
@@ -324,9 +392,12 @@ export const CheckoutProvider = ({ children }) => {
     handleDistrictChange,
     handleWardChange,
     resetCheckoutState,
-    refreshUser,         // ✅ Thêm vào
+    refreshUser,
     user,
     isAuthenticated,
+    // VNPay functions
+    checkPaymentStatus,
+    vnpayService,
   };
 
   return (

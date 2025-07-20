@@ -154,7 +154,6 @@ class CartController {
         req.sessionIdFromHeader ||
         req.headers["x-session-id"];
 
-      // Ensure sessionId is created for guests
       if (!userId && !sessionId) {
         sessionId = uuidv4();
         res.cookie("sessionId", sessionId, {

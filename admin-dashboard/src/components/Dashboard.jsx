@@ -50,6 +50,8 @@ const Dashboard = () => {
     completedOrders: 0,
     pendingOrders: 0,
     cancelledOrders: 0,
+    confirmedOrders: 0,
+    shippedOrders: 0,
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [chartData, setChartData] = useState([]);
@@ -75,7 +77,7 @@ const Dashboard = () => {
         loaiThongKe: "ngay",
       });
 
-      // Cập nhật thống kê tổng quan
+      // Cập nhật thống kê tổng quan - sửa tên trường cho đúng API response
       const overview = orderStatsResponse?.overview || {};
 
       setStats({
@@ -85,13 +87,37 @@ const Dashboard = () => {
         completedOrders: parseInt(overview.deliveredOrders || 0),
         pendingOrders: parseInt(overview.pendingOrders || 0),
         cancelledOrders: parseInt(overview.cancelledOrders || 0),
+        confirmedOrders: parseInt(overview.confirmedOrders || 0),
+        shippedOrders: parseInt(overview.shippedOrders || 0),
       });
 
       // Đơn hàng gần đây
       setRecentOrders(ordersResponse?.orders?.slice(0, 3) || []);
 
-      // Doanh thu theo ngày
-      if (
+      // Doanh thu theo ngày - sử dụng revenueByDate từ orderStatsResponse nếu có
+      if (orderStatsResponse?.revenueByDate && Array.isArray(orderStatsResponse.revenueByDate)) {
+        const formattedChartData = orderStatsResponse.revenueByDate.map((item, index) => {
+          let dayLabel = `Ngày ${index + 1}`;
+          try {
+            if (item.date) {
+              const date = new Date(item.date);
+              if (!isNaN(date.getTime())) {
+                dayLabel = date.toLocaleDateString("vi-VN", { weekday: "short" });
+              }
+            }
+          } catch {
+            // fallback giữ lại label
+          }
+
+          return {
+            day: dayLabel,
+            revenue: Math.round(parseFloat(item.revenue || 0) / 1_000_000), // triệu VNĐ
+            orders: parseInt(item.orders || 0),
+          };
+        });
+
+        setChartData(formattedChartData);
+      } else if (
         revenueResponse?.success &&
         Array.isArray(revenueResponse?.data?.doanhThuTheoThoiGian)
       ) {
@@ -110,7 +136,7 @@ const Dashboard = () => {
 
           return {
             day: dayLabel,
-            revenue: Math.round(parseFloat(item.tongThanhToan || 0) / 1_000_000_000), // tỷ VNĐ
+            revenue: Math.round(parseFloat(item.tongThanhToan || 0) / 1_000_000), // triệu VNĐ
             orders: parseInt(item.soDonHang || 0),
           };
         });
@@ -122,13 +148,8 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       toast.error("Lỗi khi tải dữ liệu dashboard");
-      const statusInfo = orderStatuses[order.TrangThai] || orderStatuses[1];
-      <span
-        className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-${statusInfo.color}-100 text-${statusInfo.color}-800`}
-      >
-        {statusInfo.label}
-      </span>
-      // fallback
+
+      // fallback data
       setStats({
         totalOrders: 0,
         totalRevenue: 0,
@@ -295,7 +316,7 @@ const Dashboard = () => {
             <h2 className="text-lg font-semibold text-gray-900 mb-1">
               Doanh thu 7 ngày
             </h2>
-            <p className="text-xs text-gray-600">Doanh thu (tỷ đồng)</p>
+            <p className="text-xs text-gray-600">Doanh thu </p>
           </div>
           <div className="h-60">
             <ResponsiveContainer width="100%" height="100%">
@@ -319,7 +340,7 @@ const Dashboard = () => {
                     borderRadius: "8px",
                     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                   }}
-                  formatter={(value, name) => [`${value} tỷ VNĐ`, "Doanh thu"]}
+                  formatter={(value) => [`${value}  VNĐ`, "Doanh thu"]}
                 />
                 <Bar
                   dataKey="revenue"

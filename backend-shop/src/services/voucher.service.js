@@ -72,7 +72,8 @@ class VoucherService {
       throw new Error("Không tìm thấy voucher");
     }
 
-    return { maVoucher, TrangThai: trangThai };
+    // Trả về chi tiết voucher mới nhất
+    return this.layChiTietVoucher(maVoucher);
   }
 
   // Lấy chi tiết voucher
@@ -235,6 +236,18 @@ class VoucherService {
       throw new Error("Không tìm thấy voucher");
     }
 
+    return this.layChiTietVoucher(maVoucher);
+  }
+
+  // Giảm số lượt sử dụng voucher (hoàn lại khi đơn bị hủy)
+  async giamSoLuotSuDung(maVoucher) {
+    const [result] = await db.execute(
+      "UPDATE magiamgia SET SoLuotDaSuDung = GREATEST(SoLuotDaSuDung - 1, 0) WHERE Ma = ?",
+      [maVoucher]
+    );
+    if (result.affectedRows === 0) {
+      throw new Error("Không tìm thấy voucher");
+    }
     return this.layChiTietVoucher(maVoucher);
   }
 }

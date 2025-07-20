@@ -191,7 +191,7 @@ class OrderController {
       const { orderId } = req.params;
       const { status, note } = req.body;
 
-      // Status đã được validator chuyển về số
+      // Gọi service cập nhật trạng thái, service sẽ tự xử lý logic voucher
       const order = await orderService.updateOrderStatusAdmin(
         orderId,
         status,

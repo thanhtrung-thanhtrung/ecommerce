@@ -18,6 +18,7 @@ import {
   FiArchive,
   FiUser,
   FiLogOut,
+  FiDollarSign,
 } from "react-icons/fi";
 import { useAdmin } from "../contexts/AdminContext";
 
@@ -40,6 +41,12 @@ const Sidebar = () => {
     { id: "wishlists", label: "Yêu thích", icon: FiHeart, path: "/wishlists" },
     { id: "analytics", label: "Thống kê", icon: FiBarChart2, path: "/analytics" },
     { id: "settings", label: "Cài đặt", icon: FiSettings, path: "/settings" },
+    {
+      id: "vnpay-test",
+      label: "Test VNPay",
+      icon: FiDollarSign,
+      path: "/vnpay-test",
+    },
   ];
 
   const handleLinkClick = () => {

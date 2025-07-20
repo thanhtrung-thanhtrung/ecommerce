@@ -145,13 +145,12 @@ const Vouchers = () => {
     }
   };
 
-  const handleStatusToggle = async (method) => {
+  const handleStatusToggle = async (voucher) => {
     try {
-      const newStatus = method.TrangThai === 1 ? 0 : 1;
-      await updateVoucherStatus(method.id, newStatus);
+      const newStatus = voucher.TrangThai === 1 ? 0 : 1;
+      await updateVoucherStatus(voucher.Ma, newStatus);
       toast.success("Cập nhật trạng thái thành công");
       loadVouchers();
-
     } catch (error) {
       toast.error(error.message || "Có lỗi xảy ra");
     }
@@ -253,7 +252,7 @@ const Vouchers = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">stt</th>
+                  <th className="px-1 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">stt</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Mã Voucher
                   </th>
@@ -306,7 +305,7 @@ const Vouchers = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
-                        onClick={() => handleStatusToggle(voucher.Ma, voucher.TrangThai)}
+                        onClick={() => handleStatusToggle(voucher)}
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${voucher.TrangThai === 1
                           ? "bg-green-100 text-green-800"
                           : "bg-red-100 text-red-800"
@@ -473,7 +472,7 @@ const Vouchers = () => {
                   />
                 </div>
 
-                <div>
+                {/* <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Trạng thái
                   </label>
@@ -485,7 +484,7 @@ const Vouchers = () => {
                     <option value={1}>Hoạt động</option>
                     <option value={0}>Không hoạt động</option>
                   </select>
-                </div>
+                </div> */}
               </div>
 
               <div className="flex justify-end space-x-3 mt-6">

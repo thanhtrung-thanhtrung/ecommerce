@@ -178,22 +178,40 @@ const CheckoutPage = () => {
         // Clear cart after successful order
         await clearCart();
 
-        // Handle payment redirect or success page
+        // Handle different response types
         if (response.data?.paymentUrl) {
+          // VNPay payment - redirect to payment gateway
           window.location.href = response.data.paymentUrl;
         } else {
-          // Redirect based on authentication status
+          // COD payment or other payment methods - redirect based on authentication status
           if (isAuthenticated) {
             // For logged in users, go to orders page
             navigate("/user/orders");
           } else {
-            // For guest users, go to home page
+            // For guest users, go to home page  
             navigate("/");
           }
         }
       }
     } catch (error) {
       console.error("Checkout error:", error);
+
+      // Check if this is a VNPay payment URL creation error
+      if (error.message && error.message.includes("Đơn hàng đã được tạo") && error.message.includes("VNPay")) {
+        // Show specific error for VNPay issues with option to contact support
+        const shouldContactSupport = confirm(
+          `${error.message}\n\nBạn có muốn liên hệ hỗ trợ hoặc thử phương thức thanh toán khác không?\n\n` +
+          `- Nhấn "OK" để liên hệ hỗ trợ\n` +
+          `- Nhấn "Cancel" để ở lại trang này và thử lại`
+        );
+
+        if (shouldContactSupport) {
+          // Redirect to support or contact page
+          navigate("/contact");
+        }
+        // If user chooses to stay, they can try again with different payment method
+        return;
+      }
 
       if (error.response?.data?.errors) {
         // Handle validation errors from backend

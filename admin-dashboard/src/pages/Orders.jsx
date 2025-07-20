@@ -81,39 +81,51 @@ const Orders = () => {
       toast.error("Lỗi khi tải danh sách đơn hàng");
     }
   };
+  
+  const validTransitions = {
+    1: [2, 5], // Chờ xác nhận: Có thể chuyển sang Đã xác nhận (2) hoặc Đã hủy (5)
+    2: [3, 5], // Đã xác nhận: Có thể chuyển sang Đang giao (3) hoặc Đã hủy (5)
+    3: [4, 5], // Đang giao: Có thể chuyển sang Đã giao (4) hoặc Đã hủy (5)
+    4: [],     // Đã giao: Không thể chuyển trạng thái nữa
+    5: []      // Đã hủy: Không thể chuyển trạng thái nữa
+  };
 
   const handleStatusChange = async (orderId, newStatus, currentStatus) => {
-    let backendStatus;
+    const currentStatusNumber = typeof currentStatus === "number" ? currentStatus : parseInt(currentStatus);
+    const backendStatus = typeof newStatus === "number" ? newStatus : parseInt(newStatus);
 
-    if (typeof newStatus === "number") {
-      backendStatus = newStatus;
-    } else {
-      const statusMap = {
-        1: "pending",
-        2: "confirmed",
-        3: "shipping",
-        4: "delivered",
-        5: "cancelled"
-      };
-
-      const reverseMap = Object.entries(statusMap).find(([num, str]) => str === newStatus);
-      backendStatus = reverseMap ? parseInt(reverseMap[0]) : parseInt(newStatus);
+    // Kiểm tra quy tắc chuyển trạng thái hợp lệ
+    if (!validTransitions[currentStatusNumber] || !validTransitions[currentStatusNumber].includes(backendStatus)) {
+      toast.error("Không thể chuyển trạng thái này! Vui lòng tuân theo quy trình: Chờ xác nhận → Đã xác nhận → Đang giao → Đã giao");
+      return;
     }
 
+    // Xác nhận trước khi chuyển trạng thái
+    const statusMessages = {
+      1: "Chờ xác nhận",
+      2: "Đã xác nhận",
+      3: "Đang giao",
+      4: "Đã giao",
+      5: "Đã hủy"
+    };
+
+    const currentStatusText = statusMessages[currentStatusNumber];
+    const newStatusText = statusMessages[backendStatus];
+
+    // Xử lý đặc biệt cho việc hủy đơn hàng
     if (backendStatus === 5) {
-      if (window.confirm("Bạn có chắc chắn muốn hủy đơn hàng này?")) {
+      const confirmMessage = `Bạn có chắc chắn muốn hủy đơn hàng #${orderId}?\n\nTrạng thái hiện tại: ${currentStatusText}\nSẽ chuyển thành: ${newStatusText}`;
+      if (window.confirm(confirmMessage)) {
         await doUpdateStatus(orderId, backendStatus);
       }
       return;
     }
 
-    const currentStatusNumber = typeof currentStatus === "number" ? currentStatus : parseInt(currentStatus);
-    if (currentStatusNumber === 4 || currentStatusNumber === 5) {
-      toast.info("Đơn hàng đã hoàn thành hoặc đã hủy, không thể cập nhật!");
-      return;
+    // Xác nhận cho các trạng thái khác
+    const confirmMessage = `Xác nhận chuyển trạng thái đơn hàng #${orderId}?\n\nTừ: ${currentStatusText}\nSang: ${newStatusText}`;
+    if (window.confirm(confirmMessage)) {
+      await doUpdateStatus(orderId, backendStatus);
     }
-
-    await doUpdateStatus(orderId, backendStatus);
   };
 
   const doUpdateStatus = async (orderId, newStatusNumber) => {
@@ -179,7 +191,7 @@ const Orders = () => {
       </div>
 
       {/* Compact Filters */}
-      <div className="mb-4 bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+      {/* <div className="mb-4 bg-white p-3 rounded-lg shadow-sm border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -225,7 +237,7 @@ const Orders = () => {
             <span>Xóa lọc</span>
           </button>
         </div>
-      </div>
+      </div> */}
 
       {/* Compact Orders Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -323,18 +335,30 @@ const Orders = () => {
                       <td className="px-3 py-2 whitespace-nowrap">
                         <div className="flex items-center space-x-1">
                           <StatusIcon className={`w-3 h-3 text-${statusInfo.color}-500`} />
-                          <select
-                            value={statusNumber}
-                            onChange={(e) => handleStatusChange(order.id, parseInt(e.target.value), statusNumber)}
-                            className={`text-xs border-0 bg-${statusInfo.color}-100 text-${statusInfo.color}-800 rounded-full px-2 py-1 font-medium focus:ring-2 focus:ring-${statusInfo.color}-500 cursor-pointer`}
-                            disabled={isFinalStatus}
-                          >
-                            {Object.values(orderStatuses).map((status) => (
-                              <option key={status.key} value={status.key}>
-                                {status.label}
+                          {/* Chỉ hiển thị select nếu có thể chuyển trạng thái */}
+                          {validTransitions[statusNumber] && validTransitions[statusNumber].length > 0 ? (
+                            <select
+                              value={statusNumber}
+                              onChange={(e) => handleStatusChange(order.id, parseInt(e.target.value), statusNumber)}
+                              className={`text-xs border-0 bg-${statusInfo.color}-100 text-${statusInfo.color}-800 rounded-full px-2 py-1 font-medium focus:ring-2 focus:ring-${statusInfo.color}-500 cursor-pointer`}
+                            >
+                              {/* Trạng thái hiện tại */}
+                              <option value={statusNumber}>
+                                {orderStatuses[statusNumber]?.label || ""}
                               </option>
-                            ))}
-                          </select>
+                              {/* Các trạng thái có thể chuyển đến */}
+                              {validTransitions[statusNumber].map((nextStatus) => (
+                                <option key={nextStatus} value={nextStatus}>
+                                  {nextStatus === 5 ? "🚫 " : "➡️ "}{orderStatuses[nextStatus]?.label || ""}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            // Hiển thị badge tĩnh nếu không thể chuyển trạng thái
+                            <span className={`text-xs bg-${statusInfo.color}-100 text-${statusInfo.color}-800 rounded-full px-2 py-1 font-medium`}>
+                              {statusInfo.label}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">

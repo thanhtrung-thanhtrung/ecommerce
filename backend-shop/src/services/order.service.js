@@ -18,17 +18,16 @@ class OrderService {
         email,
         diaChiGiao,
         soDienThoai,
-        id_ThanhToan, // ✅ Fixed: match database field name
+        id_ThanhToan,
         id_VanChuyen,
         MaGiamGia,
         ghiChu,
         tongTien,
         tongTienSauGiam,
         phiVanChuyen,
-        sessionId: frontendSessionId, // In case sessionId is sent in body
+        sessionId: frontendSessionId,
       } = orderData;
 
-      // Use sessionId from parameter or from body
       const finalSessionId = sessionId || frontendSessionId;
 
       // Validate required fields
@@ -36,7 +35,6 @@ class OrderService {
         throw new Error("Thiếu thông tin bắt buộc");
       }
 
-      // Cải thiện validation cho payment và shipping methods
       const paymentMethodId = parseInt(id_ThanhToan);
       const shippingMethodId = parseInt(id_VanChuyen);
 
@@ -52,7 +50,6 @@ class OrderService {
         );
       }
 
-      // Kiểm tra xem phương thức thanh toán có tồn tại không
       const [paymentMethod] = await connection.execute(
         "SELECT id FROM hinhthucthanhtoan WHERE id = ? AND TrangThai = 1",
         [paymentMethodId]
@@ -63,7 +60,6 @@ class OrderService {
         );
       }
 
-      // 1. Lấy giỏ hàng
       let cartQuery, cartParams;
       if (userId) {
         cartQuery = `
@@ -85,22 +81,17 @@ class OrderService {
         throw new Error("Thiếu thông tin người dùng hoặc session");
       }
 
-      // Debugging logs to verify session and cart query
-      console.log("🔍 Debug - sessionId:", sessionId);
-      console.log("🔍 Debug - userId:", userId);
-
       const [cartItems] = await connection.execute(cartQuery, cartParams);
-
-      // Debug log kết quả giỏ hàng
-      console.log("🔍 Debug - cartItems count:", cartItems.length);
-      console.log("🔍 Debug - cartItems:", cartItems);
 
       if (cartItems.length === 0) {
         throw new Error("Giỏ hàng trống");
       }
-
-      // ✅ SỬA: 2. Kiểm tra tồn kho bằng database functions thay vì cột TonKho
+      // if (cartItems.length > 2) {
+      //   throw new Error("Giỏ hàng không được quá 2 sản phẩm");
+      // }
       for (const item of cartItems) {
+        // giới hạn số lượng sản phẩm trong giỏ hàng
+      
         const [stockCheck] = await connection.execute(
           `SELECT 
             fn_TinhTonKhoRealTime(?) as TonKhoThucTe,
@@ -118,10 +109,6 @@ class OrderService {
         }
       }
 
-      // 3. THAY ĐỔI: Sử dụng giá trị từ frontend thay vì tính toán lại
-      // Lý do: Frontend đã tính toán chính xác, backend chỉ cần validate và sử dụng
-
-      // Validate và convert giá trị từ frontend về số (không phải chuỗi)
       const frontendTongTien = Number(tongTien) || 0;
       const frontendPhiVanChuyen = Number(phiVanChuyen) || 0;
       const frontendTongTienSauGiam = Number(tongTienSauGiam) || 0;
@@ -139,7 +126,6 @@ class OrderService {
         },
       });
 
-      // Tính tổng tiền từ giỏ hàng để so sánh (validation)
       let calculatedTongTienHang = cartItems.reduce((sum, item) => {
         const finalPrice = Number(item.GiaKhuyenMai) || Number(item.Gia) || 0;
         const quantity = Number(item.SoLuong) || 0;
@@ -149,7 +135,6 @@ class OrderService {
       // Kiểm tra sự khác biệt quá lớn giữa frontend và backend calculation
       const diff = Math.abs(calculatedTongTienHang - frontendTongTien);
       if (diff > 1000) {
-        // Cho phép sai số nhỏ do làm tròn
         console.warn(
           "⚠️ Cảnh báo: Tổng tiền frontend và backend khác biệt lớn:",
           {
@@ -785,17 +770,9 @@ class OrderService {
         throw new Error("Trạng thái không hợp lệ");
       }
 
-      // Get full order details including items
+      // Get full order details
       const [orders] = await connection.execute(
-        `SELECT dh.*, 
-                httt.Ten as tenHinhThucThanhToan, 
-                htvc.Ten as tenHinhThucVanChuyen,
-                IFNULL(mgg.Ma, '') as maGiamGiaText
-         FROM donhang dh
-         LEFT JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
-         LEFT JOIN hinhthucvanchuyen htvc ON dh.id_VanChuyen = htvc.id
-         LEFT JOIN magiamgia mgg ON dh.MaGiamGia = mgg.Ma
-         WHERE dh.id = ?`,
+        `SELECT dh.*, IFNULL(mgg.Ma, '') as MaGiamGia FROM donhang dh LEFT JOIN magiamgia mgg ON dh.MaGiamGia = mgg.Ma WHERE dh.id = ?`,
         [orderId]
       );
 
@@ -819,7 +796,7 @@ class OrderService {
         [orderId]
       );
 
-      // 🔥 KIỂM TRA TỒN KHO KHI DUYỆT ĐÔN HÀNG (chuyển từ status 1 sang 2)
+      // KIỂM TRA TỒN KHO KHI DUYỆT ĐÔN HÀNG (chuyển từ status 1 sang 2)
       if (dbStatus === 2 && oldStatus === 1) {
         console.log(
           `🔍 Checking inventory for order ${orderId} before confirmation...`
@@ -851,7 +828,7 @@ class OrderService {
         // Nếu có sản phẩm không đủ hàng, tự động hủy đơn và thông báo
         if (insufficientItems.length > 0) {
           console.log(
-            `❌ Order ${orderId} has insufficient inventory:`,
+            ` Order ${orderId} has insufficient inventory:`,
             insufficientItems
           );
 
@@ -895,13 +872,13 @@ class OrderService {
               );
             } catch (emailError) {
               console.error(
-                `❌ Lỗi gửi email hủy đơn cho #${orderId}:`,
+                ` Lỗi gửi email hủy đơn cho #${orderId}:`,
                 emailError.message
               );
             }
           }
 
-          // 🔥 TÌM VÀ TỰ ĐỘNG HỦY CÁC ĐƠN HÀNG KHÁC CÙNG SẢN PHẨM KHÔNG ĐỦ HÀNG
+          //  TÌM VÀ TỰ ĐỘNG HỦY CÁC ĐƠN HÀNG KHÁC CÙNG SẢN PHẨM KHÔNG ĐỦ HÀNG
           await this.cancelSimilarInsufficientOrders(
             insufficientItems,
             orderId
@@ -919,25 +896,26 @@ class OrderService {
         chiTiet: orderDetails,
       };
 
-      // Cập nhật trạng thái, database trigger sẽ tự động quản lý tồn kho
+      // Cập nhật trạng thái đơn hàng
       await connection.execute(
-        `UPDATE donhang 
-         SET TrangThai = ?, 
-             GhiChu = CASE 
-               WHEN ? IS NOT NULL THEN CONCAT(IFNULL(GhiChu, ''), '\n[Admin] ', ?)
-               ELSE GhiChu 
-             END,
-             NgayCapNhat = NOW()
-         WHERE id = ?`,
+        `UPDATE donhang SET TrangThai = ?, GhiChu = CASE WHEN ? IS NOT NULL THEN CONCAT(IFNULL(GhiChu, ''), '\n[Admin] ', ?) ELSE GhiChu END, NgayCapNhat = NOW() WHERE id = ?`,
         [dbStatus, note, note, orderId]
       );
 
-      // Hoàn lại mã giảm giá nếu hủy đơn hàng
-      if (dbStatus === 5 && oldStatus !== 5 && order.MaGiamGia) {
-        await connection.execute(
-          "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung - 1 WHERE Ma = ?",
-          [order.MaGiamGia]
-        );
+      // Logic voucher: chỉ cộng/trừ lượt sử dụng khi trạng thái thay đổi hợp lệ
+      if (order.MaGiamGia) {
+        // Chuyển từ 1 sang 2,3,4: cộng lượt sử dụng
+        if ([2, 3, 4].includes(dbStatus) && oldStatus === 1) {
+          await require("../services/voucher.service").tangSoLuotSuDung(
+            order.MaGiamGia
+          );
+        }
+        // Chuyển từ 2,3,4 sang 5: hoàn lại lượt sử dụng
+        if (dbStatus === 5 && [2, 3, 4].includes(oldStatus)) {
+          await require("../services/voucher.service").giamSoLuotSuDung(
+            order.MaGiamGia
+          );
+        }
       }
 
       await connection.commit();
@@ -962,7 +940,7 @@ class OrderService {
           );
         } catch (emailError) {
           console.error(
-            `❌ Lỗi gửi email cho đơn hàng #${orderId}:`,
+            ` Lỗi gửi email cho đơn hàng #${orderId}:`,
             emailError.message
           );
         }
@@ -977,11 +955,9 @@ class OrderService {
     }
   }
 
-  // 🔥 HÀM MỚI: Tự động hủy các đơn hàng khác có cùng sản phẩm không đủ hàng
+  // HÀM MỚI: Tự động hủy các đơn hàng khác có cùng sản phẩm không đủ hàng
   async cancelSimilarInsufficientOrders(insufficientItems, excludeOrderId) {
     try {
-      console.log(`🔍 Looking for similar orders to cancel...`);
-
       for (const item of insufficientItems) {
         // Tìm các đơn hàng khác đang chờ xác nhận và có cùng sản phẩm
         const [similarOrders] = await db.execute(
@@ -1018,10 +994,6 @@ class OrderService {
             [cancelReason, cancelReason, similarOrder.id]
           );
 
-          console.log(
-            `✅ Auto-cancelled order ${similarOrder.id} due to insufficient inventory`
-          );
-
           // Gửi email thông báo (không chặn luồng chính)
           if (similarOrder.EmailNguoiNhan) {
             this.sendCancellationEmailAsync(
@@ -1029,7 +1001,7 @@ class OrderService {
               cancelReason
             ).catch((err) => {
               console.error(
-                `❌ Email error for order ${similarOrder.id}:`,
+                `Email error for order ${similarOrder.id}:`,
                 err.message
               );
             });
@@ -1042,7 +1014,7 @@ class OrderService {
     }
   }
 
-  // 🔥 HÀM ASYNC GỬI EMAIL (không chặn luồng chính)
+  // HÀM ASYNC GỬI EMAIL (không chặn luồng chính)
   async sendCancellationEmailAsync(orderId, reason) {
     try {
       const orderDetail = await this.getOrderDetailAdmin(orderId);
@@ -1059,12 +1031,12 @@ class OrderService {
     }
   }
 
-  // 🔥 HÀM MỚI: Thống kê đơn hàng cho admin dashboard
+  //  HÀM MỚI: Thống kê đơn hàng cho admin dashboard
   async getOrderStats(period = "week") {
     try {
       const stats = {};
 
-      // Thống kê tổng quan
+      // Thống kê tổng quan - CHỈ TÍNH DOANH THU TỪ ĐƠN HÀNG ĐÃ GIAO (TrangThai = 4)
       const [overviewStats] = await db.execute(`
         SELECT 
           COUNT(*) as totalOrders,
@@ -1073,8 +1045,8 @@ class OrderService {
           SUM(CASE WHEN TrangThai = 3 THEN 1 ELSE 0 END) as shippingOrders,
           SUM(CASE WHEN TrangThai = 4 THEN 1 ELSE 0 END) as deliveredOrders,
           SUM(CASE WHEN TrangThai = 5 THEN 1 ELSE 0 END) as cancelledOrders,
-          COALESCE(SUM(CASE WHEN TrangThai NOT IN (5) THEN TongThanhToan ELSE 0 END), 0) as totalRevenue,
-          COALESCE(AVG(CASE WHEN TrangThai NOT IN (5) THEN TongThanhToan ELSE NULL END), 0) as averageOrderValue
+          COALESCE(SUM(CASE WHEN TrangThai = 4 THEN TongThanhToan ELSE 0 END), 0) as totalRevenue,
+          COALESCE(AVG(CASE WHEN TrangThai = 4 THEN TongThanhToan ELSE NULL END), 0) as averageOrderValue
         FROM donhang
       `);
 
@@ -1103,12 +1075,12 @@ class OrderService {
             "WHERE NgayDatHang >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
       }
 
-      // Doanh thu theo ngày trong khoảng thời gian
+      // Doanh thu theo ngày - CHỈ TÍNH ĐƠN HÀNG ĐÃ GIAO (TrangThai = 4)
       const [revenueByDate] = await db.execute(`
         SELECT 
           DATE(NgayDatHang) as date,
           COUNT(*) as orders,
-          COALESCE(SUM(CASE WHEN TrangThai NOT IN (5) THEN TongThanhToan ELSE 0 END), 0) as revenue
+          COALESCE(SUM(CASE WHEN TrangThai = 4 THEN TongThanhToan ELSE 0 END), 0) as revenue
         FROM donhang 
         ${dateCondition}
         GROUP BY DATE(NgayDatHang)
@@ -1117,7 +1089,7 @@ class OrderService {
 
       stats.revenueByDate = revenueByDate;
 
-      // Top sản phẩm bán chạy
+      // Top sản phẩm bán chạy - CHỈ TÍNH ĐƠN HÀNG ĐÃ GIAO
       const [topProducts] = await db.execute(`
         SELECT 
           sp.Ten as productName,
@@ -1128,7 +1100,7 @@ class OrderService {
         JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
         JOIN sanpham sp ON ctsp.id_SanPham = sp.id
         JOIN donhang dh ON ctdh.id_DonHang = dh.id
-        WHERE dh.TrangThai NOT IN (5) ${dateCondition.replace("WHERE", "AND")}
+        WHERE dh.TrangThai = 4 ${dateCondition.replace("WHERE", "AND")}
         GROUP BY sp.id
         ORDER BY totalSold DESC
         LIMIT 5
@@ -1136,33 +1108,12 @@ class OrderService {
 
       stats.topProducts = topProducts;
 
-      // Thống kê trạng thái đơn hàng
-      const [statusStats] = await db.execute(`
-        SELECT 
-          TrangThai,
-          COUNT(*) as count,
-          CASE TrangThai
-            WHEN 1 THEN 'Chờ xác nhận'
-            WHEN 2 THEN 'Đã xác nhận'
-            WHEN 3 THEN 'Đang giao'
-            WHEN 4 THEN 'Đã giao'
-            WHEN 5 THEN 'Đã hủy'
-            ELSE 'Khác'
-          END as statusName
-        FROM donhang 
-        ${dateCondition}
-        GROUP BY TrangThai
-        ORDER BY TrangThai ASC
-      `);
-
-      stats.statusDistribution = statusStats;
-
-      // Thống kê theo phương thức thanh toán
+      // Thống kê theo phương thức thanh toán - CHỈ TÍNH ĐƠN HÀNG ĐÃ GIAO
       const [paymentStats] = await db.execute(`
         SELECT 
           httt.Ten as paymentMethod,
           COUNT(*) as orderCount,
-          COALESCE(SUM(CASE WHEN dh.TrangThai NOT IN (5) THEN dh.TongThanhToan ELSE 0 END), 0) as totalRevenue
+          COALESCE(SUM(CASE WHEN dh.TrangThai = 4 THEN dh.TongThanhToan ELSE 0 END), 0) as totalRevenue
         FROM donhang dh
         JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
         ${dateCondition}
@@ -1209,3 +1160,8 @@ class OrderService {
 }
 
 module.exports = new OrderService();
+// if (item.SoLuong > 2) {
+//   throw new Error(
+//     `Số lượng sản phẩm không được vượt quá 2 trong giỏ hàng`
+//   );
+// }

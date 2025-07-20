@@ -76,28 +76,37 @@ export const AdminProvider = ({ children }) => {
   // Load dashboard data
   const loadDashboardData = async () => {
     try {
-      // You can implement API calls to get real dashboard data here
-      // For now, we'll use mock data
-      const mockData = {
-        weeklyProgress: [
-          { day: "T2", duration: 12 },
-          { day: "T3", duration: 15 },
-          { day: "T4", duration: 8 },
-          { day: "T5", duration: 20 },
-          { day: "T6", duration: 18 },
-          { day: "T7", duration: 25 },
-          { day: "CN", duration: 10 },
-        ],
+      setLoading(true);
+
+      // Gọi API thống kê đơn hàng thực tế
+      const orderStats = await getOrderStats();
+
+      // Gọi API thống kê sản phẩm
+      const productStats = await getProductsAdmin({ limit: 1 });
+
+      setDashboardData({
+        weeklyProgress: orderStats?.revenueByDate || [],
         stats: {
-          totalOrders: 145,
-          totalRevenue: 25000000,
-          totalProducts: 89,
-          completedOrders: 132,
+          totalOrders: orderStats?.overview?.totalOrders || 0,
+          totalRevenue: orderStats?.overview?.totalRevenue || 0, // Chỉ tính đơn hàng TrangThai = 4
+          totalProducts: productStats?.pagination?.total || 0,
+          completedOrders: orderStats?.overview?.deliveredOrders || 0,
         },
-      };
-      setDashboardData(mockData);
+      });
     } catch (error) {
       console.error("Error loading dashboard data:", error);
+      // Fallback to basic data if API fails
+      setDashboardData({
+        weeklyProgress: [],
+        stats: {
+          totalOrders: 0,
+          totalRevenue: 0,
+          totalProducts: 0,
+          completedOrders: 0,
+        },
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -160,7 +169,7 @@ export const AdminProvider = ({ children }) => {
     setLoading(true);
     try {
       const token = getToken();
-      
+
       // Skip authenticated API calls if no token available
       if (!token && url.includes('/admin')) {
         console.warn('Skipping admin API call - no token available');
@@ -844,6 +853,23 @@ export const AdminProvider = ({ children }) => {
     });
   };
 
+  // VNPay APIs
+  const createPayment = async (orderId, paymentMethodId) => {
+    return await apiCall("/api/payments/create", {
+      method: "POST",
+      body: JSON.stringify({ orderId, paymentMethodId }),
+    });
+  };
+
+  const testVNPay = async () => {
+    return await apiCall("/api/payments/test/vnpay");
+  };
+
+  const handleVNPayReturn = async (returnData) => {
+    const queryString = new URLSearchParams(returnData).toString();
+    return await apiCall(`/api/payments/vnpay/return?${queryString}`);
+  };
+
   const value = {
     loading,
     initialLoading, // Thêm vào value
@@ -937,12 +963,59 @@ export const AdminProvider = ({ children }) => {
     deleteShippingMethod,
 
     // Payments
-    getPaymentMethods,
-    getPaymentMethodsAdmin,
-    createPaymentMethod,
-    updatePaymentMethod,
-    updatePaymentStatus,
-    deletePaymentMethod,
+    getPaymentMethods: async () => {
+      return await apiCall("/api/payments/methods");
+    },
+
+    getPaymentMethodsAdmin: async (params = {}) => {
+      const queryString = new URLSearchParams(params).toString();
+      const url = queryString ? `/api/payments/admin?${queryString}` : "/api/payments/admin";
+      return await apiCall(url);
+    },
+
+    createPaymentMethod: async (paymentData) => {
+      return await apiCall("/api/payments/admin", {
+        method: "POST",
+        body: JSON.stringify(paymentData),
+      });
+    },
+
+    updatePaymentMethod: async (methodId, paymentData) => {
+      return await apiCall(`/api/payments/admin/${methodId}`, {
+        method: "PUT",
+        body: JSON.stringify(paymentData),
+      });
+    },
+
+    updatePaymentStatus: async (methodId, status) => {
+      return await apiCall(`/api/payments/admin/${methodId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ TrangThai: status }),
+      });
+    },
+
+    deletePaymentMethod: async (methodId) => {
+      return await apiCall(`/api/payments/admin/${methodId}`, {
+        method: "DELETE",
+      });
+    },
+
+    // VNPay APIs
+    createPayment: async (orderId, paymentMethodId) => {
+      return await apiCall("/api/payments/create", {
+        method: "POST",
+        body: JSON.stringify({ orderId, paymentMethodId }),
+      });
+    },
+
+    testVNPay: async () => {
+      return await apiCall("/api/payments/test/vnpay");
+    },
+
+    handleVNPayReturn: async (returnData) => {
+      const queryString = new URLSearchParams(returnData).toString();
+      return await apiCall(`/api/payments/vnpay/return?${queryString}`);
+    },
   };
 
   return (

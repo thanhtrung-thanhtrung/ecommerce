@@ -16,6 +16,8 @@ import Vouchers from "./pages/Vouchers";
 import Analytics from "./pages/Analytics";
 import Suppliers from "./pages/Suppliers.jsx";
 import Payments from "./pages/Payments";
+import VNPayTest from "./pages/VNPayTest";
+import VNPayReturn from "./pages/VNPayReturn";
 import Shippings from "./pages/Shippings";
 import Wishlists from "./pages/Wishlists";
 import Inventorys from "./pages/Inventorys";
@@ -167,6 +169,21 @@ function App() {
             </AuthenticatedLayout>
           </ProtectedRoute>
         } />
+
+        <Route path="/vnpay-test" element={
+          <ProtectedRoute>
+            <AuthenticatedLayout>
+              <VNPayTest />
+            </AuthenticatedLayout>
+          </ProtectedRoute>
+        } />
+
+        {/* ✅ SỬA: VNPay return route - tự động redirect về customer */}
+        <Route path="/vnpay-return" element={<VNPayReturn />} />
+
+        {/* ✅ THÊM: Catch-all route cho bất kỳ VNPay URL nào */}
+        <Route path="/api/test/vnpay/return" element={<VNPayReturn />} />
+        <Route path="/payments/vnpay/return" element={<VNPayReturn />} />
       </Routes>
 
       <ToastContainer position="top-right" autoClose={3000} theme="light" />

@@ -3,7 +3,6 @@ import { toast } from "react-toastify";
 import { useAdmin } from '../contexts/AdminContext';
 import { FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiTruck } from "react-icons/fi";
 
-
 const Shippings = () => {
   const {
     loading,
@@ -26,24 +25,55 @@ const Shippings = () => {
     TrangThai: 1
   });
 
+  // Hàm xử lý lỗi từ API response
+  const handleApiError = (errorResponse) => {
+    if (errorResponse.errors && errorResponse.errors.length > 0) {
+      // Hiển thị lỗi đầu tiên
+      const firstError = errorResponse.errors[0];
+      toast.error(firstError.msg);
+      
+      // Hoặc hiển thị tất cả lỗi (nếu muốn)
+      // errorResponse.errors.forEach(error => {
+      //   toast.error(error.msg);
+      // });
+    } else if (errorResponse.message) {
+      // Hiển thị message chung
+      toast.error(errorResponse.message);
+    } else {
+      // Lỗi mặc định
+      toast.error('Đã có lỗi xảy ra!');
+    }
+  };
+
   // Load shipping methods
   const loadShippingMethods = async () => {
     try {
       const response = await getShippingMethods();
       if (response.success) {
         setShippingMethods(response.data || []);
+      } else {
+        // Xử lý lỗi khi load data
+        handleApiError(response);
       }
     } catch (error) {
       console.error('Error loading shipping methods:', error);
-      toast.error('Lỗi khi tải danh sách phương thức vận chuyển');
+      
+      // Kiểm tra nếu error có response data
+      if (error.response && error.response.data) {
+        handleApiError(error.response.data);
+      } else {
+        toast.error('Lỗi khi tải danh sách phương thức vận chuyển');
+      }
     }
   };
 
   useEffect(() => {
     loadShippingMethods();
   }, []);
+
   const filterSearch = shippingMethods.filter(method =>
-    method.ThoiGianDuKien.toLowerCase().includes(searchTerm.toLowerCase())
+    method.Ten?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    method.ThoiGianDuKien?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Handle search input change
@@ -55,7 +85,6 @@ const Shippings = () => {
   useEffect(() => {
     resetForm();
   }, [showModal]);
-
 
   // Handle form submit
   const handleSubmit = async (e) => {
@@ -80,10 +109,21 @@ const Shippings = () => {
         setShowModal(false);
         resetForm();
         loadShippingMethods();
+      } else {
+        // Xử lý lỗi validation hoặc lỗi khác
+        handleApiError(response);
       }
     } catch (error) {
       console.error('Error saving shipping method:', error);
-      toast.error('Lỗi khi lưu phương thức vận chuyển');
+      
+      // Kiểm tra nếu error có response data từ backend
+      if (error.response && error.response.data) {
+        handleApiError(error.response.data);
+      } else if (error.message) {
+        toast.error(error.message);
+      } else {
+        toast.error('Lỗi khi lưu phương thức vận chuyển');
+      }
     }
   };
 
@@ -99,10 +139,17 @@ const Shippings = () => {
       if (response.success) {
         toast.success(response.message || 'Xóa thành công');
         loadShippingMethods();
+      } else {
+        handleApiError(response);
       }
     } catch (error) {
       console.error('Error deleting shipping method:', error);
-      toast.error('Lỗi khi xóa phương thức vận chuyển');
+      
+      if (error.response && error.response.data) {
+        handleApiError(error.response.data);
+      } else {
+        toast.error('Lỗi khi xóa phương thức vận chuyển');
+      }
     }
   };
 
@@ -157,7 +204,6 @@ const Shippings = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
-
 
           <button
             onClick={loadShippingMethods}

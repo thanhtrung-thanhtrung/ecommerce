@@ -286,13 +286,13 @@ const Analytics = () => {
                 {formatCurrency(analyticsData.totalRevenue / getDaysCount())}
               </span>
             </div>
-            <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+            {/* <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
               <span className="text-xs font-medium text-gray-700">Đơn hàng TB/ngày</span>
               <span className="text-xs font-bold text-gray-900">
                 {(analyticsData.totalOrders / getDaysCount()).toFixed(2)}
               </span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+            </div> */}
+            {/* <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
               <span className="text-xs font-medium text-gray-700">Giá trị ĐH TB</span>
               <span className="text-xs font-bold text-gray-900">
                 {formatCurrency(
@@ -301,7 +301,7 @@ const Analytics = () => {
                     : 0
                 )}
               </span>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

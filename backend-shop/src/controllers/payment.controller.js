@@ -6,84 +6,120 @@ class PaymentController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({
+          success: false,
+          message: "Dữ liệu không hợp lệ",
+          errors: errors.array(),
+        });
       }
 
-      const { maDonHang, maHinhThucThanhToan } = req.body;
+      const { orderId, paymentMethodId } = req.body;
       const userId = req.user?.userId || null;
 
+      // ✅ THÊM: Debug logging với thông tin rõ ràng hơn
+      console.log("🔍 Payment Debug:", {
+        orderId,
+        userId: userId || "Guest User",
+        paymentMethodId,
+        userType: userId ? "Logged In" : "Guest",
+        requestBody: req.body,
+        hasAuth: !!req.headers.authorization,
+      });
+
+      const clientIp =
+        req.headers["x-forwarded-for"]?.split(",")[0] ||
+        req.socket?.remoteAddress ||
+        "127.0.0.1";
+
       const paymentData = await paymentService.createPayment(
-        maDonHang,
+        orderId,
         userId,
-        maHinhThucThanhToan
+        paymentMethodId,
+        clientIp
       );
-      res.json(paymentData);
+
+      res.json({ success: true, ...paymentData });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error("❌ Create payment error:", error.message);
+      res.status(400).json({ success: false, message: error.message });
     }
   }
 
   async handleVNPayIPN(req, res) {
     try {
-      const result = await paymentService.handleVNPayIPN(req.query);
-      res.json(result);
+      console.log("Received VNPay IPN:", req.body);
+      const result = await paymentService.handleVNPayIPN(req.body);
+      res.status(200).json(result);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error("VNPay IPN error:", error);
+      res.status(200).json({ RspCode: "99", Message: "Unknown error" });
     }
   }
 
   async handleVNPayReturn(req, res) {
     try {
-      const vnpayData = req.query;
-      if (vnpayData.vnp_ResponseCode === "00") {
-        res.json({
-          code: "00",
-          message: "Thanh toán thành công",
-          data: vnpayData,
-        });
-      } else {
-        res.json({
-          code: vnpayData.vnp_ResponseCode,
-          message: "Thanh toán thất bại",
-          data: vnpayData,
-        });
-      }
+      console.log("Received VNPay Return:", req.query);
+      const result = await paymentService.handleVNPayReturn(req.query);
+      res.json(result);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error("VNPay Return error:", error);
+      res.status(400).json({
+        success: false,
+        message: "Lỗi xử lý kết quả thanh toán",
+        error: error.message,
+      });
     }
   }
 
-  // Các phương thức xử lý callback từ MoMo và ZaloPay sẽ được thêm sau
+  async testVNPay(req, res) {
+    try {
+      const testOrder = {
+        id: "TEST_" + Date.now(),
+        MaDonHang: "TEST_" + Date.now(),
+        TongThanhToan: 100000,
+      };
+
+      const paymentData = await paymentService.createVNPayPayment(testOrder);
+      res.json({
+        success: true,
+        message: "Tạo URL test VNPay thành công",
+        ...paymentData,
+      });
+    } catch (error) {
+      console.error("Test VNPay error:", error);
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
   async handleMoMoIPN(req, res) {
-    res.status(501).json({ message: "Chức năng đang được phát triển" });
+    res
+      .status(501)
+      .json({ success: false, message: "Chức năng MoMo đang được phát triển" });
   }
 
   async handleZaloPayIPN(req, res) {
-    res.status(501).json({ message: "Chức năng đang được phát triển" });
+    res.status(501).json({
+      success: false,
+      message: "Chức năng ZaloPay đang được phát triển",
+    });
   }
 
-  // Lấy danh sách phương thức thanh toán
   async getPaymentMethods(req, res) {
     try {
       const paymentMethods =
-        await paymentService.layDanhSachPhuongThucThanhToan({
-          trangThai: 1, // Chỉ lấy những phương thức đang hoạt động
-        });
+        await paymentService.layDanhSachPhuongThucThanhToan({ trangThai: 1 });
       res.json(paymentMethods);
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   }
 
-  // Admin: Lấy tất cả phương thức thanh toán
   async getPaymentMethodsAdmin(req, res) {
     try {
       const { search, status } = req.query;
       const filters = {};
-
       if (search) filters.tuKhoa = search;
       if (status !== undefined) filters.trangThai = parseInt(status);
-
       const paymentMethods =
         await paymentService.layDanhSachPhuongThucThanhToan(filters);
       res.json(paymentMethods);
@@ -92,7 +128,6 @@ class PaymentController {
     }
   }
 
-  // Admin: Tạo phương thức thanh toán mới
   async createPaymentMethod(req, res) {
     try {
       const errors = validationResult(req);
@@ -113,7 +148,6 @@ class PaymentController {
     }
   }
 
-  // Admin: Cập nhật phương thức thanh toán
   async updatePaymentMethod(req, res) {
     try {
       const errors = validationResult(req);
@@ -136,7 +170,6 @@ class PaymentController {
     }
   }
 
-  // Admin: Cập nhật trạng thái phương thức thanh toán
   async updatePaymentStatus(req, res) {
     try {
       const errors = validationResult(req);
@@ -157,15 +190,11 @@ class PaymentController {
     }
   }
 
-  // Admin: Xóa phương thức thanh toán
   async deletePaymentMethod(req, res) {
     try {
       const { id } = req.params;
       const result = await paymentService.xoaPhuongThucThanhToan(id);
-      res.json({
-        success: true,
-        message: result.message,
-      });
+      res.json({ success: true, message: result.message });
     } catch (error) {
       res.status(400).json({ message: error.message });
     }

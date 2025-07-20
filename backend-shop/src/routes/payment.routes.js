@@ -3,7 +3,7 @@ const router = express.Router();
 const paymentController = require("../controllers/payment.controller");
 const {
   createPaymentValidator,
-  paymentMethodValidator,
+  updatePaymentValidator,
   updateStatusValidator,
 } = require("../validators/payment.validator");
 const {
@@ -11,42 +11,39 @@ const {
   checkAdminRole,
 } = require("../middlewares/auth.middleware");
 
-// Route lấy danh sách phương thức thanh toán (public)
+// Public
 router.get("/methods", paymentController.getPaymentMethods);
-
-// Route tạo thanh toán (không cần xác thực)
 router.post("/create", createPaymentValidator, paymentController.createPayment);
-
-// Routes callback từ các cổng thanh toán (không yêu cầu xác thực)
-router.get("/vnpay/ipn", paymentController.handleVNPayIPN);
+router.post(
+  "/vnpay/create-payment-url",
+  createPaymentValidator,
+  paymentController.createPayment
+);
+router.get("/test/vnpay", paymentController.testVNPay);
+router.post("/vnpay/ipn", paymentController.handleVNPayIPN);
 router.get("/vnpay/return", paymentController.handleVNPayReturn);
-router.get("/momo/ipn", paymentController.handleMoMoIPN);
-router.get("/zalopay/ipn", paymentController.handleZaloPayIPN);
 
-// Admin routes - yêu cầu quyền admin (Admin hoặc Nhân viên)
+// Admin
 router.get(
   "/admin",
   verifyToken,
   checkAdminRole(),
   paymentController.getPaymentMethodsAdmin
 );
-
 router.post(
   "/admin",
   verifyToken,
   checkAdminRole(),
-  paymentMethodValidator,
+  updatePaymentValidator,
   paymentController.createPaymentMethod
 );
-
 router.put(
   "/admin/:id",
   verifyToken,
   checkAdminRole(),
-  paymentMethodValidator,
+  updatePaymentValidator,
   paymentController.updatePaymentMethod
 );
-
 router.patch(
   "/admin/:id/status",
   verifyToken,
@@ -54,7 +51,6 @@ router.patch(
   updateStatusValidator,
   paymentController.updatePaymentStatus
 );
-
 router.delete(
   "/admin/:id",
   verifyToken,

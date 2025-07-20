@@ -1,6 +1,5 @@
 const { body, param, query } = require("express-validator");
 
-// Validator cho danh sách sản phẩm
 const getAllProductsValidator = [
   query("page")
     .optional()
@@ -13,7 +12,6 @@ const getAllProductsValidator = [
     .withMessage("Số lượng bản ghi mỗi trang phải từ 1 đến 100"),
 ];
 
-// Validator cho tìm kiếm sản phẩm
 const searchProductsValidator = [
   query("tuKhoa")
     .optional()
@@ -333,7 +331,6 @@ const deleteProductValidator = [
     .withMessage("ID sản phẩm không hợp lệ"),
 ];
 
-// Validator cho danh sách sản phẩm (admin)
 const getAllProductsAdminValidator = [
   query("page")
     .optional()

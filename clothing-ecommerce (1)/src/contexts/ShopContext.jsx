@@ -851,6 +851,7 @@ export const ShopProvider = ({ children }) => {
         fetchBrands,
         getBrandById,
         fetchOrders,
+        fetchUserOrders, // ✅ Thêm function này
         addToWishlist,
         removeFromWishlist,
         fetchWishlist,

@@ -42,7 +42,8 @@ class RevenueService {
         COUNT(DISTINCT CASE WHEN dh.id_NguoiMua IS NULL THEN dh.session_id END) AS soKhachVangLai
       FROM donhang dh
       WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai != 5
+        AND dh.TrangThai = 4
+
       GROUP BY ${groupByClause}
       ORDER BY thoiGian ASC`,
       [dateFormat, startDate, endDate]
@@ -57,7 +58,7 @@ class RevenueService {
       FROM donhang dh
       LEFT JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
       WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai != 5
+AND dh.TrangThai = 4
       GROUP BY httt.id, httt.Ten
       ORDER BY tongThanhToan DESC`,
       [startDate, endDate]
@@ -295,7 +296,7 @@ class RevenueService {
       JOIN sanpham sp ON ctsp.id_SanPham = sp.id
       JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
       WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai != 5
+AND dh.TrangThai = 4
       GROUP BY dm.id, dm.Ten
       ORDER BY tongDoanhThu DESC`,
       [startDate, endDate]
@@ -314,7 +315,7 @@ class RevenueService {
       JOIN sanpham sp ON ctsp.id_SanPham = sp.id
       JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
       WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai != 5
+AND dh.TrangThai = 4
       GROUP BY th.id, th.Ten
       ORDER BY tongDoanhThu DESC`,
       [startDate, endDate]
@@ -336,7 +337,7 @@ class RevenueService {
       JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
       JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
       WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai != 5
+AND dh.TrangThai = 4
       GROUP BY sp.id, sp.Ten, th.Ten, dm.Ten
       ORDER BY tongSoLuong DESC
       LIMIT 10`,
@@ -409,7 +410,7 @@ class RevenueService {
       FROM nguoidung nd
       JOIN donhang dh ON nd.id = dh.id_NguoiMua
       WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai != 5
+AND dh.TrangThai = 4
       GROUP BY nd.id, nd.HoTen, nd.Email, nd.SDT
       ORDER BY tongChiTieu DESC
       LIMIT ?`,
@@ -442,8 +443,9 @@ class RevenueService {
       FROM donhang dh
       JOIN magiamgia mgg ON dh.MaGiamGia = mgg.Ma
       WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai != 5
-        AND dh.GiamGia > 0
+      AND dh.TrangThai = 4
+  
+      AND dh.GiamGia > 0
       GROUP BY mgg.Ma, mgg.Ten
       ORDER BY tongGiaTriGiam DESC`,
       [startDate, endDate]
