@@ -120,7 +120,7 @@ export const AdminProvider = ({ children }) => {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ email, matKhau: password }),
+        body: JSON.stringify({ Email: email, MatKhau: password }),
       });
 
       if (!response.ok) {
@@ -130,13 +130,21 @@ export const AdminProvider = ({ children }) => {
 
       const data = await response.json();
 
-      // Check if user has admin or staff role
-      if (!data.user || (data.user.maQuyen !== 1 && data.user.maQuyen !== 2)) {
+      // Backend trả về { accessToken, refreshToken, user }
+      if (!data.accessToken || !data.user) {
+        throw new Error('Response không hợp lệ');
+      }
+
+      // Kiểm tra quyền admin (role = 1) trong user.vaiTro array
+      const userRoles = data.user.vaiTro || [];
+      const isAdmin = userRoles.includes('Admin');
+
+      if (!isAdmin) {
         throw new Error('Bạn không có quyền truy cập vào trang quản trị');
       }
 
-      // Store token and user data
-      localStorage.setItem('adminToken', data.token);
+      // Store accessToken và user data
+      localStorage.setItem('adminToken', data.accessToken);
       localStorage.setItem('adminUser', JSON.stringify(data.user));
 
       setUser(data.user);

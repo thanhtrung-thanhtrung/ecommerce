@@ -241,6 +241,7 @@ const Brands = () => {
                         </div>
                       </div>
                     </td>
+                    
                     <td className="px-3 py-2 whitespace-nowrap">
                       {brand.Website ? (
                         <a

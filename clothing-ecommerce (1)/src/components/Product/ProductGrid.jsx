@@ -11,10 +11,8 @@ import { useEffect, useState, useCallback } from "react";
 const ProductGrid = ({ products }) => {
   const { isAuthenticated, addToWishlist, removeFromWishlist, wishlistItems } = useShop();
 
-  const [wishlistStats, setWishlistStats] = useState([]);
+  const [wishlistStats, setWishlistStats] = useState(new Map());
   const { addToCart } = useCartContext();
-
-
 
   const showWishlist = useCallback(async () => {
     try {
@@ -22,19 +20,34 @@ const ProductGrid = ({ products }) => {
       const result = await response.json();
 
       if (result && result.success) {
-        setWishlistStats(result.data || []);
+        // Lấy dữ liệu wishlist từ response
+        const wishlistData = result.data?.data || result.data || [];
+
+        // Thống kê số lượt yêu thích cho từng sản phẩm
+        const statsMap = new Map();
+        wishlistData.forEach(item => {
+          const productId = item.id_SanPham;
+          if (statsMap.has(productId)) {
+            statsMap.set(productId, statsMap.get(productId) + 1);
+          } else {
+            statsMap.set(productId, 1);
+          }
+        });
+
+        setWishlistStats(statsMap);
       } else {
-        setWishlistStats([]);
+        setWishlistStats(new Map());
       }
     } catch (error) {
       console.error("Lỗi khi gọi API wishlist:", error);
-      setWishlistStats([]);
+      setWishlistStats(new Map());
     }
   }, []);
 
   useEffect(() => {
     showWishlist();
   }, [showWishlist]);
+
   const getProductImage = (product) => {
     try {
       // Ưu tiên sử dụng images đã được parse từ ShopContext
@@ -91,9 +104,13 @@ const ProductGrid = ({ products }) => {
       if (isInWishlist) {
         await removeFromWishlist(product.id);
         toast.success("Đã xóa khỏi danh sách yêu thích");
+        // Cập nhật lại stats sau khi xóa
+        showWishlist();
       } else {
-        await addToWishlist(product.id); // chỉ truyền product.id, không truyền object
+        await addToWishlist(product.id);
         toast.success("Đã thêm vào danh sách yêu thích");
+        // Cập nhật lại stats sau khi thêm
+        showWishlist();
       }
     } catch (error) {
       toast.error("Có lỗi xảy ra");
@@ -198,13 +215,9 @@ const ProductGrid = ({ products }) => {
                       className={`h-4 w-4 ${isInWishlist ? "fill-red-500 text-red-500" : ""}`}
                     />
                     <span className="text-xs text-gray-500">
-                      {
-                        wishlistStats.find((item) => item.id_SanPham === product.id)
-                          ?.so_luot_yeu_thich || 0
-                      }
+                      {wishlistStats.get(product.id) || 0}
                     </span>
                   </div>
-
                 </button>
               </div>
             </div>

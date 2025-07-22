@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const db = require("../config/database");
+const { User, Role, UserRole } = require("../models");
 
 // Middleware xác thực token bắt buộc
 const verifyToken = (req, res, next) => {
@@ -17,6 +17,7 @@ const verifyToken = (req, res, next) => {
       id: decoded.userId,
       email: decoded.email,
       role: decoded.role,
+      roleName: decoded.roleName,
     };
     next();
   } catch (error) {
@@ -25,6 +26,7 @@ const verifyToken = (req, res, next) => {
       .json({ message: "Token không hợp lệ hoặc đã hết hạn" });
   }
 };
+
 // Middleware xác thực tùy chọn - cho phép cả user đã đăng nhập và khách
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -38,6 +40,7 @@ const optionalAuth = (req, res, next) => {
         id: decoded.userId,
         email: decoded.email,
         role: decoded.role,
+        roleName: decoded.roleName,
       };
     } catch (error) {
       // Token không hợp lệ, tiếp tục như khách
@@ -71,17 +74,23 @@ const checkRole = (allowedRoles) => {
       // Chuyển đổi allowedRoles thành mảng nếu là string
       const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
-      // Lấy thông tin quyền của user từ database qua bảng quyenguoidung
-      const [userRoles] = await db.execute(
-        `SELECT q.TenQuyen as roleName 
-         FROM nguoidung nd
-         JOIN quyenguoidung qnd ON nd.id = qnd.id_NguoiDung
-         JOIN quyen q ON qnd.id_Quyen = q.id
-         WHERE nd.id = ? AND nd.TrangThai = 1`,
-        [req.user.id]
-      );
+      // Lấy thông tin quyền của user từ database bằng Sequelize
+      const user = await User.findOne({
+        where: {
+          id: req.user.id,
+          TrangThai: 1,
+        },
+        include: [
+          {
+            model: Role,
+            as: "roles",
+            attributes: ["TenQuyen"],
+            through: { attributes: [] },
+          },
+        ],
+      });
 
-      if (!userRoles || userRoles.length === 0) {
+      if (!user || !user.roles || user.roles.length === 0) {
         console.error(`User ${req.user.id} has no roles assigned`);
         return res.status(403).json({
           message: "Bạn không có quyền truy cập tài nguyên này",
@@ -90,7 +99,7 @@ const checkRole = (allowedRoles) => {
       }
 
       // Lấy danh sách các quyền của user
-      const userRoleNames = userRoles.map((role) => role.roleName);
+      const userRoleNames = user.roles.map((role) => role.TenQuyen);
       console.log(`User ${req.user.id} has roles:`, userRoleNames);
 
       // Kiểm tra xem user có ít nhất một trong các quyền được phép không
@@ -140,19 +149,19 @@ const checkAccountStatus = async (req, res, next) => {
       return next(); // Cho phép tiếp tục nếu là khách
     }
 
-    const [user] = await db.execute(
-      "SELECT TrangThai FROM nguoidung WHERE id = ?",
-      [req.user.id]
-    );
+    const user = await User.findOne({
+      where: { id: req.user.id },
+      attributes: ["TrangThai"],
+    });
 
-    if (user.length === 0) {
+    if (!user) {
       return res.status(404).json({ message: "Không tìm thấy tài khoản" });
     }
 
-    if (user[0].TrangThai !== 1) {
+    if (user.TrangThai !== 1) {
       return res.status(403).json({
         message: "Tài khoản đã bị khóa hoặc chưa được kích hoạt",
-        status: user[0].TrangThai,
+        status: user.TrangThai,
       });
     }
 
@@ -185,7 +194,7 @@ const checkSession = (req, res, next) => {
   next();
 };
 
-// Middleware kiểm tra IP và thiết bị
+// Middleware kiểm tra IP và thiết bị (commented out vì chưa có model Device)
 const checkDeviceAndIP = async (req, res, next) => {
   try {
     if (!req.user) {
@@ -195,27 +204,29 @@ const checkDeviceAndIP = async (req, res, next) => {
     const clientIP = req.ip || req.connection.remoteAddress;
     const userAgent = req.headers["user-agent"];
 
-    // Kiểm tra IP và thiết bị trong database
-    const [device] = await db.execute(
-      `SELECT * FROM thietbi 
-       WHERE id_NguoiDung = ? AND IP = ? AND UserAgent = ? AND TrangThai = 1`,
-      [req.user.id, clientIP, userAgent]
-    );
+    // TODO: Tạo model Device để thay thế raw SQL
+    // const device = await Device.findOne({
+    //   where: {
+    //     id_NguoiDung: req.user.id,
+    //     IP: clientIP,
+    //     UserAgent: userAgent,
+    //     TrangThai: 1
+    //   }
+    // });
 
-    if (device.length === 0) {
-      // Ghi log thiết bị mới
-      await db.execute(
-        `INSERT INTO thietbi (id_NguoiDung, IP, UserAgent, TrangThai, NgayTao)
-         VALUES (?, ?, ?, 1, NOW())`,
-        [req.user.id, clientIP, userAgent]
-      );
-    } else {
-      // Cập nhật thời gian hoạt động
-      await db.execute(
-        "UPDATE thietbi SET ThoiGianHoatDongCuoi = NOW() WHERE id = ?",
-        [device[0].id]
-      );
-    }
+    // if (!device) {
+    //   await Device.create({
+    //     id_NguoiDung: req.user.id,
+    //     IP: clientIP,
+    //     UserAgent: userAgent,
+    //     TrangThai: 1,
+    //     NgayTao: new Date()
+    //   });
+    // } else {
+    //   await device.update({
+    //     ThoiGianHoatDongCuoi: new Date()
+    //   });
+    // }
 
     next();
   } catch (error) {
@@ -224,12 +235,80 @@ const checkDeviceAndIP = async (req, res, next) => {
   }
 };
 
+// Middleware kiểm tra quyền cụ thể cho từng chức năng
+const checkPermission = (permission) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({
+          message: "Vui lòng đăng nhập để tiếp tục",
+        });
+      }
+
+      const user = await User.findOne({
+        where: {
+          id: req.user.id,
+          TrangThai: 1,
+        },
+        include: [
+          {
+            model: Role,
+            as: "roles",
+            attributes: ["TenQuyen"],
+            through: { attributes: [] },
+          },
+        ],
+      });
+
+      if (!user || !user.roles || user.roles.length === 0) {
+        return res.status(403).json({
+          message: "Bạn không có quyền truy cập tài nguyên này",
+        });
+      }
+
+      const userRoleNames = user.roles.map((role) => role.TenQuyen);
+
+      // Logic phân quyền chi tiết
+      const permissions = {
+        manage_users: ["Admin"],
+        manage_products: ["Admin", "Nhân viên"],
+        manage_orders: ["Admin", "Nhân viên"],
+        view_reports: ["Admin", "Nhân viên"],
+        manage_categories: ["Admin", "Nhân viên"],
+        manage_brands: ["Admin", "Nhân viên"],
+        manage_suppliers: ["Admin", "Nhân viên"],
+        customer_actions: ["Admin", "Nhân viên", "Khách hàng"],
+      };
+
+      const allowedRoles = permissions[permission] || [];
+      const hasPermission = allowedRoles.some((role) =>
+        userRoleNames.includes(role)
+      );
+
+      if (!hasPermission) {
+        return res.status(403).json({
+          message: "Bạn không có quyền thực hiện hành động này",
+          requiredPermission: permission,
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error("Error in checkPermission middleware:", error);
+      return res.status(500).json({
+        message: "Lỗi hệ thống khi kiểm tra quyền",
+      });
+    }
+  };
+};
+
 module.exports = {
   verifyToken,
   optionalAuth,
   checkRole,
-  checkAdminRole, // Thêm middleware mới
+  checkAdminRole,
   checkAccountStatus,
   checkSession,
   checkDeviceAndIP,
+  checkPermission, // Thêm middleware mới
 };

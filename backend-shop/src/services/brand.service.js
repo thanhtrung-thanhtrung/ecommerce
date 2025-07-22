@@ -1,16 +1,17 @@
-const db = require("../config/database");
+const { Brand, Product, Category } = require("../models");
+const { Op } = require("sequelize");
+const { sequelize } = require("../config/sequelize");
 const cloudinaryUtil = require("../utils/cloudinary.util");
 
 class BrandService {
   // Tạo thương hiệu mới
   async taoThuongHieu(brandData) {
     // Kiểm tra tên thương hiệu đã tồn tại chưa
-    const [existingName] = await db.execute(
-      "SELECT id FROM thuonghieu WHERE Ten = ?",
-      [brandData.Ten]
-    );
+    const existingBrand = await Brand.findOne({
+      where: { Ten: brandData.Ten },
+    });
 
-    if (existingName.length > 0) {
+    if (existingBrand) {
       throw new Error("Tên thương hiệu đã tồn tại");
     }
 
@@ -22,34 +23,28 @@ class BrandService {
       brandData.Logo = uploadResult.url;
     }
 
-    const [result] = await db.execute(
-      `INSERT INTO thuonghieu (Ten, MoTa, TrangThai, Website, Logo) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        brandData.Ten,
-        brandData.MoTa || null,
-        brandData.TrangThai ?? 1,
-        brandData.Website || null,
-        brandData.Logo || null,
-      ]
-    );
-
-    return {
-      id: result.insertId,
-      ...brandData,
+    const newBrand = await Brand.create({
+      Ten: brandData.Ten,
+      MoTa: brandData.MoTa || null,
       TrangThai: brandData.TrangThai ?? 1,
-    };
+      Website: brandData.Website || null,
+      Logo: brandData.Logo || null,
+    });
+
+    return newBrand;
   }
 
   // Cập nhật thương hiệu
   async capNhatThuongHieu(id, brandData) {
     // Kiểm tra tên thương hiệu đã tồn tại chưa (trừ thương hiệu hiện tại)
-    const [existingName] = await db.execute(
-      "SELECT id FROM thuonghieu WHERE Ten = ? AND id != ?",
-      [brandData.Ten, id]
-    );
+    const existingBrand = await Brand.findOne({
+      where: {
+        Ten: brandData.Ten,
+        id: { [Op.ne]: id },
+      },
+    });
 
-    if (existingName.length > 0) {
+    if (existingBrand) {
       throw new Error("Tên thương hiệu đã tồn tại");
     }
 
@@ -61,21 +56,20 @@ class BrandService {
       brandData.Logo = uploadResult.url;
     }
 
-    const [result] = await db.execute(
-      `UPDATE thuonghieu SET 
-        Ten = ?, MoTa = ?, TrangThai = ?, Website = ?, Logo = ?
-      WHERE id = ?`,
-      [
-        brandData.Ten,
-        brandData.MoTa || null,
-        brandData.TrangThai ?? 1,
-        brandData.Website || null,
-        brandData.Logo || null,
-        id,
-      ]
+    const [updatedRowsCount] = await Brand.update(
+      {
+        Ten: brandData.Ten,
+        MoTa: brandData.MoTa || null,
+        TrangThai: brandData.TrangThai ?? 1,
+        Website: brandData.Website || null,
+        Logo: brandData.Logo || null,
+      },
+      {
+        where: { id },
+      }
     );
 
-    if (result.affectedRows === 0) {
+    if (updatedRowsCount === 0) {
       throw new Error("Không tìm thấy thương hiệu");
     }
 
@@ -85,20 +79,19 @@ class BrandService {
   // Xóa thương hiệu
   async xoaThuongHieu(id) {
     // Kiểm tra xem thương hiệu có sản phẩm không
-    const [products] = await db.execute(
-      "SELECT COUNT(*) as count FROM sanpham WHERE id_ThuongHieu = ?",
-      [id]
-    );
+    const productCount = await Product.count({
+      where: { id_ThuongHieu: id },
+    });
 
-    if (products[0].count > 0) {
+    if (productCount > 0) {
       throw new Error("Không thể xóa thương hiệu đang có sản phẩm");
     }
 
-    const [result] = await db.execute("DELETE FROM thuonghieu WHERE id = ?", [
-      id,
-    ]);
+    const deletedRowsCount = await Brand.destroy({
+      where: { id },
+    });
 
-    if (result.affectedRows === 0) {
+    if (deletedRowsCount === 0) {
       throw new Error("Không tìm thấy thương hiệu");
     }
 
@@ -107,12 +100,12 @@ class BrandService {
 
   // Cập nhật trạng thái
   async capNhatTrangThai(id, trangThai) {
-    const [result] = await db.execute(
-      "UPDATE thuonghieu SET TrangThai = ? WHERE id = ?",
-      [trangThai, id]
+    const [updatedRowsCount] = await Brand.update(
+      { TrangThai: trangThai },
+      { where: { id } }
     );
 
-    if (result.affectedRows === 0) {
+    if (updatedRowsCount === 0) {
       throw new Error("Không tìm thấy thương hiệu");
     }
 
@@ -121,47 +114,89 @@ class BrandService {
 
   // Lấy chi tiết thương hiệu
   async layChiTietThuongHieu(id) {
-    const [brands] = await db.execute(
-      `SELECT th.*, 
-        COUNT(DISTINCT sp.id) as soSanPham,
-        COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
-        COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong,
-        SUM(sp.SoLuongDaBan) as tongSoLuongBan,
-        SUM(sp.SoLuongDaBan * sp.Gia) as tongDoanhThu
-      FROM thuonghieu th
-      LEFT JOIN sanpham sp ON th.id = sp.id_ThuongHieu
-      WHERE th.id = ?
-      GROUP BY th.id`,
-      [id]
-    );
+    const brand = await Brand.findByPk(id, {
+      attributes: [
+        "id",
+        "Ten",
+        "MoTa",
+        "TrangThai",
+        "Website",
+        "Logo",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.literal(
+              "CASE WHEN products.TrangThai = 1 THEN products.id END"
+            )
+          ),
+          "soSanPhamHoatDong",
+        ],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.literal(
+              "CASE WHEN products.TrangThai = 0 THEN products.id END"
+            )
+          ),
+          "soSanPhamKhongHoatDong",
+        ],
+        [
+          sequelize.fn("SUM", sequelize.col("products.SoLuongDaBan")),
+          "tongSoLuongBan",
+        ],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("products.SoLuongDaBan * products.Gia")
+          ),
+          "tongDoanhThu",
+        ],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          required: false,
+        },
+      ],
+      group: ["Brand.id"],
+    });
 
-    if (brands.length === 0) {
+    if (!brand) {
       throw new Error("Không tìm thấy thương hiệu");
     }
 
     // Lấy danh sách sản phẩm bán chạy nhất của thương hiệu
-    const [topProducts] = await db.execute(
-      `SELECT id, Ten, Gia, HinhAnh, TrangThai, SoLuongDaBan
-       FROM sanpham
-       WHERE id_ThuongHieu = ?
-       ORDER BY SoLuongDaBan DESC
-       LIMIT 5`,
-      [id]
-    );
+    const topProducts = await Product.findAll({
+      where: { id_ThuongHieu: id },
+      attributes: ["id", "Ten", "Gia", "HinhAnh", "TrangThai", "SoLuongDaBan"],
+      order: [["SoLuongDaBan", "DESC"]],
+      limit: 5,
+    });
 
     // Lấy danh sách danh mục có sản phẩm của thương hiệu
-    const [categories] = await db.execute(
-      `SELECT DISTINCT dm.id, dm.Ten, 
-        COUNT(sp.id) as soSanPham
-       FROM danhmuc dm
-       JOIN sanpham sp ON dm.id = sp.id_DanhMuc
-       WHERE sp.id_ThuongHieu = ?
-       GROUP BY dm.id`,
-      [id]
-    );
+    const categories = await Category.findAll({
+      attributes: [
+        "id",
+        "Ten",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          where: { id_ThuongHieu: id },
+          attributes: [],
+          required: true,
+        },
+      ],
+      group: ["Category.id"],
+    });
 
     return {
-      ...brands[0],
+      ...brand.get({ plain: true }),
       sanPhamBanChay: topProducts,
       danhMuc: categories,
     };
@@ -169,74 +204,159 @@ class BrandService {
 
   // Lấy danh sách thương hiệu
   async layDanhSachThuongHieu(filters = {}) {
-    let query = `
-      SELECT th.*, 
-        COUNT(DISTINCT sp.id) as soSanPham,
-        COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
-        COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong,
-        SUM(sp.SoLuongDaBan) as tongSoLuongBan,
-        SUM(sp.SoLuongDaBan * sp.Gia) as tongDoanhThu
-      FROM thuonghieu th
-      LEFT JOIN sanpham sp ON th.id = sp.id_ThuongHieu
-      WHERE 1=1
-    `;
-    const params = [];
+    const whereClause = {};
 
     if (filters.trangThai !== undefined) {
-      query += " AND th.TrangThai = ?";
-      params.push(filters.trangThai);
+      whereClause.TrangThai = filters.trangThai;
     }
 
     if (filters.tuKhoa) {
-      query += " AND (th.Ten LIKE ? OR th.MoTa LIKE ?)";
-      const searchTerm = `%${filters.tuKhoa}%`;
-      params.push(searchTerm, searchTerm);
+      whereClause[Op.or] = [
+        { Ten: { [Op.like]: `%${filters.tuKhoa}%` } },
+        { MoTa: { [Op.like]: `%${filters.tuKhoa}%` } },
+      ];
     }
 
-    query += " GROUP BY th.id ORDER BY th.id DESC";
+    const brands = await Brand.findAll({
+      where: whereClause,
+      attributes: [
+        "id",
+        "Ten",
+        "MoTa",
+        "TrangThai",
+        "Website",
+        "Logo",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.literal(
+              "CASE WHEN products.TrangThai = 1 THEN products.id END"
+            )
+          ),
+          "soSanPhamHoatDong",
+        ],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.literal(
+              "CASE WHEN products.TrangThai = 0 THEN products.id END"
+            )
+          ),
+          "soSanPhamKhongHoatDong",
+        ],
+        [
+          sequelize.fn("SUM", sequelize.col("products.SoLuongDaBan")),
+          "tongSoLuongBan",
+        ],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("products.SoLuongDaBan * products.Gia")
+          ),
+          "tongDoanhThu",
+        ],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          required: false,
+        },
+      ],
+      group: ["Brand.id"],
+      order: [["id", "DESC"]],
+    });
 
-    const [brands] = await db.execute(query, params);
     return brands;
   }
 
   // Thống kê thương hiệu
   async thongKeThuongHieu() {
-    const [stats] = await db.execute(`
-      SELECT 
-        COUNT(*) as tongSoThuongHieu,
-        SUM(CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END) as soThuongHieuHoatDong,
-        SUM(CASE WHEN TrangThai = 0 THEN 1 ELSE 0 END) as soThuongHieuKhongHoatDong
-      FROM thuonghieu
-    `);
+    // Thống kê tổng quan
+    const stats = await Brand.findOne({
+      attributes: [
+        [sequelize.fn("COUNT", "*"), "tongSoThuongHieu"],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END")
+          ),
+          "soThuongHieuHoatDong",
+        ],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("CASE WHEN TrangThai = 0 THEN 1 ELSE 0 END")
+          ),
+          "soThuongHieuKhongHoatDong",
+        ],
+      ],
+      raw: true,
+    });
 
-    const [topBrands] = await db.execute(`
-      SELECT 
-        th.id,
-        th.Ten,
-        COUNT(sp.id) as soSanPham,
-        SUM(sp.SoLuongDaBan) as tongSoLuongBan,
-        SUM(sp.SoLuongDaBan * sp.Gia) as tongDoanhThu
-      FROM thuonghieu th
-      LEFT JOIN sanpham sp ON th.id = sp.id_ThuongHieu
-      WHERE YEAR(sp.NgayTao) = YEAR(CURRENT_DATE)
-      GROUP BY th.id
-      ORDER BY tongDoanhThu DESC
-      LIMIT 5
-    `);
+    // Top thương hiệu theo doanh thu năm hiện tại
+    const topBrands = await Brand.findAll({
+      attributes: [
+        "id",
+        "Ten",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+        [
+          sequelize.fn("SUM", sequelize.col("products.SoLuongDaBan")),
+          "tongSoLuongBan",
+        ],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("products.SoLuongDaBan * products.Gia")
+          ),
+          "tongDoanhThu",
+        ],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          where: sequelize.where(
+            sequelize.fn("YEAR", sequelize.col("products.NgayTao")),
+            sequelize.fn("YEAR", sequelize.fn("NOW"))
+          ),
+          required: false,
+        },
+      ],
+      group: ["Brand.id"],
+      order: [[sequelize.literal("tongDoanhThu"), "DESC"]],
+      limit: 5,
+    });
 
-    const [brandDistribution] = await db.execute(`
-      SELECT 
-        th.Ten,
-        COUNT(sp.id) as soSanPham,
-        ROUND(COUNT(sp.id) * 100.0 / (SELECT COUNT(*) FROM sanpham), 2) as phanTram
-      FROM thuonghieu th
-      LEFT JOIN sanpham sp ON th.id = sp.id_ThuongHieu
-      GROUP BY th.id
-      ORDER BY soSanPham DESC
-    `);
+    // Phân bố thương hiệu theo số sản phẩm
+    const brandDistribution = await Brand.findAll({
+      attributes: [
+        "Ten",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+        [
+          sequelize.literal(
+            "ROUND(COUNT(products.id) * 100.0 / (SELECT COUNT(*) FROM sanpham), 2)"
+          ),
+          "phanTram",
+        ],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          required: false,
+        },
+      ],
+      group: ["Brand.id"],
+      order: [[sequelize.literal("soSanPham"), "DESC"]],
+    });
 
     return {
-      tongQuat: stats[0],
+      tongQuat: stats,
       topThuongHieu: topBrands,
       phanBoThuongHieu: brandDistribution,
     };

@@ -91,236 +91,233 @@ const reviewProductValidator = [
 ];
 
 // Validator cho tạo sản phẩm mới
-const createProductValidator = [
-  body("Ten")
-    .notEmpty()
-    .withMessage("Tên sản phẩm không được để trống")
-    .trim()
-    .isLength({ max: 255 })
-    .withMessage("Tên sản phẩm không được vượt quá 255 ký tự"),
+// const createProductValidator = [
+//   body("Ten")
+//     .notEmpty()
+//     .withMessage("Tên sản phẩm không được để trống")
+//     .trim()
+//     .isLength({ max: 255 })
+//     .withMessage("Tên sản phẩm không được vượt quá 255 ký tự"),
 
-  body("MoTa")
-    .notEmpty()
-    .withMessage("Mô tả không được để trống")
-    .trim()
-    .isLength({ min: 10, max: 1000 })
-    .withMessage("Mô tả phải từ 10 đến 1000 ký tự"),
+//   body("MoTa")
+//     .notEmpty()
+//     .withMessage("Mô tả không được để trống")
+//     .trim()
+//     .isLength({ min: 10, max: 1000 })
+//     .withMessage("Mô tả phải từ 10 đến 1000 ký tự"),
 
-  body("MoTaChiTiet")
-    .notEmpty()
-    .withMessage("Mô tả chi tiết không được để trống")
-    .trim()
-    .isLength({ min: 50 })
-    .withMessage("Mô tả chi tiết phải có ít nhất 50 ký tự"),
+//   body("MoTaChiTiet")
+//     .notEmpty()
+//     .withMessage("Mô tả chi tiết không được để trống")
+//     .trim()
+//     .isLength({ min: 50 })
+//     .withMessage("Mô tả chi tiết phải có ít nhất 50 ký tự"),
 
-  body("ThongSoKyThuat")
-    .notEmpty()
-    .withMessage("Thông số kỹ thuật không được để trống")
-    .custom((value, { req }) => {
-      try {
-        // Nếu đã là object, không cần parse
-        if (
-          typeof value === "object" &&
-          value !== null &&
-          !Array.isArray(value)
-        ) {
-          req.body.ThongSoKyThuat = value;
-          return true;
-        }
+//   body("ThongSoKyThuat")
+//     .notEmpty()
+//     .withMessage("Thông số kỹ thuật không được để trống")
+//     .custom((value, { req }) => {
+//       try {
+//         // Nếu đã là object, không cần parse
+//         if (
+//           typeof value === "object" &&
+//           value !== null &&
+//           !Array.isArray(value)
+//         ) {
+//           req.body.ThongSoKyThuat = value;
+//           return true;
+//         }
 
-        // Nếu là chuỗi, thử parse thành object
-        const parsed = JSON.parse(value);
-        if (
-          typeof parsed !== "object" ||
-          Array.isArray(parsed) ||
-          parsed === null
-        ) {
-          throw new Error("Thông số kỹ thuật phải là đối tượng JSON hợp lệ");
-        }
-        req.body.ThongSoKyThuat = parsed;
-        return true;
-      } catch (e) {
-        throw new Error(
-          "Thông số kỹ thuật phải là chuỗi JSON hoặc đối tượng hợp lệ"
-        );
-      }
-    }),
+//         // Nếu là chuỗi, thử parse thành object
+//         const parsed = JSON.parse(value);
+//         if (
+//           typeof parsed !== "object" ||
+//           Array.isArray(parsed) ||
+//           parsed === null
+//         ) {
+//           throw new Error("Thông số kỹ thuật phải là đối tượng JSON hợp lệ");
+//         }
+//         req.body.ThongSoKyThuat = parsed;
+//         return true;
+//       } catch (e) {
+//         throw new Error(
+//           "Thông số kỹ thuật phải là chuỗi JSON hoặc đối tượng hợp lệ"
+//         );
+//       }
+//     }),
 
-  body("Gia")
-    .notEmpty()
-    .withMessage("Giá không được để trống")
-    .isFloat({ min: 0 })
-    .withMessage("Giá phải là số dương"),
+//   body("Gia")
+//     .notEmpty()
+//     .withMessage("Giá không được để trống")
+//     .isFloat({ min: 0 })
+//     .withMessage("Giá phải là số dương"),
 
-  body("GiaKhuyenMai")
-    .optional()
-    .isNumeric()
-    .withMessage("Giá khuyến mãi phải là số"),
+//   body("GiaKhuyenMai")
+//     .optional()
+//     .isNumeric()
+//     .withMessage("Giá khuyến mãi phải là số"),
 
-  body("id_DanhMuc")
-    .notEmpty()
-    .withMessage("Danh mục không được để trống")
-    .isInt()
-    .withMessage("Mã danh mục không hợp lệ"),
+//   body("id_DanhMuc")
+//     .notEmpty()
+//     .withMessage("Danh mục không được để trống")
+//     .isInt()
+//     .withMessage("Mã danh mục không hợp lệ"),
 
-  body("id_ThuongHieu")
-    .notEmpty()
-    .withMessage("Thương hiệu không được để trống")
-    .isInt()
-    .withMessage("Mã thương hiệu không hợp lệ"),
+//   body("id_ThuongHieu")
+//     .notEmpty()
+//     .withMessage("Thương hiệu không được để trống")
+//     .isInt()
+//     .withMessage("Mã thương hiệu không hợp lệ"),
 
-  body("id_NhaCungCap")
-    .notEmpty()
-    .withMessage("Nhà cung cấp không được để trống")
-    .isInt()
-    .withMessage("Mã nhà cung cấp không hợp lệ"),
+//   body("id_NhaCungCap")
+//     .notEmpty()
+//     .withMessage("Nhà cung cấp không được để trống")
+//     .isInt()
+//     .withMessage("Mã nhà cung cấp không hợp lệ"),
 
-  body("bienThe")
-    .notEmpty()
-    .withMessage("Phải có ít nhất một biến thể sản phẩm")
-    .custom((value, { req }) => {
-      try {
-        // Nếu đã là mảng, kiểm tra độ dài
-        if (Array.isArray(value)) {
-          if (value.length < 1) {
-            throw new Error("Phải có ít nhất một biến thể sản phẩm");
-          }
-          return true;
-        }
+//   body("bienThe")
+//     .notEmpty()
+//     .withMessage("Phải có ít nhất một biến thể sản phẩm")
+//     .custom((value, { req }) => {
+//       try {
+//         // Nếu đã là mảng, kiểm tra độ dài
+//         if (Array.isArray(value)) {
+//           if (value.length < 1) {
+//             throw new Error("Phải có ít nhất một biến thể sản phẩm");
+//           }
+//           return true;
+//         }
 
-        // Nếu là chuỗi, thử parse thành mảng
-        const parsed = JSON.parse(value);
-        if (!Array.isArray(parsed) || parsed.length < 1) {
-          throw new Error("Phải có ít nhất một biến thể sản phẩm");
-        }
-        req.body.bienThe = parsed; // Cập nhật lại giá trị đã parse
-        return true;
-      } catch (e) {
-        throw new Error(
-          "Biến thể sản phẩm phải là mảng JSON hợp lệ và có ít nhất một phần tử"
-        );
-      }
-    }),
+//         // Nếu là chuỗi, thử parse thành mảng
+//         const parsed = JSON.parse(value);
+//         if (!Array.isArray(parsed) || parsed.length < 1) {
+//           throw new Error("Phải có ít nhất một biến thể sản phẩm");
+//         }
+//         req.body.bienThe = parsed; // Cập nhật lại giá trị đã parse
+//         return true;
+//       } catch (e) {
+//         throw new Error(
+//           "Biến thể sản phẩm phải là mảng JSON hợp lệ và có ít nhất một phần tử"
+//         );
+//       }
+//     }),
 
-  body("bienThe.*.id_KichCo").custom((value, { req }) => {
-    // Nếu bienThe là chuỗi, cần kiểm tra sau khi đã parse
-    const bienThe = req.body.bienThe;
+//   body("bienThe.*.id_KichCo").custom((value, { req }) => {
+//     // Nếu bienThe là chuỗi, cần kiểm tra sau khi đã parse
+//     const bienThe = req.body.bienThe;
 
-    if (!bienThe) return true; // Sẽ được xử lý bởi validator bienThe
+//     if (!bienThe) return true; // Sẽ được xử lý bởi validator bienThe
 
-    if (Array.isArray(bienThe)) {
-      for (const variant of bienThe) {
-        if (!variant.id_KichCo) {
-          throw new Error("Kích cỡ không được để trống");
-        }
-        if (isNaN(parseInt(variant.id_KichCo))) {
-          throw new Error("Mã kích cỡ không hợp lệ");
-        }
-      }
-    }
-    return true;
-  }),
+//     if (Array.isArray(bienThe)) {
+//       for (const variant of bienThe) {
+//         if (!variant.id_KichCo) {
+//           throw new Error("Kích cỡ không được để trống");
+//         }
+//         if (isNaN(parseInt(variant.id_KichCo))) {
+//           throw new Error("Mã kích cỡ không hợp lệ");
+//         }
+//       }
+//     }
+//     return true;
+//   }),
 
-  body("bienThe.*.id_MauSac").custom((value, { req }) => {
-    // Nếu bienThe là chuỗi, cần kiểm tra sau khi đã parse
-    const bienThe = req.body.bienThe;
+//   body("bienThe.*.id_MauSac").custom((value, { req }) => {
+//     // Nếu bienThe là chuỗi, cần kiểm tra sau khi đã parse
+//     const bienThe = req.body.bienThe;
 
-    if (!bienThe) return true; // Sẽ được xử lý bởi validator bienThe
+//     if (!bienThe) return true; // Sẽ được xử lý bởi validator bienThe
 
-    if (Array.isArray(bienThe)) {
-      for (const variant of bienThe) {
-        if (!variant.id_MauSac) {
-          throw new Error("Màu sắc không được để trống");
-        }
-        if (isNaN(parseInt(variant.id_MauSac))) {
-          throw new Error("Mã màu sắc không hợp lệ");
-        }
-      }
-    }
-    return true;
-  }),
+//     if (Array.isArray(bienThe)) {
+//       for (const variant of bienThe) {
+//         if (!variant.id_MauSac) {
+//           throw new Error("Màu sắc không được để trống");
+//         }
+//         if (isNaN(parseInt(variant.id_MauSac))) {
+//           throw new Error("Mã màu sắc không hợp lệ");
+//         }
+//       }
+//     }
+//     return true;
+//   }),
 
-  body("bienThe.*.MaSanPham").custom((value, { req }) => {
-    // Nếu bienThe là chuỗi, cần kiểm tra sau khi đã parse
-    const bienThe = req.body.bienThe;
+//   body("bienThe.*.MaSanPham").custom((value, { req }) => {
+//     // Nếu bienThe là chuỗi, cần kiểm tra sau khi đã parse
+//     const bienThe = req.body.bienThe;
 
-    if (!bienThe) return true; // Sẽ được xử lý bởi validator bienThe
+//     if (!bienThe) return true; // Sẽ được xử lý bởi validator bienThe
 
-    if (Array.isArray(bienThe)) {
-      for (const variant of bienThe) {
-        if (!variant.MaSanPham) {
-          throw new Error("Mã sản phẩm không được để trống");
-        }
-        if (!/^[A-Z0-9\-]+$/.test(variant.MaSanPham)) {
-          throw new Error(
-            "Mã sản phẩm chỉ được chứa chữ in hoa, số và dấu gạch ngang"
-          );
-        }
-        if (variant.MaSanPham.length < 3 || variant.MaSanPham.length > 20) {
-          throw new Error("Mã sản phẩm phải từ 3 đến 20 ký tự");
-        }
-      }
-    }
-    return true;
-  }),
+//     if (Array.isArray(bienThe)) {
+//       for (const variant of bienThe) {
+//         if (!variant.MaSanPham) {
+//           throw new Error("Mã sản phẩm không được để trống");
+//         }
+//         if (/\s/.test(variant.MaSanPham)) {
+//           throw new Error("Mã sản phẩm không được chứa khoảng trắng");
+//         }
+        
+       
+//       }
+//     }
+//     return true;
+//   }),
 
-  body("bienThe.*.GiaBienThe").custom((value, { req }) => {
-    // Nếu bienThe là chuỗi, cần kiểm tra sau khi đã parse
-    const bienThe = req.body.bienThe;
+//   body("bienThe.*.GiaBienThe").custom((value, { req }) => {
+//     // Nếu bienThe là chuỗi, cần kiểm tra sau khi đã parse
+//     const bienThe = req.body.bienThe;
 
-    if (!bienThe) return true; // Sẽ được xử lý bởi validator bienThe
+//     if (!bienThe) return true; // Sẽ được xử lý bởi validator bienThe
 
-    if (Array.isArray(bienThe)) {
-      for (const variant of bienThe) {
-        if (
-          variant.GiaBienThe !== undefined &&
-          (isNaN(parseFloat(variant.GiaBienThe)) ||
-            parseFloat(variant.GiaBienThe) < 0)
-        ) {
-          throw new Error("Giá biến thể phải là số dương");
-        }
-      }
-    }
-    return true;
-  }),
+//     if (Array.isArray(bienThe)) {
+//       for (const variant of bienThe) {
+//         if (
+//           variant.GiaBienThe !== undefined &&
+//           (isNaN(parseFloat(variant.GiaBienThe)) ||
+//             parseFloat(variant.GiaBienThe) < 0)
+//         ) {
+//           throw new Error("Giá biến thể phải là số dương");
+//         }
+//       }
+//     }
+//     return true;
+//   }),
 
-  body("bienThe.*.id")
-    .optional()
-    .isInt()
-    .withMessage("ID biến thể không hợp lệ"),
+//   body("bienThe.*.id")
+//     .optional()
+//     .isInt()
+//     .withMessage("ID biến thể không hợp lệ"),
 
-  body("bienThe.*.id_KichCo")
-    .optional()
-    .isInt()
-    .withMessage("Mã kích cỡ không hợp lệ"),
+//   body("bienThe.*.id_KichCo")
+//     .optional()
+//     .isInt()
+//     .withMessage("Mã kích cỡ không hợp lệ"),
 
-  body("bienThe.*.id_MauSac")
-    .optional()
-    .isInt()
-    .withMessage("Mã màu sắc không hợp lệ"),
+//   body("bienThe.*.id_MauSac")
+//     .optional()
+//     .isInt()
+//     .withMessage("Mã màu sắc không hợp lệ"),
 
-  body("bienThe.*.MaSanPham")
-    .optional()
-    .matches(/^[A-Z0-9\-]+$/)
-    .withMessage("Mã sản phẩm chỉ được chứa chữ in hoa, số và dấu gạch ngang")
-    .isLength({ min: 3, max: 20 })
-    .withMessage("Mã sản phẩm phải từ 3 đến 20 ký tự"),
+//   body("bienThe.*.MaSanPham")
+//     .optional()
+//     .matches(/^[A-Z0-9\-]+$/)
+//     .withMessage("Mã sản phẩm chỉ được chứa chữ in hoa, số và dấu gạch ngang")
+//     .isLength({ min: 3, max: 20 })
+//     .withMessage("Mã sản phẩm phải từ 3 đến 20 ký tự"),
 
-  body("bienThe.*.GiaBienThe")
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage("Giá biến thể phải là số dương"),
+//   body("bienThe.*.GiaBienThe")
+//     .optional()
+//     .isFloat({ min: 0 })
+//     .withMessage("Giá biến thể phải là số dương"),
 
-  body("bienThe.*.TrangThai")
-    .optional()
-    .isIn([0, 1])
-    .withMessage("Trạng thái biến thể không hợp lệ"),
+//   body("bienThe.*.TrangThai")
+//     .optional()
+//     .isIn([0, 1])
+//     .withMessage("Trạng thái biến thể không hợp lệ"),
 
-  body("TrangThai")
-    .optional()
-    .isIn([0, 1])
-    .withMessage("Trạng thái sản phẩm không hợp lệ"),
-];
+//   body("TrangThai")
+//     .optional()
+//     .isIn([0, 1])
+//     .withMessage("Trạng thái sản phẩm không hợp lệ"),
+// ];
 
 // Validator cho xóa sản phẩm
 const deleteProductValidator = [
@@ -443,20 +440,30 @@ const createProductAdminValidator = [
 
       try {
         // Nếu đã là object, không cần parse
-        if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
           req.body.ThongSoKyThuat = value;
           return true;
         }
 
         // Nếu là chuỗi, thử parse thành object
         const parsed = JSON.parse(value);
-        if (typeof parsed !== "object" || Array.isArray(parsed) || parsed === null) {
+        if (
+          typeof parsed !== "object" ||
+          Array.isArray(parsed) ||
+          parsed === null
+        ) {
           throw new Error("Thông số kỹ thuật phải là đối tượng JSON hợp lệ");
         }
         req.body.ThongSoKyThuat = parsed;
         return true;
       } catch (e) {
-        throw new Error("Thông số kỹ thuật phải là chuỗi JSON hoặc đối tượng hợp lệ");
+        throw new Error(
+          "Thông số kỹ thuật phải là chuỗi JSON hoặc đối tượng hợp lệ"
+        );
       }
     }),
 
@@ -530,11 +537,8 @@ const createProductAdminValidator = [
         if (!variant.MaSanPham) {
           throw new Error("Mã sản phẩm không được để trống");
         }
-        if (!/^[A-Z0-9\-]+$/.test(variant.MaSanPham)) {
-          throw new Error("Mã sản phẩm chỉ được chứa chữ in hoa, số và dấu gạch ngang");
-        }
-        if (variant.MaSanPham.length < 3 || variant.MaSanPham.length > 20) {
-          throw new Error("Mã sản phẩm phải từ 3 đến 20 ký tự");
+        if (/\s/.test(variant.MaSanPham)) {
+          throw new Error("Mã sản phẩm không được chứa khoảng trắng");
         }
       }
     }
@@ -556,7 +560,7 @@ const createProductAdminValidator = [
       }
     }
     return true;
-  })
+  }),
 ];
 
 // Validator cho việc cập nhật sản phẩm (admin)
@@ -619,22 +623,32 @@ const updateProductAdminValidator = [
 
       try {
         // Nếu đã là object, không cần parse
-        if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
           req.body.ThongSoKyThuat = value;
           return true;
         }
 
         // Nếu là chuỗi, thử parse thành object
         const parsed = JSON.parse(value);
-        if (typeof parsed !== "object" || Array.isArray(parsed) || parsed === null) {
+        if (
+          typeof parsed !== "object" ||
+          Array.isArray(parsed) ||
+          parsed === null
+        ) {
           throw new Error("Thông số kỹ thuật phải là đối tượng JSON hợp lệ");
         }
         req.body.ThongSoKyThuat = parsed;
         return true;
       } catch (e) {
-        throw new Error("Thông số kỹ thuật phải là chuỗi JSON hoặc đối tượng hợp lệ");
+        throw new Error(
+          "Thông số kỹ thuật phải là chuỗi JSON hoặc đối tượng hợp lệ"
+        );
       }
-    })
+    }),
 ];
 
 module.exports = {
@@ -642,7 +656,7 @@ module.exports = {
   searchProductsValidator,
   getProductDetailValidator,
   reviewProductValidator,
-  createProductValidator,
+  // createProductValidator,
   deleteProductValidator,
   getAllProductsAdminValidator,
   updateProductStatusValidator,

@@ -1,137 +1,233 @@
-const db = require("../config/database");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
+const { Op } = require("sequelize");
+const { User, Role, UserRole, TokenRefresh } = require("../models");
 
 class AuthService {
   async register(userData) {
-    const { email, matKhau, hoTen, soDienThoai, diaChi } = userData;
+    try {
+      // Kiểm tra email đã tồn tại
+      const existingUser = await User.findOne({
+        where: { Email: userData.email },
+      });
 
-    const [existingUser] = await db.execute(
-      "SELECT * FROM nguoidung WHERE Email = ?",
-      [email]
-    );
+      if (existingUser) {
+        throw new Error("Email đã được sử dụng");
+      }
 
-    if (existingUser.length > 0) {
-      throw new Error("Email đã được sử dụng");
+      // Hash password
+      const hashedPassword = await bcrypt.hash(userData.matKhau, 10);
+
+      // Tạo user mới
+      const newUser = await User.create({
+        HoTen: userData.hoTen,
+        Email: userData.email,
+        SDT: userData.sdt,
+        DiaChi: userData.diaChi,
+        MatKhau: hashedPassword,
+        TrangThai: 1,
+      });
+
+      // Gán quyền mặc định (Khách hàng - id: 3)
+      await UserRole.create({
+        id_NguoiDung: newUser.id,
+        id_Quyen: 3,
+      });
+
+      return {
+        id: newUser.id,
+        hoTen: newUser.HoTen,
+        email: newUser.Email,
+        sdt: newUser.SDT,
+        diaChi: newUser.DiaChi,
+      };
+    } catch (error) {
+      throw error;
     }
-
-    const hashedPassword = await bcrypt.hash(matKhau, 10);
-
-    const [result] = await db.execute(
-      "INSERT INTO nguoidung (Email, MatKhau, HoTen, SDT, DiaChi, TrangThai) VALUES (?, ?, ?, ?, ?, ?)",
-      [email, hashedPassword, hoTen, soDienThoai, diaChi, 1]
-    );
-
-    const userId = result.insertId;
-    await db.execute(
-      "INSERT INTO quyenguoidung (id_Quyen, id_NguoiDung) VALUES (?, ?)",
-      [3, userId]
-    );
-
-    return userId;
   }
 
   async login(email, matKhau) {
-    const [users] = await db.execute(
-      `SELECT nd.*, qnd.id_Quyen FROM nguoidung nd
-       LEFT JOIN quyenguoidung qnd ON nd.id = qnd.id_NguoiDung
-       WHERE nd.Email = ?`,
-      [email]
-    );
-
-    if (users.length === 0) {
-      throw new Error("Email hoặc mật khẩu không đúng");
-    }
-
-    const user = users[0];
-
-    const isValidPassword = await bcrypt.compare(matKhau, user.MatKhau);
-    if (!isValidPassword) {
-      throw new Error("Email hoặc mật khẩu không đúng");
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, email: user.Email, role: user.id_Quyen },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    );
-
-    const refreshToken = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_REFRESH_SECRET,
-      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN }
-    );
-
-    await db.execute(
-      "INSERT INTO token_lammoi (Token, id_NguoiDung, ngay_het_han) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))",
-      [refreshToken, user.id]
-    );
-
-    return {
-      token,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.Email,
-        hoTen: user.HoTen,
-        maQuyen: user.id_Quyen,
-      },
-    };
-  }
-
-  async forgotPassword(email) {
-    const [users] = await db.execute(
-      "SELECT * FROM nguoidung WHERE Email = ?",
-      [email]
-    );
-
-    if (users.length === 0) {
-      throw new Error("Email không tồn tại trong hệ thống");
-    }
-
-    const user = users[0];
-
-    const resetToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
-
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-
-    await transporter.sendMail({
-      to: email,
-      subject: "Đặt lại mật khẩu",
-      html: `
-        <p>Bạn đã yêu cầu đặt lại mật khẩu.</p>
-        <p>Click vào link sau để đặt lại mật khẩu: <a href="${resetUrl}">${resetUrl}</a></p>
-        <p>Link sẽ hết hạn sau 1 giờ.</p>
-      `,
-    });
-
-    return true;
-  }
-
-  async resetPassword(token, newPassword) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      // Tìm user với roles
+      const user = await User.findOne({
+        where: {
+          Email: email,
+          TrangThai: 1,
+        },
+        include: [
+          {
+            model: Role,
+            as: "roles",
+            through: { attributes: [] },
+          },
+        ],
+      });
 
-      await db.execute("UPDATE nguoidung SET MatKhau = ? WHERE id = ?", [
-        hashedPassword,
-        decoded.userId,
-      ]);
+      if (!user) {
+        throw new Error("Email hoặc mật khẩu không đúng");
+      }
 
-      return true;
+      // Kiểm tra password
+      const isValidPassword = await bcrypt.compare(matKhau, user.MatKhau);
+      if (!isValidPassword) {
+        throw new Error("Email hoặc mật khẩu không đúng");
+      }
+
+      // Lấy role đầu tiên (có thể cải thiện logic này)
+      const userRole = user.roles && user.roles[0] ? user.roles[0].id : 3;
+      const roleName =
+        user.roles && user.roles[0] ? user.roles[0].TenQuyen : "Khách hàng";
+
+      // Tạo access token
+      const accessToken = jwt.sign(
+        {
+          userId: user.id,
+          email: user.Email,
+          role: userRole,
+          roleName: roleName,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN || "15m" }
+      );
+
+      // Tạo refresh token
+      const refreshToken = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_REFRESH_SECRET,
+        { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" }
+      );
+
+      // Lưu refresh token vào database
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 7);
+
+      await TokenRefresh.create({
+        id_NguoiDung: user.id,
+        Token: refreshToken,
+        ngay_tao: new Date(),
+        ngay_het_han: expiryDate,
+      });
+
+      return {
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          hoTen: user.HoTen,
+          email: user.Email,
+          sdt: user.SDT,
+          diaChi: user.DiaChi,
+          avatar: user.Avatar,
+          vaiTro: [roleName],
+        },
+      };
     } catch (error) {
-      throw new Error("Token không hợp lệ hoặc đã hết hạn");
+      throw error;
+    }
+  }
+
+  async getProfile(userId) {
+    try {
+      const user = await User.findOne({
+        where: {
+          id: userId,
+          TrangThai: 1,
+        },
+        attributes: [
+          "id",
+          "HoTen",
+          "Email",
+          "SDT",
+          "DiaChi",
+          "Avatar",
+          "NgayTao",
+        ],
+        include: [
+          {
+            model: Role,
+            as: "roles",
+            attributes: ["id", "TenQuyen"],
+            through: { attributes: [] },
+          },
+        ],
+      });
+
+      if (!user) {
+        throw new Error("Người dùng không tồn tại");
+      }
+
+      return {
+        id: user.id,
+        hoTen: user.HoTen,
+        email: user.Email,
+        sdt: user.SDT,
+        diaChi: user.DiaChi,
+        avatar: user.Avatar,
+        ngayTao: user.NgayTao,
+        vaiTro: user.roles.map((role) => role.TenQuyen),
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async updateProfile(userId, updateData) {
+    try {
+      const user = await User.findOne({
+        where: {
+          id: userId,
+          TrangThai: 1,
+        },
+      });
+
+      if (!user) {
+        throw new Error("Người dùng không tồn tại");
+      }
+
+      // Cập nhật thông tin
+      await user.update({
+        HoTen: updateData.hoTen || user.HoTen,
+        SDT: updateData.sdt || user.SDT,
+        DiaChi: updateData.diaChi || user.DiaChi,
+        Avatar: updateData.avatar || user.Avatar,
+      });
+
+      return await this.getProfile(userId);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async changePassword(userId, oldPassword, newPassword) {
+    try {
+      const user = await User.findOne({
+        where: {
+          id: userId,
+          TrangThai: 1,
+        },
+      });
+
+      if (!user) {
+        throw new Error("Người dùng không tồn tại");
+      }
+
+      // Kiểm tra mật khẩu cũ
+      const isValidPassword = await bcrypt.compare(oldPassword, user.MatKhau);
+      if (!isValidPassword) {
+        throw new Error("Mật khẩu cũ không đúng");
+      }
+
+      // Hash mật khẩu mới
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+      // Cập nhật mật khẩu
+      await user.update({
+        MatKhau: hashedNewPassword,
+      });
+
+      return { message: "Đổi mật khẩu thành công" };
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -139,28 +235,51 @@ class AuthService {
     try {
       const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
-      const [tokens] = await db.execute(
-        "SELECT * FROM token_lammoi WHERE Token = ? AND id_NguoiDung = ? AND ngay_het_han > NOW()",
-        [refreshToken, decoded.userId]
-      );
+      const tokenRecord = await TokenRefresh.findOne({
+        where: {
+          Token: refreshToken,
+          id_NguoiDung: decoded.userId,
+          ngay_het_han: {
+            [Op.gt]: new Date(),
+          },
+        },
+      });
 
-      if (tokens.length === 0) {
+      if (!tokenRecord) {
         throw new Error("Refresh token không hợp lệ hoặc đã hết hạn");
       }
 
-      const [users] = await db.execute(
-        `SELECT nd.*, qnd.id_Quyen FROM nguoidung nd
-         LEFT JOIN quyenguoidung qnd ON nd.id = qnd.id_NguoiDung
-         WHERE nd.id = ?`,
-        [decoded.userId]
-      );
+      const user = await User.findOne({
+        where: {
+          id: decoded.userId,
+          TrangThai: 1,
+        },
+        include: [
+          {
+            model: Role,
+            as: "roles",
+            through: { attributes: [] },
+          },
+        ],
+      });
 
-      const user = users[0];
+      if (!user) {
+        throw new Error("Người dùng không tồn tại");
+      }
+
+      const userRole = user.roles && user.roles[0] ? user.roles[0].id : 3;
+      const roleName =
+        user.roles && user.roles[0] ? user.roles[0].TenQuyen : "Khách hàng";
 
       const newToken = jwt.sign(
-        { userId: user.id, email: user.Email, role: user.id_Quyen },
+        {
+          userId: user.id,
+          email: user.Email,
+          role: userRole,
+          roleName: roleName,
+        },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN }
+        { expiresIn: process.env.JWT_EXPIRES_IN || "15m" }
       );
 
       return {
@@ -169,7 +288,8 @@ class AuthService {
           id: user.id,
           email: user.Email,
           hoTen: user.HoTen,
-          maQuyen: user.id_Quyen,
+          maQuyen: userRole,
+          vaiTro: [roleName],
         },
       };
     } catch (error) {
@@ -178,10 +298,120 @@ class AuthService {
   }
 
   async logout(refreshToken) {
-    await db.execute("DELETE FROM token_lammoi WHERE Token = ?", [
-      refreshToken,
-    ]);
-    return true;
+    try {
+      await TokenRefresh.destroy({
+        where: { Token: refreshToken },
+      });
+      return { message: "Đăng xuất thành công" };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Thêm method để xóa token hết hạn
+  async cleanupExpiredTokens() {
+    try {
+      const deletedCount = await TokenRefresh.destroy({
+        where: {
+          ngay_het_han: {
+            [Op.lt]: new Date(),
+          },
+        },
+      });
+      return { deletedCount };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Thêm method để lấy danh sách user với role
+  async getUsersWithRoles(page = 1, limit = 10, search = "") {
+    try {
+      const offset = (page - 1) * limit;
+      const whereClause = search
+        ? {
+            [Op.or]: [
+              { HoTen: { [Op.like]: `%${search}%` } },
+              { Email: { [Op.like]: `%${search}%` } },
+            ],
+          }
+        : {};
+
+      const { count, rows } = await User.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: Role,
+            as: "roles",
+            attributes: ["id", "TenQuyen"],
+            through: { attributes: [] },
+          },
+        ],
+        attributes: [
+          "id",
+          "HoTen",
+          "Email",
+          "SDT",
+          "DiaChi",
+          "TrangThai",
+          "NgayTao",
+        ],
+        limit,
+        offset,
+        order: [["NgayTao", "DESC"]],
+      });
+
+      return {
+        users: rows.map((user) => ({
+          id: user.id,
+          hoTen: user.HoTen,
+          email: user.Email,
+          sdt: user.SDT,
+          diaChi: user.DiaChi,
+          trangThai: user.TrangThai,
+          ngayTao: user.NgayTao,
+          vaiTro: user.roles.map((role) => role.TenQuyen),
+        })),
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(count / limit),
+          totalItems: count,
+          itemsPerPage: limit,
+        },
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Thêm method để cập nhật quyền user
+  async updateUserRole(userId, roleId) {
+    try {
+      const user = await User.findByPk(userId);
+      if (!user) {
+        throw new Error("Người dùng không tồn tại");
+      }
+
+      const role = await Role.findByPk(roleId);
+      if (!role) {
+        throw new Error("Quyền không tồn tại");
+      }
+
+      // Xóa quyền cũ
+      await UserRole.destroy({
+        where: { id_NguoiDung: userId },
+      });
+
+      // Thêm quyền mới
+      await UserRole.create({
+        id_NguoiDung: userId,
+        id_Quyen: roleId,
+      });
+
+      return { message: "Cập nhật quyền thành công" };
+    } catch (error) {
+      throw error;
+    }
   }
 }
 

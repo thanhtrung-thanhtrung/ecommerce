@@ -26,8 +26,8 @@ class AuthController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { email, matKhau } = req.body;
-      const result = await authService.login(email, matKhau);
+      const { Email, MatKhau } = req.body;
+      const result = await authService.login(Email, MatKhau);
       res.json(result);
     } catch (error) {
       res.status(401).json({ message: error.message });
@@ -41,8 +41,8 @@ class AuthController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { email } = req.body;
-      await authService.forgotPassword(email);
+      const { Email } = req.body;
+      await authService.forgotPassword(Email);
       res.json({ message: "Email đặt lại mật khẩu đã được gửi" });
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -57,8 +57,8 @@ class AuthController {
       }
 
       const { token } = req.params;
-      const { matKhau } = req.body;
-      await authService.resetPassword(token, matKhau);
+      const { MatKhau } = req.body;
+      await authService.resetPassword(token, MatKhau);
       res.json({ message: "Đặt lại mật khẩu thành công" });
     } catch (error) {
       res.status(400).json({ message: error.message });

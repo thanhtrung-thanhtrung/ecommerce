@@ -11,7 +11,6 @@ const {
   checkAdminRole,
 } = require("../middlewares/auth.middleware");
 
-// Public
 router.get("/methods", paymentController.getPaymentMethods);
 router.post("/create", createPaymentValidator, paymentController.createPayment);
 router.post(
@@ -23,7 +22,6 @@ router.get("/test/vnpay", paymentController.testVNPay);
 router.post("/vnpay/ipn", paymentController.handleVNPayIPN);
 router.get("/vnpay/return", paymentController.handleVNPayReturn);
 
-// Admin
 router.get(
   "/admin",
   verifyToken,

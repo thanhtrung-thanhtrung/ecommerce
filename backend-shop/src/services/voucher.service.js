@@ -1,4 +1,5 @@
-const db = require("../config/database");
+const { Voucher, Order, sequelize } = require("../models");
+const { Op } = require("sequelize");
 
 class VoucherService {
   // Tạo voucher mới
@@ -6,55 +7,42 @@ class VoucherService {
     // Tạo mã voucher đơn giản
     const maVoucher = `VOUCHER${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
-    const [result] = await db.execute(
-      `INSERT INTO magiamgia (
-        Ma, Ten, MoTa, PhanTramGiam, GiaTriGiamToiDa, 
-        DieuKienApDung, SoLuotSuDung, SoLuotDaSuDung,
-        NgayBatDau, NgayKetThuc, TrangThai
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1)`,
-      [
-        maVoucher,
-        voucherData.Ten,
-        voucherData.MoTa,
-        voucherData.PhanTramGiam,
-        voucherData.GiaTriGiamToiDa || null,
-        voucherData.DieuKienApDung,
-        voucherData.SoLuotSuDung,
-        voucherData.NgayBatDau,
-        voucherData.NgayKetThuc,
-      ]
-    );
-
-    return {
+    const result = await Voucher.create({
       Ma: maVoucher,
-      ...voucherData,
+      Ten: voucherData.Ten,
+      MoTa: voucherData.MoTa,
+      PhanTramGiam: voucherData.PhanTramGiam,
+      GiaTriGiamToiDa: voucherData.GiaTriGiamToiDa || null,
+      DieuKienApDung: voucherData.DieuKienApDung,
+      SoLuotSuDung: voucherData.SoLuotSuDung,
       SoLuotDaSuDung: 0,
+      NgayBatDau: voucherData.NgayBatDau,
+      NgayKetThuc: voucherData.NgayKetThuc,
       TrangThai: 1,
-    };
+    });
+
+    return result.toJSON();
   }
 
   // Cập nhật voucher
   async capNhatVoucher(maVoucher, voucherData) {
-    const [result] = await db.execute(
-      `UPDATE magiamgia SET 
-        Ten = ?, MoTa = ?, PhanTramGiam = ?, GiaTriGiamToiDa = ?,
-        DieuKienApDung = ?, SoLuotSuDung = ?,
-        NgayBatDau = ?, NgayKetThuc = ?
-      WHERE Ma = ?`,
-      [
-        voucherData.Ten,
-        voucherData.MoTa,
-        voucherData.PhanTramGiam,
-        voucherData.GiaTriGiamToiDa || null,
-        voucherData.DieuKienApDung,
-        voucherData.SoLuotSuDung,
-        voucherData.NgayBatDau,
-        voucherData.NgayKetThuc,
-        maVoucher,
-      ]
+    const [affectedRows] = await Voucher.update(
+      {
+        Ten: voucherData.Ten,
+        MoTa: voucherData.MoTa,
+        PhanTramGiam: voucherData.PhanTramGiam,
+        GiaTriGiamToiDa: voucherData.GiaTriGiamToiDa || null,
+        DieuKienApDung: voucherData.DieuKienApDung,
+        SoLuotSuDung: voucherData.SoLuotSuDung,
+        NgayBatDau: voucherData.NgayBatDau,
+        NgayKetThuc: voucherData.NgayKetThuc,
+      },
+      {
+        where: { Ma: maVoucher },
+      }
     );
 
-    if (result.affectedRows === 0) {
+    if (affectedRows === 0) {
       throw new Error("Không tìm thấy voucher");
     }
 
@@ -63,12 +51,12 @@ class VoucherService {
 
   // Cập nhật trạng thái voucher
   async capNhatTrangThai(maVoucher, trangThai) {
-    const [result] = await db.execute(
-      "UPDATE magiamgia SET TrangThai = ? WHERE Ma = ?",
-      [trangThai, maVoucher]
+    const [affectedRows] = await Voucher.update(
+      { TrangThai: trangThai },
+      { where: { Ma: maVoucher } }
     );
 
-    if (result.affectedRows === 0) {
+    if (affectedRows === 0) {
       throw new Error("Không tìm thấy voucher");
     }
 
@@ -78,64 +66,70 @@ class VoucherService {
 
   // Lấy chi tiết voucher
   async layChiTietVoucher(maVoucher) {
-    const [vouchers] = await db.execute(
-      `SELECT * FROM magiamgia WHERE Ma = ?`,
-      [maVoucher]
-    );
+    const voucher = await Voucher.findOne({
+      where: { Ma: maVoucher },
+    });
 
-    if (vouchers.length === 0) {
+    if (!voucher) {
       throw new Error("Không tìm thấy voucher");
     }
 
-    return vouchers[0];
+    return voucher.toJSON();
   }
 
   // Tìm kiếm và lọc voucher
   async timKiemVoucher(filters) {
-    let query = "SELECT * FROM magiamgia WHERE 1=1";
-    const params = [];
+    const whereConditions = {};
 
     if (filters.tuKhoa) {
-      query += " AND (Ma LIKE ? OR Ten LIKE ? OR MoTa LIKE ?)";
-      const searchTerm = `%${filters.tuKhoa}%`;
-      params.push(searchTerm, searchTerm, searchTerm);
+      whereConditions[Op.or] = [
+        { Ma: { [Op.like]: `%${filters.tuKhoa}%` } },
+        { Ten: { [Op.like]: `%${filters.tuKhoa}%` } },
+        { MoTa: { [Op.like]: `%${filters.tuKhoa}%` } },
+      ];
     }
 
     if (filters.trangThai !== undefined) {
-      query += " AND TrangThai = ?";
-      params.push(filters.trangThai);
+      whereConditions.TrangThai = filters.trangThai;
     }
 
     // Lọc theo loại voucher (công khai/bí mật)
     if (filters.loaiVoucher !== undefined) {
-      query += " AND LoaiVoucher = ?";
-      params.push(filters.loaiVoucher);
+      whereConditions.LoaiVoucher = filters.loaiVoucher;
     }
 
     // Lọc theo thời gian hiệu lực
     if (filters.dangHieuLuc) {
-      const now = new Date().toISOString().split("T")[0];
-      query += " AND NgayBatDau <= ? AND NgayKetThuc >= ? AND TrangThai = 1";
-      params.push(now, now);
+      const now = new Date();
+      whereConditions.NgayBatDau = { [Op.lte]: now };
+      whereConditions.NgayKetThuc = { [Op.gte]: now };
+      whereConditions.TrangThai = 1;
     }
 
     // Chỉ lấy voucher công khai cho customer
     if (filters.congKhai) {
-      const now = new Date().toISOString().split("T")[0];
-      query +=
-        " AND NgayBatDau <= ? AND NgayKetThuc >= ? AND TrangThai = 1 AND LoaiVoucher = 1";
-      params.push(now, now);
+      const now = new Date();
+      whereConditions.NgayBatDau = { [Op.lte]: now };
+      whereConditions.NgayKetThuc = { [Op.gte]: now };
+      whereConditions.TrangThai = 1;
+      whereConditions.LoaiVoucher = 1;
     }
 
     // Lọc theo số lượt sử dụng còn lại
     if (filters.conHieuLuc) {
-      query += " AND SoLuotDaSuDung < SoLuotSuDung";
+      whereConditions[Op.and] = sequelize.where(
+        sequelize.col("SoLuotDaSuDung"),
+        Op.lt,
+        sequelize.col("SoLuotSuDung")
+      );
     }
 
-    query += " ORDER BY NgayBatDau DESC";
+    const vouchers = await Voucher.findAll({
+      where: whereConditions,
+      order: [["NgayBatDau", "DESC"]],
+    });
 
-    const [vouchers] = await db.execute(query, params);
-    return vouchers;
+    return vouchers.map((v) => v.toJSON());
   }
 
   // Enhanced voucher application with comprehensive validation
@@ -178,13 +172,15 @@ class VoucherService {
 
       // 6. Kiểm tra người dùng đã sử dụng voucher này chưa (nếu có userId)
       if (userId) {
-        const [existingUsage] = await db.execute(
-          `SELECT COUNT(*) as count FROM donhang 
-           WHERE id_nguoidung = ? AND MaGiamGia = ? AND TrangThai != 6`,
-          [userId, maVoucher]
-        );
+        const existingUsage = await Order.count({
+          where: {
+            id_NguoiMua: userId,
+            MaGiamGia: maVoucher,
+            TrangThai: { [Op.ne]: 6 },
+          },
+        });
 
-        if (existingUsage[0].count > 0) {
+        if (existingUsage > 0) {
           throw new Error("Bạn đã sử dụng mã giảm giá này rồi");
         }
       }
@@ -227,12 +223,14 @@ class VoucherService {
 
   // Tăng số lượt sử dụng voucher
   async tangSoLuotSuDung(maVoucher) {
-    const [result] = await db.execute(
-      "UPDATE magiamgia SET SoLuotDaSuDung = SoLuotDaSuDung + 1 WHERE Ma = ?",
-      [maVoucher]
+    const [affectedRows] = await Voucher.update(
+      {
+        SoLuotDaSuDung: sequelize.literal("SoLuotDaSuDung + 1"),
+      },
+      { where: { Ma: maVoucher } }
     );
 
-    if (result.affectedRows === 0) {
+    if (affectedRows === 0) {
       throw new Error("Không tìm thấy voucher");
     }
 
@@ -241,13 +239,17 @@ class VoucherService {
 
   // Giảm số lượt sử dụng voucher (hoàn lại khi đơn bị hủy)
   async giamSoLuotSuDung(maVoucher) {
-    const [result] = await db.execute(
-      "UPDATE magiamgia SET SoLuotDaSuDung = GREATEST(SoLuotDaSuDung - 1, 0) WHERE Ma = ?",
-      [maVoucher]
+    const [affectedRows] = await Voucher.update(
+      {
+        SoLuotDaSuDung: sequelize.literal("GREATEST(SoLuotDaSuDung - 1, 0)"),
+      },
+      { where: { Ma: maVoucher } }
     );
-    if (result.affectedRows === 0) {
+
+    if (affectedRows === 0) {
       throw new Error("Không tìm thấy voucher");
     }
+
     return this.layChiTietVoucher(maVoucher);
   }
 }

@@ -37,16 +37,16 @@ const Settings = () => {
                 Tự động to dần theo màn hình
             </p>
             <div class="bg-red-300 md:bg-green-300 lg:bg-blue-300">
-  Màu nền đổi theo màn hình
-</div>
-<div class="flex flex-col md:flex-row gap-4">
-  <div class="w-full md:w-1/3 bg-gray-200 p-4">Sidebar</div>
-  <div class="w-full md:flex-1 bg-white p-4 disabled:opacity-40     " disabled>Content</div>
-</div>
-<input class=" flex justify-center border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-900" />
-<button class="bg-gray-400 text-white px-4 py-2 rounded disabled:opacity-50" disabled>
-  Đang xử lý...
-</button>
+                Màu nền đổi theo màn hình
+            </div>
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="w-full md:w-1/3 bg-gray-200 p-4">Sidebar</div>
+                <div class="w-full md:flex-1 bg-white p-4 disabled:opacity-40     " disabled>Content</div>
+            </div>
+            <input class=" flex justify-center border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-900" />
+            <button class="bg-gray-400 text-white px-4 py-2 rounded disabled:opacity-50" disabled>
+                Đang xử lý...
+            </button>
 
 
             <p class="italic">Chữ nghiêng   </p>
@@ -77,33 +77,33 @@ const Settings = () => {
 
             </div>
             <button class="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded transition duration-300 ease-in-out">
-  Hover đổi màu mượt
-</button><header class="bg-white shadow-md px-4 py-2 flex justify-between items-center">
-  <div class="text-xl font-bold">Logo</div>
-  <nav class="hidden md:flex gap-4">
-    <a href="#">Trang chủ</a>
-    <a href="#">Sản phẩm</a>
-    <a href="#">Liên hệ</a>
-  </nav>
-</header>
-<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
-  Mua ngay
-</button>
-<div class="bg-white rounded-lg shadow-md p-4 max-w-sm">
-  <img src="..." class="w-full h-40 object-cover rounded-t-lg mb-4" />
-  <h3 class="text-lg font-bold mb-2">Tên sản phẩm</h3>
-  <p class="text-gray-600 text-sm mb-4">Mô tả ngắn gọn...</p>
-  <button class="bg-green-500 text-white px-4 py-2 rounded">Mua ngay</button>
-</div>
-<label class="block mb-2 text-sm font-medium">Email</label>
-<input
-  type="email"
-  class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-/>
-<span class="inline-block bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-1 rounded-full">
-  Mới ra mắt
-</span>
-{/* <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                Hover đổi màu mượt
+            </button><header class="bg-white shadow-md px-4 py-2 flex justify-between items-center">
+                <div class="text-xl font-bold">Logo</div>
+                <nav class="hidden md:flex gap-4">
+                    <a href="#">Trang chủ</a>
+                    <a href="#">Sản phẩm</a>
+                    <a href="#">Liên hệ</a>
+                </nav>
+            </header>
+            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                Mua ngay
+            </button>
+            <div class="bg-white rounded-lg shadow-md p-4 max-w-sm">
+                <img src="..." class="w-full h-40 object-cover rounded-t-lg mb-4" />
+                <h3 class="text-lg font-bold mb-2">Tên sản phẩm</h3>
+                <p class="text-gray-600 text-sm mb-4">Mô tả ngắn gọn...</p>
+                <button class="bg-green-500 text-white px-4 py-2 rounded">Mua ngay</button>
+            </div>
+            <label class="block mb-2 text-sm font-medium">Email</label>
+            <input
+                type="email"
+                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <span class="inline-block bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-1 rounded-full">
+                Mới ra mắt
+            </span>
+            {/* <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
   <div class="bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
     <h2 class="text-xl font-bold mb-4">Thông báo</h2>
     <p class="mb-4">Bạn có chắc muốn xoá?</p>
@@ -120,7 +120,7 @@ const Settings = () => {
                 <div class="w-1/3 bg-green-200 p-4">Cột 2</div>
                 <div class="w-1/3 bg-blue-200 p-4">Cột 3</div>
             </div>
-<div class="animate-bounce w-6 h-6 bg-blue-500 rounded-full"></div>
+            <div class="animate-bounce w-6 h-6 bg-blue-500 rounded-full"></div>
             <div class="animate-spin w-6 h-6 bg-green-500 rounded-full"></div>
             <div class="animate-ping w-6 h-6 bg-yellow-500 rounded-full"></div>
             <div class="animate-pulse w-6 h-6 bg-purple-500 rounded-full"></div>

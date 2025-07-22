@@ -20,7 +20,6 @@ const {
   checkAdminRole,
 } = require("../middlewares/auth.middleware");
 
-// Cấu hình multer cho upload ảnh
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "uploads/products");
@@ -100,23 +99,20 @@ router.post(
   productController.reviewProduct
 );
 
-// Admin routes - yêu cầu quyền admin
 const adminRouter = express.Router();
 
-// Áp dụng middleware phân quyền cho tất cả admin routes
 adminRouter.use(verifyToken, checkAdminRole());
 
-// Quản lý sản phẩm
 adminRouter.post(
   "/admin/create",
-  upload.any(), // Chấp nhận tất cả các trường file
+  upload.any(), 
   handleUploadError,
   createProductAdminValidator,
   productController.createProduct
 );
 adminRouter.put(
   "/admin/update/:id",
-  upload.any(), // Chấp nhận tất cả các trường file
+  upload.any(), 
   handleUploadError,
   updateProductAdminValidator,
   productController.updateProduct
@@ -147,18 +143,15 @@ adminRouter.get(
   productController.getProductStockInfo
 );
 
-// Quản lý màu sắc
 adminRouter.post("/admin/colors", productController.createColor);
 adminRouter.put("/admin/colors/:id", productController.updateColor);
 adminRouter.delete("/admin/colors/:id", productController.deleteColor);
 adminRouter.get("/admin/colors/:id", productController.getColorById);
 
-// Quản lý kích cỡ
 adminRouter.post("/admin/sizes", productController.createSize);
 adminRouter.put("/admin/sizes/:id", productController.updateSize);
 adminRouter.delete("/admin/sizes/:id", productController.deleteSize);
 
-// Thêm adminRouter vào router chính
 router.use(adminRouter);
 
 module.exports = router;

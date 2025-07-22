@@ -1,56 +1,53 @@
-const db = require("../config/database");
+const { Category, Product, sequelize } = require("../models");
+const { Op } = require("sequelize");
 
 class CategoryService {
   // Tạo danh mục mới
   async taoDanhMuc(categoryData) {
     // Kiểm tra tên danh mục đã tồn tại chưa
-    const [existingName] = await db.execute(
-      "SELECT id FROM danhmuc WHERE Ten = ?",
-      [categoryData.Ten]
-    );
+    const existingCategory = await Category.findOne({
+      where: { Ten: categoryData.Ten },
+    });
 
-    if (existingName.length > 0) {
+    if (existingCategory) {
       throw new Error("Tên danh mục đã tồn tại");
     }
 
-    const [result] = await db.execute(
-      `INSERT INTO danhmuc (Ten, MoTa, TrangThai) 
-       VALUES (?, ?, ?)`,
-      [categoryData.Ten, categoryData.MoTa || null, categoryData.TrangThai ?? 1]
-    );
-
-    return {
-      id: result.insertId,
-      ...categoryData,
+    const newCategory = await Category.create({
+      Ten: categoryData.Ten,
+      MoTa: categoryData.MoTa || null,
       TrangThai: categoryData.TrangThai ?? 1,
-    };
+    });
+
+    return newCategory;
   }
 
   // Cập nhật danh mục
   async capNhatDanhMuc(id, categoryData) {
     // Kiểm tra tên danh mục đã tồn tại chưa (trừ danh mục hiện tại)
-    const [existingName] = await db.execute(
-      "SELECT id FROM danhmuc WHERE Ten = ? AND id != ?",
-      [categoryData.Ten, id]
-    );
+    const existingCategory = await Category.findOne({
+      where: {
+        Ten: categoryData.Ten,
+        id: { [Op.ne]: id },
+      },
+    });
 
-    if (existingName.length > 0) {
+    if (existingCategory) {
       throw new Error("Tên danh mục đã tồn tại");
     }
 
-    const [result] = await db.execute(
-      `UPDATE danhmuc SET 
-        Ten = ?, MoTa = ?, TrangThai = ?
-      WHERE id = ?`,
-      [
-        categoryData.Ten,
-        categoryData.MoTa || null,
-        categoryData.TrangThai ?? 1,
-        id,
-      ]
+    const [updatedRowsCount] = await Category.update(
+      {
+        Ten: categoryData.Ten,
+        MoTa: categoryData.MoTa || null,
+        TrangThai: categoryData.TrangThai ?? 1,
+      },
+      {
+        where: { id },
+      }
     );
 
-    if (result.affectedRows === 0) {
+    if (updatedRowsCount === 0) {
       throw new Error("Không tìm thấy danh mục");
     }
 
@@ -59,18 +56,19 @@ class CategoryService {
 
   // Xóa danh mục
   async xoaDanhMuc(id) {
-    const [products] = await db.execute(
-      "SELECT COUNT(*) as count FROM sanpham WHERE id_DanhMuc = ?",
-      [id]
-    );
+    const productCount = await Product.count({
+      where: { id_DanhMuc: id },
+    });
 
-    if (products[0].count > 0) {
+    if (productCount > 0) {
       throw new Error("Không thể xóa danh mục đang có sản phẩm");
     }
 
-    const [result] = await db.execute("DELETE FROM danhmuc WHERE id = ?", [id]);
+    const deletedRowsCount = await Category.destroy({
+      where: { id },
+    });
 
-    if (result.affectedRows === 0) {
+    if (deletedRowsCount === 0) {
       throw new Error("Không tìm thấy danh mục");
     }
 
@@ -79,149 +77,217 @@ class CategoryService {
 
   //Cập nhật trạng thái
   async capNhatTrangThai(id, trangThai) {
-    const [result] = await db.execute(
-      "UPDATE danhmuc SET TrangThai = ? WHERE id = ?",
-      [trangThai, id]
+    const [updatedRowsCount] = await Category.update(
+      { TrangThai: trangThai },
+      { where: { id } }
     );
 
-    if (result.affectedRows === 0) {
+    if (updatedRowsCount === 0) {
       throw new Error("Không tìm thấy danh mục");
     }
 
     return { id, TrangThai: trangThai };
   }
+
   // Lấy chi tiết danh mục
-
   async layChiTietDanhMuc(id) {
-    const [categories] = await db.execute(
-      `SELECT dm.*,
-        COUNT(DISTINCT sp.id) as soSanPham,
-        COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
-        COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong
-      FROM danhmuc dm
-      LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
-      WHERE dm.id = ?
-      GROUP BY dm.id`,
-      [id]
-    );
+    const category = await Category.findByPk(id, {
+      attributes: [
+        "id",
+        "Ten",
+        "MoTa",
+        "TrangThai",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.literal(
+              "CASE WHEN products.TrangThai = 1 THEN products.id END"
+            )
+          ),
+          "soSanPhamHoatDong",
+        ],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.literal(
+              "CASE WHEN products.TrangThai = 0 THEN products.id END"
+            )
+          ),
+          "soSanPhamKhongHoatDong",
+        ],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          required: false,
+        },
+      ],
+      group: ["Category.id"],
+    });
 
-    if (categories.length === 0) {
+    if (!category) {
       throw new Error("Không tìm thấy danh mục");
     }
 
     // Lấy danh sách sản phẩm mới nhất trong danh mục
-    const [latestProducts] = await db.execute(
-      `SELECT id, Ten, Gia, HinhAnh, TrangThai
-       FROM sanpham
-       WHERE id_DanhMuc = ?
-       ORDER BY NgayTao DESC
-       LIMIT 5`,
-      [id]
-    );
+    const latestProducts = await Product.findAll({
+      where: { id_DanhMuc: id },
+      attributes: ["id", "Ten", "Gia", "HinhAnh", "TrangThai"],
+      order: [["NgayTao", "DESC"]],
+      limit: 5,
+    });
 
     return {
-      ...categories[0],
+      ...category.get({ plain: true }),
       sanPhamMoiNhat: latestProducts,
     };
   }
 
-  // // Lấy danh sách danh mục
-  // async layDanhSachDanhMuc(filters = {}) {
-  //   let query = `
-  //     SELECT dm.*,
-  //       COUNT(DISTINCT sp.id) as soSanPham,
-  //       COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
-  //       COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong
-  //     FROM danhmuc dm
-  //     LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
-  //     WHERE 1=1
-  //   `;
-  //   const params = [];
-
-  //   if (filters.trangThai !== undefined) {
-  //     query += " AND dm.TrangThai = ?";
-  //     params.push(filters.trangThai);
-  //   }
-
-  //   if (filters.tuKhoa) {
-  //     query += " AND (dm.Ten LIKE ? OR dm.MoTa LIKE ?)";
-  //     const searchTerm = `%${filters.tuKhoa}%`;
-  //     params.push(searchTerm, searchTerm);
-  //   }
-
-  //   query += " GROUP BY dm.id ORDER BY dm.id DESC";
-
-  //   const [categories] = await db.execute(query, params);
-  //   return categories;
-  // }
+  // Lấy danh sách danh mục
   async layDanhSachDanhMuc(filters = {}) {
-    const baseQuery = `
-        SELECT dm.*, 
-          COUNT(DISTINCT sp.id) as soSanPham,
-          COUNT(DISTINCT CASE WHEN sp.TrangThai = 1 THEN sp.id END) as soSanPhamHoatDong,
-          COUNT(DISTINCT CASE WHEN sp.TrangThai = 0 THEN sp.id END) as soSanPhamKhongHoatDong
-        FROM danhmuc dm
-        LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
-        WHERE 1=1
-      `;
-    let query = baseQuery;
-    const params = [];
+    const whereClause = {};
 
     if (filters.trangThai !== undefined) {
-      query += " AND dm.TrangThai = ?";
-      params.push(filters.trangThai);
+      whereClause.TrangThai = filters.trangThai;
     }
 
     if (filters.tuKhoa) {
-      query += " AND (dm.Ten LIKE ? OR dm.MoTa LIKE ?)";
-      const searchTerm = `%${filters.tuKhoa}%`;
-      params.push(searchTerm, searchTerm);
+      whereClause[Op.or] = [
+        { Ten: { [Op.like]: `%${filters.tuKhoa}%` } },
+        { MoTa: { [Op.like]: `%${filters.tuKhoa}%` } },
+      ];
     }
 
-    query += " GROUP BY dm.id ORDER BY dm.id DESC";
+    const categories = await Category.findAll({
+      where: whereClause,
+      attributes: [
+        "id",
+        "Ten",
+        "MoTa",
+        "TrangThai",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.literal(
+              "CASE WHEN products.TrangThai = 1 THEN products.id END"
+            )
+          ),
+          "soSanPhamHoatDong",
+        ],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.literal(
+              "CASE WHEN products.TrangThai = 0 THEN products.id END"
+            )
+          ),
+          "soSanPhamKhongHoatDong",
+        ],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          required: false,
+        },
+      ],
+      group: ["Category.id"],
+      order: [["id", "DESC"]],
+    });
 
-    const [categories] = await db.execute(query, params);
     return categories;
   }
 
   // Thống kê danh mục
   async thongKeDanhMuc() {
-    const [stats] = await db.execute(`
-      SELECT 
-        COUNT(*) as tongSoDanhMuc,
-        SUM(CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END) as soDanhMucHoatDong,
-        SUM(CASE WHEN TrangThai = 0 THEN 1 ELSE 0 END) as soDanhMucKhongHoatDong
-      FROM danhmuc
-    `);
+    // Thống kê tổng quan
+    const stats = await Category.findOne({
+      attributes: [
+        [sequelize.fn("COUNT", "*"), "tongSoDanhMuc"],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END")
+          ),
+          "soDanhMucHoatDong",
+        ],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("CASE WHEN TrangThai = 0 THEN 1 ELSE 0 END")
+          ),
+          "soDanhMucKhongHoatDong",
+        ],
+      ],
+      raw: true,
+    });
 
-    const [topCategories] = await db.execute(`
-      SELECT 
-        dm.id,
-        dm.Ten,
-        COUNT(sp.id) as soSanPham,
-        COALESCE(SUM(sp.SoLuongDaBan), 0) as tongSoLuongBan,
-        COALESCE(SUM(sp.SoLuongDaBan * sp.Gia), 0) as tongDoanhThu
-      FROM danhmuc dm
-      LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
-      WHERE sp.id IS NOT NULL AND YEAR(sp.NgayTao) = YEAR(CURRENT_DATE)
-      GROUP BY dm.id
-      ORDER BY tongDoanhThu DESC
-      LIMIT 5
-    `);
+    // Top danh mục theo doanh thu năm hiện tại
+    const topCategories = await Category.findAll({
+      attributes: [
+        "id",
+        "Ten",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+        [
+          sequelize.fn("SUM", sequelize.col("products.SoLuongDaBan")),
+          "tongSoLuongBan",
+        ],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("products.SoLuongDaBan * products.Gia")
+          ),
+          "tongDoanhThu",
+        ],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          where: sequelize.where(
+            sequelize.fn("YEAR", sequelize.col("products.NgayTao")),
+            sequelize.fn("YEAR", sequelize.fn("NOW"))
+          ),
+          required: true,
+        },
+      ],
+      group: ["Category.id"],
+      order: [[sequelize.literal("tongDoanhThu"), "DESC"]],
+      limit: 5,
+    });
 
-    const [categoryDistribution] = await db.execute(`
-      SELECT 
-        dm.Ten,
-        COUNT(sp.id) as soSanPham,
-        ROUND(COUNT(sp.id) * 100.0 / (SELECT COUNT(*) FROM sanpham), 2) as phanTram
-      FROM danhmuc dm
-      LEFT JOIN sanpham sp ON dm.id = sp.id_DanhMuc
-      GROUP BY dm.id
-      ORDER BY soSanPham DESC
-    `);
+    // Phân bố danh mục theo số sản phẩm
+    const categoryDistribution = await Category.findAll({
+      attributes: [
+        "Ten",
+        [sequelize.fn("COUNT", sequelize.col("products.id")), "soSanPham"],
+        [
+          sequelize.literal(
+            "ROUND(COUNT(products.id) * 100.0 / (SELECT COUNT(*) FROM sanpham), 2)"
+          ),
+          "phanTram",
+        ],
+      ],
+      include: [
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          required: false,
+        },
+      ],
+      group: ["Category.id"],
+      order: [[sequelize.literal("soSanPham"), "DESC"]],
+    });
 
     return {
-      tongQuat: stats[0],
+      tongQuat: stats,
       topDanhMuc: topCategories,
       phanBoDanhMuc: categoryDistribution,
     };

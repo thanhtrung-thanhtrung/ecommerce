@@ -1,49 +1,42 @@
-const db = require("../config/database");
+const { ShippingMethod, Order, sequelize } = require("../models");
+const { Op } = require("sequelize");
 
 class ShippingService {
   // Lấy danh sách phương thức vận chuyển với phân trang và tìm kiếm
-  async   getShippingMethods(page = 1, limit = 10, search = "", status = null) {
+  async getShippingMethods(page = 1, limit = 10, search = "", status = null) {
     try {
       const offset = (page - 1) * limit;
-      let query = "SELECT * FROM hinhthucvanchuyen WHERE 1=1";
-      let countQuery =
-        "SELECT COUNT(*) as total FROM hinhthucvanchuyen WHERE 1=1";
-      const params = [];
-      const countParams = [];
+      const whereConditions = {};
 
       // Thêm điều kiện tìm kiếm
       if (search) {
-        query += " AND (Ten LIKE ? OR MoTa LIKE ?)";
-        countQuery += " AND (Ten LIKE ? OR MoTa LIKE ?)";
-        const searchParam = `%${search}%`;
-        params.push(searchParam, searchParam);
-        countParams.push(searchParam, searchParam);
+        whereConditions[Op.or] = [
+          { Ten: { [Op.like]: `%${search}%` } },
+          { MoTa: { [Op.like]: `%${search}%` } },
+        ];
       }
 
       // Thêm điều kiện trạng thái
       if (status !== null) {
-        query += " AND TrangThai = ?";
-        countQuery += " AND TrangThai = ?";
-        params.push(status);
-        countParams.push(status);
+        whereConditions.TrangThai = status;
       }
 
-      // Thêm sắp xếp và phân trang
-      query += " ORDER BY id DESC LIMIT ? OFFSET ?";
-      params.push(limit, offset);
+      const { count, rows: shippingMethods } =
+        await ShippingMethod.findAndCountAll({
+          where: whereConditions,
+          order: [["id", "DESC"]],
+          limit,
+          offset,
+        });
 
-      const [shippingMethods] = await db.execute(query, params);
-      const [countResult] = await db.execute(countQuery, countParams);
-
-      const total = countResult[0].total;
-      const totalPages = Math.ceil(total / limit);
+      const totalPages = Math.ceil(count / limit);
 
       return {
-        data: shippingMethods,
+        data: shippingMethods.map((s) => s.toJSON()),
         pagination: {
           currentPage: page,
           totalPages,
-          totalItems: total,
+          totalItems: count,
           itemsPerPage: limit,
           hasNext: page < totalPages,
           hasPrev: page > 1,
@@ -59,10 +52,12 @@ class ShippingService {
   // Lấy tất cả phương thức vận chuyển đang hoạt động (cho dropdown)
   async getAllActiveShippingMethods() {
     try {
-      const [shippingMethods] = await db.execute(
-        "SELECT * FROM hinhthucvanchuyen WHERE TrangThai = 1 ORDER BY id DESC"
-      );
-      return shippingMethods;
+      const shippingMethods = await ShippingMethod.findAll({
+        where: { TrangThai: 1 },
+        order: [["id", "DESC"]],
+      });
+
+      return shippingMethods.map((s) => s.toJSON());
     } catch (error) {
       throw new Error(
         "Có lỗi khi lấy phương thức vận chuyển: " + error.message
@@ -72,16 +67,13 @@ class ShippingService {
 
   async getShippingMethodById(id) {
     try {
-      const [shippingMethod] = await db.execute(
-        "SELECT * FROM hinhthucvanchuyen WHERE id = ?",
-        [id]
-      );
+      const shippingMethod = await ShippingMethod.findByPk(id);
 
-      if (shippingMethod.length === 0) {
+      if (!shippingMethod) {
         throw new Error("Phương thức vận chuyển không tồn tại");
       }
 
-      return shippingMethod[0];
+      return shippingMethod.toJSON();
     } catch (error) {
       throw new Error(
         "Có lỗi khi lấy phương thức vận chuyển: " + error.message
@@ -101,25 +93,26 @@ class ShippingService {
       } = shippingData;
 
       // Kiểm tra tên đã tồn tại
-      const [existing] = await db.execute(
-        "SELECT id FROM hinhthucvanchuyen WHERE Ten = ? AND TrangThai = 1",
-        [Ten]
-      );
+      const existing = await ShippingMethod.findOne({
+        where: {
+          Ten,
+          TrangThai: 1,
+        },
+      });
 
-      if (existing.length > 0) {
+      if (existing) {
         throw new Error("Tên phương thức vận chuyển đã tồn tại");
       }
 
-      const [result] = await db.execute(
-        `INSERT INTO hinhthucvanchuyen (Ten, MoTa, PhiVanChuyen, ThoiGianDuKien, TrangThai) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [Ten, MoTa || null, PhiVanChuyen, ThoiGianDuKien || null, TrangThai]
-      );
+      const result = await ShippingMethod.create({
+        Ten,
+        MoTa: MoTa || null,
+        PhiVanChuyen,
+        ThoiGianDuKien: ThoiGianDuKien || null,
+        TrangThai,
+      });
 
-      const newShippingMethod = await this.getShippingMethodById(
-        result.insertId
-      );
-      return newShippingMethod;
+      return result.toJSON();
     } catch (error) {
       throw new Error(
         "Có lỗi khi tạo phương thức vận chuyển: " + error.message
@@ -131,41 +124,40 @@ class ShippingService {
   async updateShippingMethod(id, updateData) {
     try {
       // Kiểm tra phương thức vận chuyển có tồn tại
-      await this.getShippingMethodById(id);
+      const shippingMethod = await ShippingMethod.findByPk(id);
+
+      if (!shippingMethod) {
+        throw new Error("Phương thức vận chuyển không tồn tại");
+      }
 
       // Kiểm tra tên trùng lặp (nếu có cập nhật tên)
       if (updateData.Ten) {
-        const [existing] = await db.execute(
-          "SELECT id FROM hinhthucvanchuyen WHERE Ten = ? AND id != ? AND TrangThai = 1",
-          [updateData.Ten, id]
-        );
+        const existing = await ShippingMethod.findOne({
+          where: {
+            Ten: updateData.Ten,
+            id: { [Op.ne]: id },
+            TrangThai: 1,
+          },
+        });
 
-        if (existing.length > 0) {
+        if (existing) {
           throw new Error("Tên phương thức vận chuyển đã tồn tại");
         }
       }
 
-      // Tạo câu query update động
-      const updateFields = [];
-      const values = [];
-
-      Object.keys(updateData).forEach((key) => {
+      // Lọc ra các field có giá trị undefined
+      const filteredUpdateData = Object.keys(updateData).reduce((acc, key) => {
         if (updateData[key] !== undefined) {
-          updateFields.push(`${key} = ?`);
-          values.push(updateData[key]);
+          acc[key] = updateData[key];
         }
-      });
+        return acc;
+      }, {});
 
-      if (updateFields.length === 0) {
+      if (Object.keys(filteredUpdateData).length === 0) {
         throw new Error("Không có dữ liệu để cập nhật");
       }
 
-      values.push(id);
-
-      await db.execute(
-        `UPDATE hinhthucvanchuyen SET ${updateFields.join(", ")} WHERE id = ?`,
-        values
-      );
+      await shippingMethod.update(filteredUpdateData);
 
       const updatedShippingMethod = await this.getShippingMethodById(id);
       return updatedShippingMethod;
@@ -180,35 +172,29 @@ class ShippingService {
   async hardDeleteShippingMethod(id) {
     try {
       // Kiểm tra phương thức vận chuyển có tồn tại (bao gồm cả đã bị xóa mềm)
-      const [shippingMethod] = await db.execute(
-        "SELECT * FROM hinhthucvanchuyen WHERE id = ?",
-        [id]
-      );
+      const shippingMethod = await ShippingMethod.findByPk(id);
 
-      if (shippingMethod.length === 0) {
+      if (!shippingMethod) {
         throw new Error("Phương thức vận chuyển không tồn tại");
       }
 
-      const method = shippingMethod[0];
-
       // Kiểm tra có đơn hàng nào sử dụng không (bao gồm cả đơn hàng đã hoàn thành)
-      const [orders] = await db.execute(
-        "SELECT COUNT(*) as count FROM donhang WHERE id_VanChuyen = ?",
-        [id]
-      );
+      const orderCount = await Order.count({
+        where: { id_VanChuyen: id },
+      });
 
-      if (orders[0].count > 0) {
+      if (orderCount > 0) {
         throw new Error(
           "Không thể xóa vĩnh viễn phương thức vận chuyển đã được sử dụng trong đơn hàng. Chỉ có thể vô hiệu hóa."
         );
       }
 
       // Xóa vĩnh viễn khỏi database
-      await db.execute("DELETE FROM hinhthucvanchuyen WHERE id = ?", [id]);
+      await shippingMethod.destroy();
 
       return {
         message: "Xóa vĩnh viễn phương thức vận chuyển thành công",
-        deletedMethod: method,
+        deletedMethod: shippingMethod.toJSON(),
       };
     } catch (error) {
       throw new Error(
@@ -217,85 +203,66 @@ class ShippingService {
     }
   }
 
+  // Tính phí vận chuyển dựa trên phương thức vận chuyển từ database
   async calculateShippingFee(shippingMethodId, orderValue, address = null) {
     try {
-      // Miễn phí vận chuyển nếu đơn hàng trên 2 triệu
-      if (orderValue >= 2000000) {
-        return 0;
+      const shippingMethod = await ShippingMethod.findOne({
+        where: {
+          id: shippingMethodId,
+          TrangThai: 1,
+        },
+      });
+
+      if (!shippingMethod) {
+        throw new Error(
+          "Phương thức vận chuyển không tồn tại hoặc đã bị vô hiệu hóa"
+        );
       }
 
-      // Nếu có địa chỉ, tính phí theo khu vực
-      if (address) {
-        const isHCM = this.isHCMAddress(address);
-        return isHCM ? 30000 : 50000;
-      }
+      const shippingFee = parseFloat(shippingMethod.PhiVanChuyen) || 0;
 
-      // Fallback về logic cũ nếu không có địa chỉ
-      const shippingMethod = await this.getShippingMethodById(shippingMethodId);
-      return shippingMethod.PhiVanChuyen || 50000; // Default 50k nếu không xác định được
+      return {
+        fee: shippingFee,
+        originalFee: parseFloat(shippingMethod.PhiVanChuyen) || 0,
+        isFree: false,
+        method: {
+          id: shippingMethod.id,
+          name: shippingMethod.Ten,
+          description: shippingMethod.MoTa,
+          estimatedTime: shippingMethod.ThoiGianDuKien,
+        },
+      };
     } catch (error) {
       throw new Error("Có lỗi khi tính phí vận chuyển: " + error.message);
     }
   }
 
-  // Kiểm tra địa chỉ có phải TP.HCM không
-  isHCMAddress(address) {
-    const hcmKeywords = [
-      "hồ chí minh",
-      "ho chi minh",
-      "hcm",
-      "tp.hcm",
-      "tphcm",
-      "sài gòn",
-      "saigon",
-      "sài gòn",
-      "thành phố hồ chí minh",
-    ];
-
-    const addressLower = address.toLowerCase();
-    return hcmKeywords.some((keyword) => addressLower.includes(keyword));
-  }
-
-  // Method để lấy thông tin vận chuyển với phí tính toán
+  // Method để lấy thông tin vận chuyển với phí tính toán từ database
   async getShippingOptionsWithFees(orderValue, address = null) {
     try {
-      const baseOptions = [
-        {
-          id: "standard_hcm",
-          name: "Giao hàng tiêu chuẩn - TP.HCM",
-          description: "Giao hàng trong 1-2 ngày (TP.HCM)",
-          estimatedDays: "1-2 ngày",
-          isHCM: true,
-        },
-        {
-          id: "standard_other",
-          name: "Giao hàng tiêu chuẩn - Ngoại thành",
-          description: "Giao hàng trong 2-4 ngày (Ngoại thành)",
-          estimatedDays: "2-4 ngày",
-          isHCM: false,
-        },
-      ];
-
-      const options = baseOptions.map((option) => {
-        let fee = option.isHCM ? 30000 : 50000;
-
-        // Miễn phí nếu đơn hàng trên 2 triệu
-        if (orderValue >= 2000000) {
-          fee = 0;
-        }
-
-        return {
-          ...option,
-          fee,
-          freeShippingThreshold: 2000000,
-        };
+      // Lấy tất cả phương thức vận chuyển đang hoạt động
+      const activeShippingMethods = await ShippingMethod.findAll({
+        where: { TrangThai: 1 },
+        order: [["id", "ASC"]],
       });
 
-      // Nếu có địa chỉ, chỉ trả về option phù hợp
-      if (address) {
-        const isHCM = this.isHCMAddress(address);
-        return options.filter((option) => option.isHCM === isHCM);
+      if (activeShippingMethods.length === 0) {
+        throw new Error("Không có phương thức vận chuyển nào khả dụng");
       }
+
+      const options = activeShippingMethods.map((method) => {
+        const fee = parseFloat(method.PhiVanChuyen) || 0;
+
+        return {
+          id: method.id,
+          name: method.Ten,
+          description: method.MoTa || `Giao hàng ${method.Ten}`,
+          estimatedTime: method.ThoiGianDuKien || "2-4 ngày",
+          originalFee: parseFloat(method.PhiVanChuyen) || 0,
+          fee: fee,
+          isFree: false,
+        };
+      });
 
       return options;
     } catch (error) {
@@ -305,4 +272,3 @@ class ShippingService {
 }
 
 module.exports = new ShippingService();
-

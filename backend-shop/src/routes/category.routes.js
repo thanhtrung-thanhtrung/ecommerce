@@ -12,12 +12,10 @@ const {
 
 const router = express.Router();
 
-// Routes công khai
 router.get("/", categoryController.layDanhSachDanhMuc);
 router.get("/thong-ke/all", categoryController.thongKeDanhMuc);
 router.get("/:id", categoryController.layChiTietDanhMuc);
 
-// Routes admin - yêu cầu quyền admin
 router.post(
   "/",
   verifyToken,

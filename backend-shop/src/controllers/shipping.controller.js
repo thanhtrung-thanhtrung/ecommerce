@@ -253,7 +253,7 @@ class ShippingController {
 
       const { id_VanChuyen, tongGiaTriDonHang, diaChi } = req.body;
 
-      const shippingFee = await shippingService.calculateShippingFee(
+      const result = await shippingService.calculateShippingFee(
         id_VanChuyen,
         tongGiaTriDonHang,
         diaChi
@@ -263,17 +263,15 @@ class ShippingController {
         success: true,
         message: "Tính phí vận chuyển thành công",
         data: {
-          phiVanChuyen: shippingFee,
-          mienphi: shippingFee === 0,
+          phiVanChuyen: result.fee,
+          phiVanChuyenGoc: result.originalFee,
+          mienphi: result.isFree,
           thongTin: {
             giaTriDonHang: tongGiaTriDonHang,
             diaChi: diaChi,
-            phiVanChuyenTheoKhuVuc: diaChi
-              ? shippingService.isHCMAddress(diaChi)
-                ? "TP.HCM (30k)"
-                : "Ngoại thành (50k)"
-              : null,
-            mienpPhiTu: 2000000,
+            phuongThucVanChuyen: result.method.name,
+            moTa: result.method.description,
+            thoiGianDuKien: result.method.estimatedTime,
           },
         },
       });

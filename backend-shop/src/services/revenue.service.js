@@ -1,4 +1,19 @@
-const db = require("../config/database");
+const {
+  Order,
+  OrderDetail,
+  ProductDetail,
+  Product,
+  Brand,
+  Category,
+  Color,
+  Size,
+  User,
+  PaymentMethod,
+  ShippingMethod,
+  Voucher,
+  sequelize,
+} = require("../models");
+const { Op, fn, col, literal } = require("sequelize");
 
 class RevenueService {
   // Thống kê doanh thu theo thời gian
@@ -13,92 +28,145 @@ class RevenueService {
     let groupByClause, dateFormat;
     switch (loaiThongKe) {
       case "ngay":
-        groupByClause = "DATE(dh.NgayDatHang)";
+        groupByClause = fn("DATE", col("NgayDatHang"));
         dateFormat = "%Y-%m-%d";
         break;
       case "thang":
-        groupByClause = "DATE_FORMAT(dh.NgayDatHang, '%Y-%m')";
+        groupByClause = fn("DATE_FORMAT", col("NgayDatHang"), "%Y-%m");
         dateFormat = "%Y-%m";
         break;
       case "nam":
-        groupByClause = "YEAR(dh.NgayDatHang)";
+        groupByClause = fn("YEAR", col("NgayDatHang"));
         dateFormat = "%Y";
         break;
       default:
-        groupByClause = "DATE(dh.NgayDatHang)";
+        groupByClause = fn("DATE", col("NgayDatHang"));
         dateFormat = "%Y-%m-%d";
     }
 
     // Truy vấn doanh thu chính
-    const [doanhThu] = await db.execute(
-      `SELECT 
-        DATE_FORMAT(dh.NgayDatHang, ?) AS thoiGian,
-        COUNT(DISTINCT dh.id) AS soDonHang,
-        COALESCE(SUM(dh.TongTienHang), 0) AS tongTienHang,
-        COALESCE(SUM(dh.GiamGia), 0) AS tongGiamGia,
-        COALESCE(SUM(dh.PhiVanChuyen), 0) AS tongPhiVanChuyen,
-        COALESCE(SUM(dh.TongThanhToan), 0) AS tongThanhToan,
-        COUNT(DISTINCT dh.id_NguoiMua) AS soKhachHang,
-        COUNT(DISTINCT CASE WHEN dh.id_NguoiMua IS NULL THEN dh.session_id END) AS soKhachVangLai
-      FROM donhang dh
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai = 4
-
-      GROUP BY ${groupByClause}
-      ORDER BY thoiGian ASC`,
-      [dateFormat, startDate, endDate]
-    );
+    const doanhThu = await Order.findAll({
+      attributes: [
+        [fn("DATE_FORMAT", col("NgayDatHang"), dateFormat), "thoiGian"],
+        [fn("COUNT", fn("DISTINCT", col("id"))), "soDonHang"],
+        [fn("COALESCE", fn("SUM", col("TongTienHang")), 0), "tongTienHang"],
+        [fn("COALESCE", fn("SUM", col("GiamGia")), 0), "tongGiamGia"],
+        [fn("COALESCE", fn("SUM", col("PhiVanChuyen")), 0), "tongPhiVanChuyen"],
+        [fn("COALESCE", fn("SUM", col("TongThanhToan")), 0), "tongThanhToan"],
+        [fn("COUNT", fn("DISTINCT", col("id_NguoiMua"))), "soKhachHang"],
+        [
+          fn(
+            "COUNT",
+            fn(
+              "DISTINCT",
+              literal("CASE WHEN id_NguoiMua IS NULL THEN session_id END")
+            )
+          ),
+          "soKhachVangLai",
+        ],
+      ],
+      where: {
+        NgayDatHang: {
+          [Op.between]: [startDate, endDate],
+        },
+        TrangThai: 4,
+      },
+      group: [groupByClause],
+      order: [["thoiGian", "ASC"]],
+      raw: true,
+    });
 
     // Truy vấn theo hình thức thanh toán
-    const [thanhToan] = await db.execute(
-      `SELECT 
-        COALESCE(httt.Ten, 'Không xác định') AS hinhThucThanhToan,
-        COUNT(DISTINCT dh.id) AS soDonHang,
-        COALESCE(SUM(dh.TongThanhToan), 0) AS tongThanhToan
-      FROM donhang dh
-      LEFT JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-AND dh.TrangThai = 4
-      GROUP BY httt.id, httt.Ten
-      ORDER BY tongThanhToan DESC`,
-      [startDate, endDate]
-    );
+    const thanhToan = await Order.findAll({
+      attributes: [
+        [
+          fn("COALESCE", col("paymentMethod.Ten"), "Không xác định"),
+          "hinhThucThanhToan",
+        ],
+        [fn("COUNT", fn("DISTINCT", col("Order.id"))), "soDonHang"],
+        [fn("COALESCE", fn("SUM", col("TongThanhToan")), 0), "tongThanhToan"],
+      ],
+      include: [
+        {
+          model: PaymentMethod,
+          as: "paymentMethod",
+          attributes: [],
+          required: false,
+        },
+      ],
+      where: {
+        NgayDatHang: {
+          [Op.between]: [startDate, endDate],
+        },
+        TrangThai: 4,
+      },
+      group: ["paymentMethod.id", "paymentMethod.Ten"],
+      order: [[fn("SUM", col("TongThanhToan")), "DESC"]],
+      raw: true,
+    });
 
     // Truy vấn theo hình thức vận chuyển
-    const [vanChuyen] = await db.execute(
-      `SELECT 
-        COALESCE(htvc.Ten, 'Không xác định') AS hinhThucVanChuyen,
-        COUNT(DISTINCT dh.id) AS soDonHang,
-        COALESCE(SUM(dh.PhiVanChuyen), 0) AS tongPhiVanChuyen,
-        COALESCE(SUM(dh.TongThanhToan), 0) AS tongThanhToan
-      FROM donhang dh
-      LEFT JOIN hinhthucvanchuyen htvc ON dh.id_VanChuyen = htvc.id
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-        AND dh.TrangThai != 5
-      GROUP BY htvc.id, htvc.Ten
-      ORDER BY tongThanhToan DESC`,
-      [startDate, endDate]
-    );
+    const vanChuyen = await Order.findAll({
+      attributes: [
+        [
+          fn("COALESCE", col("shippingMethod.Ten"), "Không xác định"),
+          "hinhThucVanChuyen",
+        ],
+        [fn("COUNT", fn("DISTINCT", col("Order.id"))), "soDonHang"],
+        [
+          fn("COALESCE", fn("SUM", col("Order.PhiVanChuyen")), 0),
+          "tongPhiVanChuyen",
+        ],
+        [
+          fn("COALESCE", fn("SUM", col("Order.TongThanhToan")), 0),
+          "tongThanhToan",
+        ],
+      ],
+      include: [
+        {
+          model: ShippingMethod,
+          as: "shippingMethod",
+          attributes: [],
+          required: false,
+        },
+      ],
+      where: {
+        NgayDatHang: {
+          [Op.between]: [startDate, endDate],
+        },
+        TrangThai: { [Op.ne]: 5 },
+      },
+      group: ["shippingMethod.id", "shippingMethod.Ten"],
+      order: [[fn("SUM", col("Order.TongThanhToan")), "DESC"]],
+      raw: true,
+    });
 
     // Truy vấn theo trạng thái đơn hàng
-    const [trangThaiDonHang] = await db.execute(
-      `SELECT 
-        CASE dh.TrangThai
+    const trangThaiDonHang = await Order.findAll({
+      attributes: [
+        [
+          literal(`CASE TrangThai
           WHEN 1 THEN 'Chờ xác nhận'
           WHEN 2 THEN 'Đã xác nhận'
           WHEN 3 THEN 'Đang giao'
           WHEN 4 THEN 'Đã giao'
           WHEN 5 THEN 'Đã hủy'
           ELSE 'Không xác định'
-        END AS trangThai,
-        COUNT(DISTINCT dh.id) AS soDonHang,
-        COALESCE(SUM(dh.TongThanhToan), 0) AS tongThanhToan
-      FROM donhang dh
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-      GROUP BY dh.TrangThai
-      ORDER BY dh.TrangThai`,
-      [startDate, endDate]
-    );
+        END`),
+          "trangThai",
+        ],
+        [fn("COUNT", fn("DISTINCT", col("id"))), "soDonHang"],
+        [fn("COALESCE", fn("SUM", col("TongThanhToan")), 0), "tongThanhToan"],
+      ],
+      where: {
+        NgayDatHang: {
+          [Op.between]: [startDate, endDate],
+        },
+      },
+      group: ["TrangThai"],
+      order: [["TrangThai", "ASC"]],
+      raw: true,
+    });
 
     // Tính tổng
     const tongTienHang = doanhThu.reduce(
@@ -166,206 +234,349 @@ AND dh.TrangThai = 4
     // Format dates
     const startDate = new Date(tuNgay).toISOString().split("T")[0];
     const endDate = new Date(denNgay).toISOString().split("T")[0];
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    let query = `
-      SELECT 
-        dh.id,
-        dh.MaDonHang,
-        dh.NgayDatHang,
-        CASE dh.TrangThai
+    // Build where conditions
+    const whereConditions = {
+      NgayDatHang: {
+        [Op.between]: [startDate, endDate],
+      },
+    };
+
+    if (id_ThanhToan && !isNaN(parseInt(id_ThanhToan))) {
+      whereConditions.id_ThanhToan = parseInt(id_ThanhToan);
+    }
+
+    if (id_VanChuyen && !isNaN(parseInt(id_VanChuyen))) {
+      whereConditions.id_VanChuyen = parseInt(id_VanChuyen);
+    }
+
+    if (trangThai && !isNaN(parseInt(trangThai))) {
+      whereConditions.TrangThai = parseInt(trangThai);
+    }
+
+    // Build include conditions for category/brand filtering
+    const includeConditions = [];
+    if (
+      (id_DanhMuc && !isNaN(parseInt(id_DanhMuc))) ||
+      (id_ThuongHieu && !isNaN(parseInt(id_ThuongHieu)))
+    ) {
+      const productWhere = {};
+      if (id_DanhMuc && !isNaN(parseInt(id_DanhMuc))) {
+        productWhere.id_DanhMuc = parseInt(id_DanhMuc);
+      }
+      if (id_ThuongHieu && !isNaN(parseInt(id_ThuongHieu))) {
+        productWhere.id_ThuongHieu = parseInt(id_ThuongHieu);
+      }
+
+      includeConditions.push({
+        model: OrderDetail,
+        include: [
+          {
+            model: ProductDetail,
+            include: [
+              {
+                model: Product,
+                where: productWhere,
+                attributes: [],
+              },
+            ],
+            attributes: [],
+          },
+        ],
+        attributes: [],
+      });
+    }
+
+    // Get total count
+    const total = await Order.count({
+      where: whereConditions,
+      include: includeConditions,
+      distinct: true,
+    });
+
+    // Get detailed orders
+    const chiTietDonHang = await Order.findAll({
+      attributes: [
+        "id",
+        "MaDonHang",
+        "NgayDatHang",
+        [
+          literal(`CASE TrangThai
           WHEN 1 THEN 'Chờ xác nhận'
           WHEN 2 THEN 'Đã xác nhận'
           WHEN 3 THEN 'Đang giao'
           WHEN 4 THEN 'Đã giao'
           WHEN 5 THEN 'Đã hủy'
           ELSE 'Không xác định'
-        END as trangThai,
-        COALESCE(dh.TongTienHang, 0) as TongTienHang,
-        COALESCE(dh.GiamGia, 0) as GiamGia,
-        COALESCE(dh.PhiVanChuyen, 0) as PhiVanChuyen,
-        COALESCE(dh.TongThanhToan, 0) as TongThanhToan,
-        COALESCE(httt.Ten, 'Không xác định') as hinhThucThanhToan,
-        COALESCE(htvc.Ten, 'Không xác định') as hinhThucVanChuyen,
-        COALESCE(nd.HoTen, 'Khách vãng lai') as tenKhachHang,
-        COALESCE(nd.SDT, dh.SDTNguoiNhan) as sdtKhachHang,
-        dh.TenNguoiNhan,
-        dh.DiaChiNhan,
-        dh.EmailNguoiNhan,
-        dh.MaGiamGia,
-        dh.GhiChu
-      FROM donhang dh
-      LEFT JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
-      LEFT JOIN hinhthucvanchuyen htvc ON dh.id_VanChuyen = htvc.id
-      LEFT JOIN nguoidung nd ON dh.id_NguoiMua = nd.id
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-    `;
+        END`),
+          "trangThai",
+        ],
+        [fn("COALESCE", col("TongTienHang"), 0), "TongTienHang"],
+        [fn("COALESCE", col("GiamGia"), 0), "GiamGia"],
+        [fn("COALESCE", col("PhiVanChuyen"), 0), "PhiVanChuyen"],
+        [fn("COALESCE", col("TongThanhToan"), 0), "TongThanhToan"],
+        "TenNguoiNhan",
+        "DiaChiNhan",
+        "EmailNguoiNhan",
+        "MaGiamGia",
+        "GhiChu",
+      ],
+      include: [
+        {
+          model: PaymentMethod,
+          as: "paymentMethod",
+          attributes: [["Ten", "hinhThucThanhToan"]],
+          required: false,
+        },
+        {
+          model: ShippingMethod,
+          as: "shippingMethod",
+          attributes: [["Ten", "hinhThucVanChuyen"]],
+          required: false,
+        },
+        {
+          model: User,
+          as: "buyer",
+          attributes: [
+            ["HoTen", "tenKhachHang"],
+            ["SDT", "sdtKhachHang"],
+          ],
+          required: false,
+        },
+        ...includeConditions,
+      ],
+      where: whereConditions,
+      order: [["NgayDatHang", "DESC"]],
+      limit: parseInt(limit),
+      offset,
+      subQuery: false,
+    });
 
-    const params = [startDate, endDate];
-
-    // Add optional filters only if they have valid values
-    if (id_ThanhToan && !isNaN(parseInt(id_ThanhToan))) {
-      query += " AND dh.id_ThanhToan = ?";
-      params.push(parseInt(id_ThanhToan));
-    }
-
-    if (id_VanChuyen && !isNaN(parseInt(id_VanChuyen))) {
-      query += " AND dh.id_VanChuyen = ?";
-      params.push(parseInt(id_VanChuyen));
-    }
-
-    if (trangThai && !isNaN(parseInt(trangThai))) {
-      query += " AND dh.TrangThai = ?";
-      params.push(parseInt(trangThai));
-    }
-
-    // Lọc theo danh mục hoặc thương hiệu (qua chi tiết đơn hàng)
-    if (
-      (id_DanhMuc && !isNaN(parseInt(id_DanhMuc))) ||
-      (id_ThuongHieu && !isNaN(parseInt(id_ThuongHieu)))
-    ) {
-      query += ` AND dh.id IN (
-        SELECT DISTINCT ctdh.id_DonHang
-        FROM chitietdonhang ctdh
-        JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
-        JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-        WHERE 1=1`;
-
-      if (id_DanhMuc && !isNaN(parseInt(id_DanhMuc))) {
-        query += " AND sp.id_DanhMuc = ?";
-        params.push(parseInt(id_DanhMuc));
-      }
-
-      if (id_ThuongHieu && !isNaN(parseInt(id_ThuongHieu))) {
-        query += " AND sp.id_ThuongHieu = ?";
-        params.push(parseInt(id_ThuongHieu));
-      }
-
-      query += ")";
-    }
-
-    // Đếm tổng số bản ghi
-    const countQuery = query.replace(
-      /SELECT[\s\S]*?FROM/,
-      "SELECT COUNT(DISTINCT dh.id) as total FROM"
-    );
-    const [countResult] = await db.execute(countQuery, params);
-    const total = countResult[0].total || 0;
-
-    // Phân trang
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    query += " ORDER BY dh.NgayDatHang DESC LIMIT ? OFFSET ?";
-    params.push(parseInt(limit), parseInt(offset));
-
-    const [chiTietDonHang] = await db.execute(query, params);
-
-    // Lấy chi tiết sản phẩm cho từng đơn hàng
+    // Get order details for each order
     for (let donHang of chiTietDonHang) {
-      const [sanPham] = await db.execute(
-        `SELECT 
-          sp.Ten as tenSanPham,
-          th.Ten as thuongHieu,
-          dm.Ten as danhMuc,
-          ms.Ten as mauSac,
-          kc.Ten as kichCo,
-          ctdh.SoLuong,
-          COALESCE(ctdh.GiaBan, 0) as GiaBan,
-          COALESCE(ctdh.ThanhTien, 0) as ThanhTien
-        FROM chitietdonhang ctdh
-        JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
-        JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-        JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-        JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-        JOIN mausac ms ON ctsp.id_MauSac = ms.id
-        JOIN kichco kc ON ctsp.id_KichCo = kc.id
-        WHERE ctdh.id_DonHang = ?`,
-        [donHang.id]
-      );
-      donHang.chiTietSanPham = sanPham;
+      const sanPham = await OrderDetail.findAll({
+        attributes: [
+          "SoLuong",
+          [fn("COALESCE", col("GiaBan"), 0), "GiaBan"],
+          [fn("COALESCE", col("ThanhTien"), 0), "ThanhTien"],
+        ],
+        include: [
+          {
+            model: ProductDetail,
+            include: [
+              {
+                model: Product,
+                attributes: [["Ten", "tenSanPham"]],
+                include: [
+                  {
+                    model: Brand,
+                    attributes: [["Ten", "thuongHieu"]],
+                  },
+                  {
+                    model: Category,
+                    attributes: [["Ten", "danhMuc"]],
+                  },
+                ],
+              },
+              {
+                model: Color,
+                attributes: [["Ten", "mauSac"]],
+              },
+              {
+                model: Size,
+                attributes: [["Ten", "kichCo"]],
+              },
+            ],
+          },
+        ],
+        where: { id_DonHang: donHang.id },
+      });
+
+      donHang.dataValues.chiTietSanPham = sanPham.map((sp) => ({
+        tenSanPham: sp.ProductDetail?.Product?.Ten,
+        thuongHieu: sp.ProductDetail?.Product?.Brand?.Ten,
+        danhMuc: sp.ProductDetail?.Product?.Category?.Ten,
+        mauSac: sp.ProductDetail?.Color?.Ten,
+        kichCo: sp.ProductDetail?.Size?.Ten,
+        SoLuong: sp.SoLuong,
+        GiaBan: sp.dataValues.GiaBan,
+        ThanhTien: sp.dataValues.ThanhTien,
+      }));
     }
 
     // Thống kê theo danh mục
-    const [thongKeDanhMuc] = await db.execute(
-      `SELECT 
-        dm.Ten as tenDanhMuc,
-        COUNT(DISTINCT dh.id) as soDonHang,
-        COALESCE(SUM(ctdh.SoLuong), 0) as tongSoLuong,
-        COALESCE(SUM(ctdh.ThanhTien), 0) as tongDoanhThu
-      FROM donhang dh
-      JOIN chitietdonhang ctdh ON dh.id = ctdh.id_DonHang
-      JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
-      JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-      JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-AND dh.TrangThai = 4
-      GROUP BY dm.id, dm.Ten
-      ORDER BY tongDoanhThu DESC`,
-      [startDate, endDate]
-    );
+    const thongKeDanhMuc = await OrderDetail.findAll({
+      attributes: [
+        [fn("COALESCE", fn("SUM", col("SoLuong")), 0), "tongSoLuong"],
+        [fn("COALESCE", fn("SUM", col("ThanhTien")), 0), "tongDoanhThu"],
+        [fn("COUNT", fn("DISTINCT", col("id_DonHang"))), "soDonHang"],
+      ],
+      include: [
+        {
+          model: Order,
+          attributes: [],
+          where: {
+            NgayDatHang: {
+              [Op.between]: [startDate, endDate],
+            },
+            TrangThai: 4,
+          },
+        },
+        {
+          model: ProductDetail,
+          include: [
+            {
+              model: Product,
+              include: [
+                {
+                  model: Category,
+                  attributes: [["Ten", "tenDanhMuc"]],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      group: [
+        "ProductDetail.Product.Category.id",
+        "ProductDetail.Product.Category.Ten",
+      ],
+      order: [[fn("SUM", col("ThanhTien")), "DESC"]],
+      raw: true,
+    });
 
     // Thống kê theo thương hiệu
-    const [thongKeThuongHieu] = await db.execute(
-      `SELECT 
-        th.Ten as tenThuongHieu,
-        COUNT(DISTINCT dh.id) as soDonHang,
-        COALESCE(SUM(ctdh.SoLuong), 0) as tongSoLuong,
-        COALESCE(SUM(ctdh.ThanhTien), 0) as tongDoanhThu
-      FROM donhang dh
-      JOIN chitietdonhang ctdh ON dh.id = ctdh.id_DonHang
-      JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
-      JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-      JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-AND dh.TrangThai = 4
-      GROUP BY th.id, th.Ten
-      ORDER BY tongDoanhThu DESC`,
-      [startDate, endDate]
-    );
+    const thongKeThuongHieu = await OrderDetail.findAll({
+      attributes: [
+        [fn("COALESCE", fn("SUM", col("SoLuong")), 0), "tongSoLuong"],
+        [fn("COALESCE", fn("SUM", col("ThanhTien")), 0), "tongDoanhThu"],
+        [fn("COUNT", fn("DISTINCT", col("id_DonHang"))), "soDonHang"],
+      ],
+      include: [
+        {
+          model: Order,
+          attributes: [],
+          where: {
+            NgayDatHang: {
+              [Op.between]: [startDate, endDate],
+            },
+            TrangThai: 4,
+          },
+        },
+        {
+          model: ProductDetail,
+          include: [
+            {
+              model: Product,
+              include: [
+                {
+                  model: Brand,
+                  attributes: [["Ten", "tenThuongHieu"]],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      group: [
+        "ProductDetail.Product.Brand.id",
+        "ProductDetail.Product.Brand.Ten",
+      ],
+      order: [[fn("SUM", col("ThanhTien")), "DESC"]],
+      raw: true,
+    });
 
     // Sản phẩm bán chạy
-    const [sanPhamBanChay] = await db.execute(
-      `SELECT 
-        sp.Ten as tenSanPham,
-        th.Ten as thuongHieu,
-        dm.Ten as danhMuc,
-        COALESCE(SUM(ctdh.SoLuong), 0) as tongSoLuong,
-        COALESCE(SUM(ctdh.ThanhTien), 0) as tongDoanhThu,
-        COUNT(DISTINCT dh.id) as soDonHang
-      FROM donhang dh
-      JOIN chitietdonhang ctdh ON dh.id = ctdh.id_DonHang
-      JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
-      JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-      JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-      JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-AND dh.TrangThai = 4
-      GROUP BY sp.id, sp.Ten, th.Ten, dm.Ten
-      ORDER BY tongSoLuong DESC
-      LIMIT 10`,
-      [startDate, endDate]
-    );
+    const sanPhamBanChay = await OrderDetail.findAll({
+      attributes: [
+        [fn("COALESCE", fn("SUM", col("SoLuong")), 0), "tongSoLuong"],
+        [fn("COALESCE", fn("SUM", col("ThanhTien")), 0), "tongDoanhThu"],
+        [fn("COUNT", fn("DISTINCT", col("id_DonHang"))), "soDonHang"],
+      ],
+      include: [
+        {
+          model: Order,
+          attributes: [],
+          where: {
+            NgayDatHang: {
+              [Op.between]: [startDate, endDate],
+            },
+            TrangThai: 4,
+          },
+        },
+        {
+          model: ProductDetail,
+          include: [
+            {
+              model: Product,
+              attributes: [["Ten", "tenSanPham"]],
+              include: [
+                {
+                  model: Brand,
+                  attributes: [["Ten", "thuongHieu"]],
+                },
+                {
+                  model: Category,
+                  attributes: [["Ten", "danhMuc"]],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      group: [
+        "ProductDetail.Product.id",
+        "ProductDetail.Product.Ten",
+        "ProductDetail.Product.Brand.Ten",
+        "ProductDetail.Product.Category.Ten",
+      ],
+      order: [[fn("SUM", col("SoLuong")), "DESC"]],
+      limit: 10,
+      raw: true,
+    });
 
     // Tính tổng với null checks
     const tongTienHang = chiTietDonHang.reduce(
-      (sum, item) => sum + (parseFloat(item.TongTienHang) || 0),
+      (sum, item) =>
+        sum +
+        (parseFloat(item.dataValues?.TongTienHang || item.TongTienHang) || 0),
       0
     );
     const tongThanhToan = chiTietDonHang.reduce(
-      (sum, item) => sum + (parseFloat(item.TongThanhToan) || 0),
+      (sum, item) =>
+        sum +
+        (parseFloat(item.dataValues?.TongThanhToan || item.TongThanhToan) || 0),
       0
     );
     const tongGiamGia = chiTietDonHang.reduce(
-      (sum, item) => sum + (parseFloat(item.GiamGia) || 0),
+      (sum, item) =>
+        sum + (parseFloat(item.dataValues?.GiamGia || item.GiamGia) || 0),
       0
     );
     const tongPhiVanChuyen = chiTietDonHang.reduce(
-      (sum, item) => sum + (parseFloat(item.PhiVanChuyen) || 0),
+      (sum, item) =>
+        sum +
+        (parseFloat(item.dataValues?.PhiVanChuyen || item.PhiVanChuyen) || 0),
       0
     );
 
     return {
       success: true,
       data: {
-        chiTietDonHang,
+        chiTietDonHang: chiTietDonHang.map((order) => ({
+          ...order.dataValues,
+          tenKhachHang:
+            order.User?.dataValues?.tenKhachHang || "Khách vãng lai",
+          sdtKhachHang:
+            order.User?.dataValues?.sdtKhachHang || order.SDTNguoiNhan,
+          hinhThucThanhToan:
+            order.PaymentMethod?.dataValues?.hinhThucThanhToan ||
+            "Không xác định",
+          hinhThucVanChuyen:
+            order.ShippingMethod?.dataValues?.hinhThucVanChuyen ||
+            "Không xác định",
+        })),
         thongKeDanhMuc,
         thongKeThuongHieu,
         sanPhamBanChay,
@@ -397,25 +608,40 @@ AND dh.TrangThai = 4
     const endDate = new Date(denNgay).toISOString().split("T")[0];
     const limitValue = parseInt(limit) || 10;
 
-    const [khachHangVip] = await db.execute(
-      `SELECT 
-        nd.id,
-        nd.HoTen,
-        nd.Email,
-        nd.SDT,
-        COUNT(DISTINCT dh.id) as soDonHang,
-        COALESCE(SUM(dh.TongThanhToan), 0) as tongChiTieu,
-        COALESCE(AVG(dh.TongThanhToan), 0) as giaTriTrungBinh,
-        MAX(dh.NgayDatHang) as donHangCuoi
-      FROM nguoidung nd
-      JOIN donhang dh ON nd.id = dh.id_NguoiMua
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-AND dh.TrangThai = 4
-      GROUP BY nd.id, nd.HoTen, nd.Email, nd.SDT
-      ORDER BY tongChiTieu DESC
-      LIMIT ?`,
-      [startDate, endDate, limitValue]
-    );
+    const khachHangVip = await User.findAll({
+      attributes: [
+        "id",
+        "HoTen",
+        "Email",
+        "SDT",
+        [fn("COUNT", fn("DISTINCT", col("Orders.id"))), "soDonHang"],
+        [
+          fn("COALESCE", fn("SUM", col("Orders.TongThanhToan")), 0),
+          "tongChiTieu",
+        ],
+        [
+          fn("COALESCE", fn("AVG", col("Orders.TongThanhToan")), 0),
+          "giaTriTrungBinh",
+        ],
+        [fn("MAX", col("Orders.NgayDatHang")), "donHangCuoi"],
+      ],
+      include: [
+        {
+          model: Order,
+          attributes: [],
+          where: {
+            NgayDatHang: {
+              [Op.between]: [startDate, endDate],
+            },
+            TrangThai: 4,
+          },
+        },
+      ],
+      group: ["User.id", "User.HoTen", "User.Email", "User.SDT"],
+      order: [[fn("SUM", col("Orders.TongThanhToan")), "DESC"]],
+      limit: limitValue,
+      raw: true,
+    });
 
     return {
       success: true,
@@ -433,95 +659,161 @@ AND dh.TrangThai = 4
     const startDate = new Date(tuNgay).toISOString().split("T")[0];
     const endDate = new Date(denNgay).toISOString().split("T")[0];
 
-    const [maGiamGia] = await db.execute(
-      `SELECT 
-        mgg.Ma,
-        mgg.Ten,
-        COUNT(DISTINCT dh.id) as soLanSuDung,
-        COALESCE(SUM(dh.GiamGia), 0) as tongGiaTriGiam,
-        COALESCE(AVG(dh.GiamGia), 0) as giaTriTrungBinh
-      FROM donhang dh
-      JOIN magiamgia mgg ON dh.MaGiamGia = mgg.Ma
-      WHERE DATE(dh.NgayDatHang) BETWEEN ? AND ?
-      AND dh.TrangThai = 4
-  
-      AND dh.GiamGia > 0
-      GROUP BY mgg.Ma, mgg.Ten
-      ORDER BY tongGiaTriGiam DESC`,
-      [startDate, endDate]
-    );
+    const maGiamGia = await Order.findAll({
+      attributes: [
+        "MaGiamGia",
+        [fn("COUNT", fn("DISTINCT", col("Order.id"))), "soLanSuDung"],
+        [fn("COALESCE", fn("SUM", col("GiamGia")), 0), "tongGiaTriGiam"],
+        [fn("COALESCE", fn("AVG", col("GiamGia")), 0), "giaTriTrungBinh"],
+      ],
+      include: [
+        {
+          model: Voucher,
+          attributes: [["Ten", "Ten"]],
+          where: { Ma: col("Order.MaGiamGia") },
+          required: true,
+        },
+      ],
+      where: {
+        NgayDatHang: {
+          [Op.between]: [startDate, endDate],
+        },
+        TrangThai: 4,
+        GiamGia: { [Op.gt]: 0 },
+        MaGiamGia: { [Op.ne]: null },
+      },
+      group: ["MaGiamGia", "Voucher.Ten"],
+      order: [[fn("SUM", col("GiamGia")), "DESC"]],
+      raw: true,
+    });
 
     return {
       success: true,
-      data: maGiamGia,
+      data: maGiamGia.map((item) => ({
+        Ma: item.MaGiamGia,
+        Ten: item["Voucher.Ten"],
+        soLanSuDung: item.soLanSuDung,
+        tongGiaTriGiam: item.tongGiaTriGiam,
+        giaTriTrungBinh: item.giaTriTrungBinh,
+      })),
     };
   }
 
   // Dashboard thống kê tổng quan
   async dashboardThongKe() {
     // Thống kê hôm nay
-    const [homNay] = await db.execute(`
-      SELECT 
-        COUNT(DISTINCT id) as soDonHang,
-        SUM(TongThanhToan) as doanhThu,
-        COUNT(DISTINCT CASE WHEN id_NguoiMua IS NOT NULL THEN id_NguoiMua END) as khachHangMoi
-      FROM donhang 
-      WHERE DATE(NgayDatHang) = CURDATE()
-        AND TrangThai != 5
-    `);
+    const homNay = await Order.findOne({
+      attributes: [
+        [fn("COUNT", fn("DISTINCT", col("id"))), "soDonHang"],
+        [fn("SUM", col("TongThanhToan")), "doanhThu"],
+        [
+          fn(
+            "COUNT",
+            fn(
+              "DISTINCT",
+              literal("CASE WHEN id_NguoiMua IS NOT NULL THEN id_NguoiMua END")
+            )
+          ),
+          "khachHangMoi",
+        ],
+      ],
+      where: {
+        NgayDatHang: {
+          [Op.gte]: fn("CURDATE"),
+        },
+        TrangThai: { [Op.ne]: 5 },
+      },
+      raw: true,
+    });
 
     // Thống kê tháng này
-    const [thangNay] = await db.execute(`
-      SELECT 
-        COUNT(DISTINCT id) as soDonHang,
-        SUM(TongThanhToan) as doanhThu,
-        COUNT(DISTINCT CASE WHEN id_NguoiMua IS NOT NULL THEN id_NguoiMua END) as khachHang
-      FROM donhang 
-      WHERE MONTH(NgayDatHang) = MONTH(CURDATE())
-        AND YEAR(NgayDatHang) = YEAR(CURDATE())
-        AND TrangThai != 5
-    `);
+    const thangNay = await Order.findOne({
+      attributes: [
+        [fn("COUNT", fn("DISTINCT", col("id"))), "soDonHang"],
+        [fn("SUM", col("TongThanhToan")), "doanhThu"],
+        [
+          fn(
+            "COUNT",
+            fn(
+              "DISTINCT",
+              literal("CASE WHEN id_NguoiMua IS NOT NULL THEN id_NguoiMua END")
+            )
+          ),
+          "khachHang",
+        ],
+      ],
+      where: {
+        [Op.and]: [
+          fn("MONTH", col("NgayDatHang")),
+          fn("MONTH", fn("CURDATE")),
+          fn("YEAR", col("NgayDatHang")),
+          fn("YEAR", fn("CURDATE")),
+        ],
+        TrangThai: { [Op.ne]: 5 },
+      },
+      raw: true,
+    });
 
     // Thống kê năm nay
-    const [namNay] = await db.execute(`
-      SELECT 
-        COUNT(DISTINCT id) as soDonHang,
-        SUM(TongThanhToan) as doanhThu
-      FROM donhang 
-      WHERE YEAR(NgayDatHang) = YEAR(CURDATE())
-        AND TrangThai != 5
-    `);
+    const namNay = await Order.findOne({
+      attributes: [
+        [fn("COUNT", fn("DISTINCT", col("id"))), "soDonHang"],
+        [fn("SUM", col("TongThanhToan")), "doanhThu"],
+      ],
+      where: {
+        [Op.and]: [fn("YEAR", col("NgayDatHang")), fn("YEAR", fn("CURDATE"))],
+        TrangThai: { [Op.ne]: 5 },
+      },
+      raw: true,
+    });
 
     // Đơn hàng cần xử lý
-    const [donHangCanXuLy] = await db.execute(`
-      SELECT 
-        SUM(CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END) as choXacNhan,
-        SUM(CASE WHEN TrangThai = 2 THEN 1 ELSE 0 END) as daXacNhan,
-        SUM(CASE WHEN TrangThai = 3 THEN 1 ELSE 0 END) as dangGiao
-      FROM donhang 
-      WHERE TrangThai IN (1, 2, 3)
-    `);
+    const donHangCanXuLy = await Order.findOne({
+      attributes: [
+        [
+          fn("SUM", literal("CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END")),
+          "choXacNhan",
+        ],
+        [
+          fn("SUM", literal("CASE WHEN TrangThai = 2 THEN 1 ELSE 0 END")),
+          "daXacNhan",
+        ],
+        [
+          fn("SUM", literal("CASE WHEN TrangThai = 3 THEN 1 ELSE 0 END")),
+          "dangGiao",
+        ],
+      ],
+      where: {
+        TrangThai: { [Op.in]: [1, 2, 3] },
+      },
+      raw: true,
+    });
 
     // Thống kê doanh thu 7 ngày gần đây
-    const [doanhThu7Ngay] = await db.execute(`
-      SELECT 
-        DATE(NgayDatHang) as ngay,
-        COUNT(DISTINCT id) as soDonHang,
-        SUM(TongThanhToan) as doanhThu
-      FROM donhang 
-      WHERE NgayDatHang >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-        AND TrangThai != 5
-      GROUP BY DATE(NgayDatHang)
-      ORDER BY ngay ASC
-    `);
+    const doanhThu7Ngay = await Order.findAll({
+      attributes: [
+        [fn("DATE", col("NgayDatHang")), "ngay"],
+        [fn("COUNT", fn("DISTINCT", col("id"))), "soDonHang"],
+        [fn("SUM", col("TongThanhToan")), "doanhThu"],
+      ],
+      where: {
+        NgayDatHang: {
+          [Op.gte]: literal("DATE_SUB(CURDATE(), INTERVAL 7 DAY)"),
+        },
+        TrangThai: { [Op.ne]: 5 },
+      },
+      group: [fn("DATE", col("NgayDatHang"))],
+      order: [["ngay", "ASC"]],
+      raw: true,
+    });
 
     return {
       success: true,
       data: {
-        homNay: homNay[0],
-        thangNay: thangNay[0],
-        namNay: namNay[0],
-        donHangCanXuLy: donHangCanXuLy[0],
+        homNay: homNay,
+        thangNay: thangNay,
+        namNay: namNay,
+        donHangCanXuLy: donHangCanXuLy,
         doanhThu7Ngay,
       },
     };

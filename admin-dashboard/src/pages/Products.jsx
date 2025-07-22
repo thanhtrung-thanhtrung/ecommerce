@@ -270,18 +270,57 @@ const Products = () => {
   const validateForm = () => {
     const errors = []
 
-    if (!formData.Ten?.trim()) errors.push("Tên sản phẩm không được để trống")
-    if (!formData.MoTa?.trim()) errors.push("Mô tả không được để trống")
-    if (!formData.Gia || Number.parseFloat(formData.Gia) <= 0) errors.push("Giá bán phải lớn hơn 0")
-    if (!formData.id_DanhMuc) errors.push("Vui lòng chọn danh mục")
-    if (!formData.id_ThuongHieu) errors.push("Vui lòng chọn thương hiệu")
-    if (!formData.id_NhaCungCap) errors.push("Vui lòng chọn nhà cung cấp")
-    if (!selectedImages.anhChinh && !editingProduct) errors.push("Vui lòng chọn ảnh chính")
+    // Validate Tên sản phẩm
+    if (!formData.Ten?.trim()) {
+      errors.push("Tên sản phẩm không được để trống")
+    } else {
+      if (formData.Ten.trim().length < 3) {
+        errors.push("Tên sản phẩm phải có ít nhất 3 ký tự")
+      }
+      if (formData.Ten.trim().length > 255) {
+        errors.push("Tên sản phẩm không được vượt quá 255 ký tự")
+      }
+    }
 
+    // Validate Mô tả
+    if (!formData.MoTa?.trim()) {
+      errors.push("Mô tả không được để trống")
+    } else {
+      if (formData.MoTa.trim().length < 10) {
+        errors.push("Mô tả phải có ít nhất 10 ký tự")
+      }
+      if (formData.MoTa.trim().length > 1000) {
+        errors.push("Mô tả không được vượt quá 1000 ký tự")
+      }
+    }
+
+    // Validate Mô tả chi tiết (optional nhưng nếu có thì phải ít nhất 50 ký tự)
+    if (formData.MoTaChiTiet?.trim()) {
+      if (formData.MoTaChiTiet.trim().length < 10) {
+        errors.push("Mô tả chi tiết phải có ít nhất 10 ký tự")
+      }
+    }
+
+    // Validate Giá bán
+    if (!formData.Gia || Number.parseFloat(formData.Gia) <= 0) {
+      errors.push("Giá bán phải lớn hơn 0")
+    }
+
+    // Validate required fields
+    if (!formData.id_DanhMuc) errors.push("Danh mục không được để trống")
+    if (!formData.id_ThuongHieu) errors.push("Thương hiệu không được để trống")
+    if (!formData.id_NhaCungCap) errors.push("Nhà cung cấp không được để trống")
+
+    // Validate images
+    if (!selectedImages.anhChinh && !editingProduct) {
+      errors.push("Ảnh chính không được để trống")
+    }
+
+    // Validate Giá khuyến mãi
     const giaGoc = Number.parseFloat(formData.Gia) || 0
     const giaKhuyenMai = Number.parseFloat(formData.GiaKhuyenMai) || 0
 
-    if (giaKhuyenMai > 0) {
+    if (formData.GiaKhuyenMai && giaKhuyenMai > 0) {
       if (giaKhuyenMai >= giaGoc) {
         errors.push("Giá khuyến mãi phải nhỏ hơn giá gốc")
       }
@@ -290,17 +329,44 @@ const Products = () => {
       if (tiLeGiam > 70) {
         errors.push("Tỷ lệ giảm giá không được vượt quá 70%")
       }
-
       if (tiLeGiam < 5) {
         errors.push("Tỷ lệ giảm giá tối thiểu phải từ 5%")
       }
     }
 
+    // Validate biến thể
     const validVariants = variants.filter((v) => v.id_KichCo && v.id_MauSac && v.MaSanPham?.trim())
     if (validVariants.length === 0) {
-      errors.push("Phải có ít nhất một biến thể hợp lệ")
+      errors.push("Phải có ít nhất một biến thể sản phẩm")
     }
 
+    // Validate từng biến thể
+    validVariants.forEach((variant, index) => {
+      const maSP = variant.MaSanPham?.trim()
+      if (maSP) {
+        // Kiểm tra khoảng trắng
+        if (/\s/.test(maSP)) {
+          errors.push(`Mã sản phẩm biến thể ${index + 1} không được chứa khoảng trắng`)
+        }
+
+        // Kiểm tra độ dài: từ 3 đến 20 ký tự
+        if (maSP.length < 3 || maSP.length > 20) {
+          errors.push(`Mã sản phẩm biến thể ${index + 1} phải từ 3 đến 20 ký tự`)
+        }
+      } else {
+        errors.push(`Mã sản phẩm biến thể ${index + 1} không được để trống`)
+      }
+
+      // Validate required fields
+      if (!variant.id_KichCo) {
+        errors.push(`Kích cỡ biến thể ${index + 1} không được để trống`)
+      }
+      if (!variant.id_MauSac) {
+        errors.push(`Màu sắc biến thể ${index + 1} không được để trống`)
+      }
+    })
+
+    // Kiểm tra trùng lặp mã sản phẩm
     const maSanPhamSet = new Set()
     const duplicateCodes = []
     validVariants.forEach((variant, index) => {
@@ -318,6 +384,7 @@ const Products = () => {
       errors.push(`Mã sản phẩm bị trùng lặp: ${duplicateCodes.join(", ")}`)
     }
 
+    // Kiểm tra trùng lặp kết hợp size-màu
     const sizeColorSet = new Set()
     const duplicateSizeColor = []
     validVariants.forEach((variant, index) => {
@@ -335,27 +402,7 @@ const Products = () => {
       errors.push(`Kết hợp size-màu bị trùng lặp: ${duplicateSizeColor.join(", ")}`)
     }
 
-    validVariants.forEach((variant, index) => {
-      const maSP = variant.MaSanPham?.trim()
-      if (maSP) {
-        if (!/^[A-Z0-9\-]+$/.test(maSP)) {
-          errors.push(`Mã sản phẩm biến thể ${index + 1}: chỉ được chứa chữ in hoa, số và dấu gạch ngang`)
-        }
-
-        if (maSP.length < 3 || maSP.length > 20) {
-          errors.push(`Mã sản phẩm biến thể ${index + 1}: phải từ 3-20 ký tự`)
-        }
-
-        if (maSP.startsWith('-') || maSP.endsWith('-')) {
-          errors.push(`Mã sản phẩm biến thể ${index + 1}: không được bắt đầu/kết thúc bằng dấu gạch ngang`)
-        }
-
-        if (maSP.includes('--')) {
-          errors.push(`Mã sản phẩm biến thể ${index + 1}: không được có dấu gạch ngang liên tiếp`)
-        }
-      }
-    })
-
+    // Validate thông số kỹ thuật (độ dài từng field)
     const { ChatLieu, KieuGiay, XuatXu } = formData.ThongSoKyThuat
     if (ChatLieu && ChatLieu.length > 100) {
       errors.push("Chất liệu không được vượt quá 100 ký tự")
@@ -367,24 +414,7 @@ const Products = () => {
       errors.push("Xuất xứ không được vượt quá 100 ký tự")
     }
 
-    if (formData.Ten?.trim().length < 3) {
-      errors.push("Tên sản phẩm phải có ít nhất 3 ký tự")
-    }
-    if (formData.Ten?.trim().length > 255) {
-      errors.push("Tên sản phẩm không được vượt quá 255 ký tự")
-    }
-
-    if (formData.MoTa?.trim().length < 10) {
-      errors.push("Mô tả phải có ít nhất 10 ký tự")
-    }
-    if (formData.MoTa?.trim().length > 1000) {
-      errors.push("Mô tả không được vượt quá 1000 ký tự")
-    }
-
-    if (formData.MoTaChiTiet?.trim() && formData.MoTaChiTiet.trim().length > 5000) {
-      errors.push("Mô tả chi tiết không được vượt quá 5000 ký tự")
-    }
-
+    // Validate giới hạn giá (business rules)
     if (giaGoc > 0) {
       if (giaGoc < 1000) {
         errors.push("Giá sản phẩm tối thiểu là 1,000 VNĐ")
@@ -394,6 +424,7 @@ const Products = () => {
       }
     }
 
+    // Validate số lượng biến thể
     if (validVariants.length > 50) {
       errors.push("Số lượng biến thể không được vượt quá 50")
     }

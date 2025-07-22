@@ -19,7 +19,6 @@ import CheckoutPage from "./pages/CheckoutPage";
 import OrderSuccessPage from "./pages/OrderSuccessPage";
 import TrackOrderPage from "./pages/TrackOrderPage";
 import VNPayReturn from "./pages/VNPayReturn"; // ✅ SỬA: Import component mới
-import VNPayTestPage from "./pages/VNPayTestPage";
 import LoginPage from "./pages/Auth/LoginPage";
 import RegisterPage from "./pages/Auth/RegisterPage";
 import ForgotPasswordPage from "./pages/Auth/ForgotPasswordPage";
@@ -57,7 +56,6 @@ function App() {
                   />
                   <Route path="/track-order" element={<TrackOrderPage />} />
                   <Route path="/vnpay-return" element={<VNPayReturn />} />
-                  <Route path="/vnpay-test" element={<VNPayTestPage />} />
 
                   {/* Protected Routes */}
                   <Route

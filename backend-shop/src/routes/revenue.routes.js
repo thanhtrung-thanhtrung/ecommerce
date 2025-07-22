@@ -15,8 +15,6 @@ const {
   checkAdminRole,
 } = require("../middlewares/auth.middleware");
 
-// Tất cả routes revenue yêu cầu quyền admin
-// GET /api/revenue/stats - Thống kê doanh thu theo thời gian
 router.get(
   "/stats",
   verifyToken,
@@ -25,7 +23,6 @@ router.get(
   revenueController.thongKeDoanhThu
 );
 
-// GET /api/revenue/report - Báo cáo doanh thu chi tiết
 router.get(
   "/report",
   verifyToken,
@@ -34,7 +31,6 @@ router.get(
   revenueController.baoCaoDoanhThu
 );
 
-// GET /api/revenue/customers - Thống kê khách hàng VIP
 router.get(
   "/customers",
   verifyToken,
@@ -43,7 +39,6 @@ router.get(
   revenueController.thongKeKhachHang
 );
 
-// GET /api/revenue/vouchers - Thống kê mã giảm giá
 router.get(
   "/vouchers",
   verifyToken,
@@ -52,7 +47,6 @@ router.get(
   revenueController.thongKeMaGiamGia
 );
 
-// GET /api/revenue/dashboard - Dashboard thống kê tổng quan
 router.get(
   "/dashboard",
   verifyToken,
@@ -60,7 +54,6 @@ router.get(
   revenueController.dashboardThongKe
 );
 
-// GET /api/revenue/export - Xuất báo cáo
 router.get(
   "/export",
   verifyToken,
@@ -69,7 +62,6 @@ router.get(
   revenueController.xuatBaoCao
 );
 
-// GET /api/revenue/compare - So sánh doanh thu giữa 2 kỳ
 router.get(
   "/compare",
   verifyToken,
@@ -78,7 +70,6 @@ router.get(
   revenueController.soSanhDoanhThu
 );
 
-// GET /api/revenue/overview - Tổng quan doanh thu (cho admin dashboard)
 router.get(
   "/overview",
   verifyToken,

@@ -1,21 +1,49 @@
-const db = require("../config/database");
+const {
+  User,
+  Order,
+  OrderDetail,
+  ProductDetail,
+  Product,
+  PaymentMethod,
+  ShippingMethod,
+  Wishlist,
+  UserRole,
+  Role,
+} = require("../models");
 const bcrypt = require("bcryptjs");
+const { Op } = require("sequelize");
 
 class UserService {
   async getProfile(userId) {
-    const [users] = await db.execute(
-      `SELECT nd.id, nd.Email, nd.HoTen, nd.SDT, nd.DiaChi, nd.TrangThai, qnd.id_Quyen
-       FROM nguoidung nd
-       LEFT JOIN quyenguoidung qnd ON nd.id = qnd.id_NguoiDung
-       WHERE nd.id = ?`,
-      [userId]
-    );
+    const user = await User.findOne({
+      where: { id: userId },
+      include: [
+        {
+          model: Role,
+          as: "roles",
+          through: { attributes: [] },
+          attributes: ["id", "TenQuyen"],
+        },
+      ],
+      attributes: ["id", "Email", "HoTen", "SDT", "DiaChi", "TrangThai"],
+    });
 
-    if (users.length === 0) {
+    if (!user) {
       throw new Error("Người dùng không tồn tại");
     }
 
-    return users[0];
+    // Format response to match original structure
+    const userProfile = {
+      id: user.id,
+      Email: user.Email,
+      HoTen: user.HoTen,
+      SDT: user.SDT,
+      DiaChi: user.DiaChi,
+      TrangThai: user.TrangThai,
+      id_Quyen: user.roles && user.roles.length > 0 ? user.roles[0].id : null,
+    };
+
+    return userProfile;
   }
 
   async updateProfile(userId, userData) {
@@ -25,39 +53,34 @@ class UserService {
       diaChi: "DiaChi",
     };
 
-    const fields = [];
-    const values = [];
-
+    const updateData = {};
     for (const key in allowedFields) {
       if (userData[key] !== undefined) {
-        fields.push(`${allowedFields[key]} = ?`);
-        values.push(userData[key]);
+        updateData[allowedFields[key]] = userData[key];
       }
     }
 
-    if (fields.length === 0) {
+    if (Object.keys(updateData).length === 0) {
       throw new Error("Không có trường nào để cập nhật");
     }
 
-    values.push(userId);
-
-    const sql = `UPDATE nguoidung SET ${fields.join(", ")} WHERE id = ?`;
-
-    await db.execute(sql, values);
+    await User.update(updateData, {
+      where: { id: userId },
+    });
 
     return this.getProfile(userId);
   }
 
   async changePassword(userId, oldPassword, newPassword) {
-    const [users] = await db.execute("SELECT * FROM nguoidung WHERE id = ?", [
-      userId,
-    ]);
+    const user = await User.findOne({
+      where: { id: userId },
+      attributes: ["id", "MatKhau"],
+    });
 
-    if (users.length === 0) {
+    if (!user) {
       throw new Error("Người dùng không tồn tại");
     }
 
-    const user = users[0];
     const isValidPassword = await bcrypt.compare(oldPassword, user.MatKhau);
     if (!isValidPassword) {
       throw new Error("Mật khẩu cũ không đúng");
@@ -65,90 +88,141 @@ class UserService {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await db.execute("UPDATE nguoidung SET MatKhau = ? WHERE id = ?", [
-      hashedPassword,
-      userId,
-    ]);
+    await User.update({ MatKhau: hashedPassword }, { where: { id: userId } });
 
     return true;
   }
 
   async deleteAccount(userId) {
-    await db.execute("DELETE FROM token_lammoi WHERE id_NguoiDung = ?", [
-      userId,
-    ]);
+    // Delete refresh tokens first
+    await User.sequelize.query(
+      "DELETE FROM token_lammoi WHERE id_NguoiDung = ?",
+      {
+        replacements: [userId],
+        type: User.sequelize.QueryTypes.DELETE,
+      }
+    );
 
-    await db.execute("UPDATE nguoidung SET TrangThai = 0 WHERE id = ?", [
-      userId,
-    ]);
+    // Soft delete by updating status
+    await User.update({ TrangThai: 0 }, { where: { id: userId } });
 
     return true;
   }
 
   async getOrderHistory(userId) {
-    const [orders] = await db.execute(
-      `SELECT dh.*, httt.Ten as tenHinhThucThanhToan, htvc.Ten as tenHinhThucVanChuyen 
-       FROM donhang dh
-       LEFT JOIN hinhthucthanhtoan httt ON dh.id_ThanhToan = httt.id
-       LEFT JOIN hinhthucvanchuyen htvc ON dh.id_VanChuyen = htvc.id
-       WHERE dh.id_NguoiMua = ?
-       ORDER BY dh.NgayDatHang DESC`,
-      [userId]
-    );
+    const orders = await Order.findAll({
+      where: { id_NguoiMua: userId },
+      include: [
+        {
+          model: PaymentMethod,
+          as: "paymentMethod",
+          attributes: ["Ten"],
+        },
+        {
+          model: ShippingMethod,
+          as: "shippingMethod",
+          attributes: ["Ten"],
+        },
+        {
+          model: OrderDetail,
+          as: "orderDetails",
+          include: [
+            {
+              model: ProductDetail,
+              as: "productDetail",
+              include: [
+                {
+                  model: Product,
+                  as: "product",
+                  attributes: ["id", "Ten", "HinhAnh"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["NgayDatHang", "DESC"]],
+    });
 
-    for (let order of orders) {
-      const [orderDetails] = await db.execute(
-        `SELECT ctdh.*, ctsp.id_SanPham, sp.Ten as tenSanPham, sp.HinhAnh
-         FROM chitietdonhang ctdh
-         JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id
-         JOIN sanpham sp ON ctsp.id_SanPham = sp.id
-         WHERE ctdh.id_DonHang = ?`,
-        [order.id]
-      );
-      order.chiTiet = orderDetails;
-    }
+    // Format response to match original structure
+    const formattedOrders = orders.map((order) => {
+      const orderData = order.toJSON();
 
-    return orders;
+      return {
+        ...orderData,
+        tenHinhThucThanhToan: orderData.paymentMethod?.Ten || null,
+        tenHinhThucVanChuyen: orderData.shippingMethod?.Ten || null,
+        chiTiet:
+          orderData.orderDetails?.map((detail) => ({
+            ...detail,
+            id_SanPham: detail.productDetail?.product?.id,
+            tenSanPham: detail.productDetail?.product?.Ten,
+            HinhAnh: detail.productDetail?.product?.HinhAnh,
+          })) || [],
+      };
+    });
+
+    return formattedOrders;
   }
 
   async getWishlist(userId) {
-    const [wishlist] = await db.execute(
-      `SELECT w.*, sp.Ten as tenSanPham, sp.HinhAnh, sp.Gia, sp.MoTa
-       FROM wishlist w
-       JOIN sanpham sp ON w.id_SanPham = sp.id
-       WHERE w.id_NguoiDung = ?`,
-      [userId]
-    );
+    const wishlistItems = await Wishlist.findAll({
+      where: { id_NguoiDung: userId },
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "Ten", "HinhAnh", "Gia", "MoTa"],
+        },
+      ],
+    });
 
-    return wishlist;
+    // Format response to match original structure
+    const formattedWishlist = wishlistItems.map((item) => {
+      const itemData = item.toJSON();
+      return {
+        ...itemData,
+        tenSanPham: itemData.product?.Ten,
+        HinhAnh: itemData.product?.HinhAnh,
+        Gia: itemData.product?.Gia,
+        MoTa: itemData.product?.MoTa,
+      };
+    });
+
+    return formattedWishlist;
   }
 
   async addToWishlist(userId, productId) {
     if (userId == null || productId == null) {
       throw new Error("userId và productId không được để trống");
     }
-    const [existing] = await db.execute(
-      "SELECT * FROM wishlist WHERE id_NguoiDung = ? AND id_SanPham = ?",
-      [userId, productId]
-    );
 
-    if (existing.length > 0) {
+    const existing = await Wishlist.findOne({
+      where: {
+        id_NguoiDung: userId,
+        id_SanPham: productId,
+      },
+    });
+
+    if (existing) {
       throw new Error("Sản phẩm đã có trong danh sách yêu thích");
     }
 
-    await db.execute(
-      "INSERT INTO wishlist (id_NguoiDung, id_SanPham) VALUES (?, ?)",
-      [userId, productId]
-    );
+    await Wishlist.create({
+      id_NguoiDung: userId,
+      id_SanPham: productId,
+    });
 
     return true;
   }
 
   async removeFromWishlist(userId, productId) {
-    await db.execute(
-      "DELETE FROM wishlist WHERE id_NguoiDung = ? AND id_SanPham = ?",
-      [userId, productId]
-    );
+    await Wishlist.destroy({
+      where: {
+        id_NguoiDung: userId,
+        id_SanPham: productId,
+      },
+    });
 
     return true;
   }

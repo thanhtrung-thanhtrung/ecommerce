@@ -1,69 +1,78 @@
-const db = require("../config/database");
+const { Review, User, Order, Product, sequelize } = require("../models");
+const { Op } = require("sequelize");
 
 class ReviewService {
   // Thêm đánh giá mới
   async themDanhGia(danhGiaData) {
     // Kiểm tra trạng thái đơn hàng
-    const [orders] = await db.execute(
-      `SELECT * FROM donhang 
-       WHERE id = ? AND id_NguoiMua = ? AND TrangThai = 4`,
-      [danhGiaData.id_DonHang, danhGiaData.id_NguoiDung]
-    );
+    const order = await Order.findOne({
+      where: {
+        id: danhGiaData.id_DonHang,
+        id_NguoiMua: danhGiaData.id_NguoiDung,
+        TrangThai: 4,
+      },
+    });
 
-    if (orders.length === 0) {
+    if (!order) {
       throw new Error("Đơn hàng không hợp lệ hoặc chưa hoàn tất");
     }
 
     // Thêm đánh giá
-    const [result] = await db.execute(
-      `INSERT INTO danhgia (id_SanPham, id_NguoiDung, id_DonHang, NoiDung, SoSao, TrangThai) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        danhGiaData.id_SanPham,
-        danhGiaData.id_NguoiDung,
-        danhGiaData.id_DonHang,
-        danhGiaData.NoiDung,
-        danhGiaData.SoSao,
-        danhGiaData.TrangThai || 1,
-      ]
-    );
+    const result = await Review.create({
+      id_SanPham: danhGiaData.id_SanPham,
+      id_NguoiDung: danhGiaData.id_NguoiDung,
+      id_DonHang: danhGiaData.id_DonHang,
+      NoiDung: danhGiaData.NoiDung,
+      SoSao: danhGiaData.SoSao,
+      TrangThai: danhGiaData.TrangThai || 1,
+    });
 
     return {
-      id: result.insertId,
+      id: result.id,
       ...danhGiaData,
     };
   }
 
   // Lấy chi tiết đánh giá
   async layChiTietDanhGia(id) {
-    const [rows] = await db.execute("SELECT * FROM danhgia WHERE id = ?", [id]);
+    const review = await Review.findByPk(id);
 
-    if (rows.length === 0) {
+    if (!review) {
       throw new Error("Không tìm thấy đánh giá");
     }
 
-    return rows[0];
+    return review.toJSON();
   }
 
   async layDanhSachDanhGia(id_SanPham) {
-    const [rows] = await db.execute(
-      "SELECT dg.* , nd.HoTen FROM danhgia dg  JOIN nguoidung nd ON dg.id_NguoiDung = nd.id  WHERE dg.id_SanPham = ? AND dg.TrangThai = 1  ORDER BY dg.NgayDanhGia DESC",
-      [id_SanPham]
-    );
+    const reviews = await Review.findAll({
+      where: {
+        id_SanPham,
+        TrangThai: 1,
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["HoTen"],
+        },
+      ],
+      order: [["NgayDanhGia", "DESC"]],
+    });
 
-    if (rows.length === 0) {
+    if (reviews.length === 0) {
       throw new Error("Không tìm thấy đánh giá cho sản phẩm này");
     }
 
-    return rows.map((row) => ({
-      id: row.id,
-      id_SanPham: row.id_SanPham,
-      id_NguoiDung: row.id_NguoiDung,
-      NoiDung: row.NoiDung,
-      SoSao: row.SoSao,
-      TrangThai: row.TrangThai,
-      NgayDanhGia: row.NgayDanhGia,
-      HoTen: row.HoTen,
+    return reviews.map((review) => ({
+      id: review.id,
+      id_SanPham: review.id_SanPham,
+      id_NguoiDung: review.id_NguoiDung,
+      NoiDung: review.NoiDung,
+      SoSao: review.SoSao,
+      TrangThai: review.TrangThai,
+      NgayDanhGia: review.NgayDanhGia,
+      HoTen: review.user ? review.user.HoTen : null,
     }));
   }
 }

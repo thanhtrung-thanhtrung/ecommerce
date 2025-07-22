@@ -1,7 +1,22 @@
-const db = require("../config/database");
+const {
+  ImportReceipt,
+  ImportReceiptDetail,
+  ProductDetail,
+  Product,
+  Size,
+  Color,
+  Brand,
+  Category,
+  Supplier,
+  User,
+  Order,
+  OrderDetail,
+  sequelize,
+} = require("../models");
+const { Op } = require("sequelize");
 
 class InventoryService {
-  // Constants cho trạng thái đơn hàng theo database schema - SỬA LẠI CHO ĐÚNG
+  // Constants cho trạng thái đơn hàng theo database schema
   static ORDER_STATUS = {
     PENDING: 1, // Chờ xác nhận - KHÔNG trừ tồn kho
     CONFIRMED: 2, // Đã xác nhận - ĐÃ trừ tồn kho
@@ -10,7 +25,7 @@ class InventoryService {
     CANCELLED: 5, // Đã hủy - KHÔNG trừ tồn kho (hoàn lại nếu đã trừ)
   };
 
-  // Kiểm tra trạng thái có cần trừ tồn kho không - SỬA LẠI
+  // Kiểm tra trạng thái có cần trừ tồn kho không
   shouldDeductStock(status) {
     const statusesToDeduct = [
       this.constructor.ORDER_STATUS.CONFIRMED, // 2
@@ -20,23 +35,19 @@ class InventoryService {
     return statusesToDeduct.includes(parseInt(status));
   }
 
-  // ✅ SỬA: Cập nhật tồn kho khi thay đổi trạng thái đơn hàng - KHÔNG CẬP NHẬT TRỰC TIẾP
+  // Cập nhật tồn kho khi thay đổi trạng thái đơn hàng - SỬ DỤNG SEQUELIZE
   async updateStockAfterOrderStatusChange(orderId, oldStatus, newStatus) {
     try {
-      // Lấy chi tiết đơn hàng để log
-      const [orderItems] = await db.execute(
-        `SELECT ctdh.id_ChiTietSanPham, ctdh.SoLuong,
-                fn_TinhTonKhoRealTime(ctdh.id_ChiTietSanPham) as TonKhoSauKhiThayDoi
-         FROM chitietdonhang ctdh 
-         WHERE ctdh.id_DonHang = ?`,
-        [orderId]
-      );
+      // Lấy chi tiết đơn hàng sử dụng Sequelize
+      const orderItems = await OrderDetail.findAll({
+        where: { id_DonHang: orderId },
+        attributes: ["id_ChiTietSanPham", "SoLuong"],
+      });
 
       if (orderItems.length === 0) {
         throw new Error("Không tìm thấy chi tiết đơn hàng");
       }
 
-      // ✅ KHÔNG CẬP NHẬT TRỰC TIẾP CỘT TonKho NỮA
       // Logic tồn kho được tính real-time từ database trigger và functions
       const shouldDeductOld = this.shouldDeductStock(oldStatus);
       const shouldDeductNew = this.shouldDeductStock(newStatus);
@@ -52,12 +63,15 @@ class InventoryService {
 
       console.log(`[INVENTORY REAL-TIME] ${logMessage} - Đơn hàng #${orderId}`);
 
-      // Log tồn kho sau khi thay đổi
-      orderItems.forEach((item) => {
-        console.log(
-          `[INVENTORY REAL-TIME] Sản phẩm ${item.id_ChiTietSanPham}: Tồn kho hiện tại = ${item.TonKhoSauKhiThayDoi}`
+      // Lấy tồn kho real-time cho từng item
+      for (const item of orderItems) {
+        const stockInfo = await this.calculateRealTimeStock(
+          item.id_ChiTietSanPham
         );
-      });
+        console.log(
+          `[INVENTORY REAL-TIME] Sản phẩm ${item.id_ChiTietSanPham}: Tồn kho hiện tại = ${stockInfo}`
+        );
+      }
 
       return {
         success: true,
@@ -67,7 +81,7 @@ class InventoryService {
           oldStatus,
           newStatus,
           itemsUpdated: orderItems.length,
-          note: "Tồn kho được tính real-time từ database functions, không cập nhật trực tiếp",
+          note: "Tồn kho được tính real-time từ Sequelize aggregations, không cập nhật trực tiếp",
         },
       };
     } catch (error) {
@@ -83,48 +97,46 @@ class InventoryService {
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
     const day = date.getDate().toString().padStart(2, "0");
 
-    // Lấy số phiếu nhập trong ngày
-    const [result] = await db.execute(
-      "SELECT COUNT(*) as count FROM phieunhap WHERE DATE(NgayNhap) = CURDATE()"
-    );
-    const count = result[0].count + 1;
+    // Lấy số phiếu nhập trong ngày sử dụng Sequelize
+    const count = await ImportReceipt.count({
+      where: sequelize.where(
+        sequelize.fn("DATE", sequelize.col("NgayNhap")),
+        sequelize.fn("CURDATE")
+      ),
+    });
 
     // Format: PN-YYMMDD-XXX (XXX là số thứ tự trong ngày)
-    return `PN-${year}${month}${day}-${count.toString().padStart(3, "0")}`;
+    return `PN-${year}${month}${day}-${(count + 1)
+      .toString()
+      .padStart(3, "0")}`;
   }
 
-  // Tạo phiếu nhập mới
+  // Tạo phiếu nhập mới sử dụng Sequelize
   async createPhieuNhap(phieuNhapData, userId) {
     const { id_NhaCungCap, chiTietPhieuNhap, GhiChu } = phieuNhapData;
     const maPhieuNhap = await this.generateMaPhieuNhap();
 
-    const connection = await db.getConnection();
+    const transaction = await sequelize.transaction();
 
     try {
-      await connection.beginTransaction();
-
       const tongTien = chiTietPhieuNhap.reduce(
         (sum, item) => sum + item.SoLuong * item.GiaNhap,
         0
       );
 
-      // Tạo phiếu nhập
-      const [result] = await connection.execute(
-        `INSERT INTO phieunhap (
-          MaPhieuNhap, NgayNhap, TongTien, id_NhaCungCap, 
-          id_NguoiTao, TrangThai, GhiChu
-        ) VALUES (?, NOW(), ?, ?, ?, ?, ?)`,
-        [
-          maPhieuNhap,
-          TongTien,
+      // Tạo phiếu nhập sử dụng Sequelize
+      const newImportReceipt = await ImportReceipt.create(
+        {
+          MaPhieuNhap: maPhieuNhap,
+          NgayNhap: new Date(),
+          TongTien: tongTien,
           id_NhaCungCap,
-          userId,
-          1, // TrangThai = 1 (Chờ xác nhận)
+          id_NguoiTao: userId,
+          TrangThai: 1, // Chờ xác nhận
           GhiChu,
-        ]
+        },
+        { transaction }
       );
-
-      const phieuNhapId = result.insertId;
 
       for (const item of chiTietPhieuNhap) {
         let {
@@ -139,6 +151,7 @@ class InventoryService {
         } = item;
         const thanhTien = SoLuong * GiaNhap;
 
+        // Tạo biến thể mới nếu cần
         if (
           !id_ChiTietSanPham &&
           id_SanPham &&
@@ -146,14 +159,19 @@ class InventoryService {
           id_MauSac &&
           MaSanPham
         ) {
-          const [resultVariant] = await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham)
-             VALUES (?, ?, ?, ?)`,
-            [id_SanPham, id_KichCo, id_MauSac, MaSanPham]
+          const newVariant = await ProductDetail.create(
+            {
+              id_SanPham,
+              id_KichCo,
+              id_MauSac,
+              MaSanPham,
+            },
+            { transaction }
           );
-          id_ChiTietSanPham = resultVariant.insertId;
+          id_ChiTietSanPham = newVariant.id;
         }
 
+        // Xử lý nhiều biến thể
         if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
           for (const variant of bienThe) {
             const {
@@ -163,50 +181,53 @@ class InventoryService {
               SoLuong: variantQty,
             } = variant;
 
-            const [newVariant] = await connection.execute(
-              `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
-               VALUES (?, ?, ?, ?)`,
-              [id_SanPham, variantSize, variantColor, variantCode]
+            await ProductDetail.create(
+              {
+                id_SanPham,
+                id_KichCo: variantSize,
+                id_MauSac: variantColor,
+                MaSanPham: variantCode,
+              },
+              { transaction }
             );
           }
         }
 
         // Thêm chi tiết phiếu nhập
-        await connection.execute(
-          `INSERT INTO chitietphieunhap (
-            id_PhieuNhap, id_ChiTietSanPham, 
-            SoLuong, GiaNhap, ThanhTien
-          ) VALUES (?, ?, ?, ?, ?)`,
-          [phieuNhapId, id_ChiTietSanPham, SoLuong, GiaNhap, thanhTien]
+        await ImportReceiptDetail.create(
+          {
+            id_PhieuNhap: newImportReceipt.id,
+            id_ChiTietSanPham,
+            SoLuong,
+            GiaNhap,
+            ThanhTien: thanhTien,
+          },
+          { transaction }
         );
       }
 
-      await connection.commit();
-      connection.release();
+      await transaction.commit();
 
       return {
         success: true,
         message: "Tạo phiếu nhập thành công",
-        data: { id: phieuNhapId, MaPhieuNhap: maPhieuNhap },
+        data: { id: newImportReceipt.id, MaPhieuNhap: maPhieuNhap },
       };
     } catch (error) {
-      await connection.rollback();
-      connection.release();
+      await transaction.rollback();
       console.error("Error creating phieu nhap:", error);
       throw new Error("Không thể tạo phiếu nhập: " + error.message);
     }
   }
 
-  // Tạo phiếu nhập thông minh với tự động tạo/cập nhật biến thể
+  // Tạo phiếu nhập thông minh với tự động tạo/cập nhật biến thể - SEQUELIZE
   async createSmartPhieuNhap(phieuNhapData, userId) {
     const { id_NhaCungCap, chiTietPhieuNhap, GhiChu } = phieuNhapData;
     const maPhieuNhap = await this.generateMaPhieuNhap();
 
-    const connection = await db.getConnection();
+    const transaction = await sequelize.transaction();
 
     try {
-      await connection.beginTransaction();
-
       const tongTien = chiTietPhieuNhap.reduce((sum, item) => {
         return (
           sum +
@@ -218,16 +239,19 @@ class InventoryService {
         );
       }, 0);
 
-      // Insert phiếu nhập
-      const [result] = await connection.execute(
-        `INSERT INTO phieunhap (
-          MaPhieuNhap, NgayNhap, TongTien, id_NhaCungCap, 
-          id_NguoiTao, TrangThai, GhiChu
-        ) VALUES (?, NOW(), ?, ?, ?, ?, ?)`,
-        [maPhieuNhap, tongTien, id_NhaCungCap, userId, 1, GhiChu]
+      // Tạo phiếu nhập
+      const newImportReceipt = await ImportReceipt.create(
+        {
+          MaPhieuNhap: maPhieuNhap,
+          NgayNhap: new Date(),
+          TongTien: tongTien,
+          id_NhaCungCap,
+          id_NguoiTao: userId,
+          TrangThai: 1,
+          GhiChu,
+        },
+        { transaction }
       );
-
-      const phieuNhapId = result.insertId;
 
       for (const item of chiTietPhieuNhap) {
         const { id_SanPham, variants, GiaNhap } = item;
@@ -236,71 +260,87 @@ class InventoryService {
           const { id_KichCo, id_MauSac, SoLuong, MaSanPham } = variant;
           let id_ChiTietSanPham = null;
 
-          const [existingVariant] = await connection.execute(
-            `SELECT id FROM chitietsanpham 
-             WHERE id_SanPham = ? AND id_KichCo = ? AND id_MauSac = ?`,
-            [id_SanPham, id_KichCo, id_MauSac]
-          );
+          // Tìm biến thể có sẵn sử dụng Sequelize
+          const existingVariant = await ProductDetail.findOne({
+            where: {
+              id_SanPham,
+              id_KichCo,
+              id_MauSac,
+            },
+            transaction,
+          });
 
-          if (existingVariant.length > 0) {
+          if (existingVariant) {
             // Biến thể đã tồn tại
-            id_ChiTietSanPham = existingVariant[0].id;
+            id_ChiTietSanPham = existingVariant.id;
           } else {
-            const [newVariant] = await connection.execute(
-              `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham)
-               VALUES (?, ?, ?, ?)`,
-              [id_SanPham, id_KichCo, id_MauSac, MaSanPham]
+            // Tạo biến thể mới
+            const newVariant = await ProductDetail.create(
+              {
+                id_SanPham,
+                id_KichCo,
+                id_MauSac,
+                MaSanPham,
+              },
+              { transaction }
             );
-            id_ChiTietSanPham = newVariant.insertId;
+            id_ChiTietSanPham = newVariant.id;
           }
 
           // Thêm chi tiết phiếu nhập
           const thanhTien = SoLuong * GiaNhap;
-          await connection.execute(
-            `INSERT INTO chitietphieunhap (
-              id_PhieuNhap, id_ChiTietSanPham, 
-              SoLuong, GiaNhap, ThanhTien
-            ) VALUES (?, ?, ?, ?, ?)`,
-            [phieuNhapId, id_ChiTietSanPham, SoLuong, GiaNhap, thanhTien]
+          await ImportReceiptDetail.create(
+            {
+              id_PhieuNhap: newImportReceipt.id,
+              id_ChiTietSanPham,
+              SoLuong,
+              GiaNhap,
+              ThanhTien: thanhTien,
+            },
+            { transaction }
           );
         }
       }
 
-      await connection.commit();
-      connection.release();
+      await transaction.commit();
 
       return {
         success: true,
         message: "Tạo phiếu nhập thông minh thành công",
-        data: { id: phieuNhapId, MaPhieuNhap: maPhieuNhap },
+        data: { id: newImportReceipt.id, MaPhieuNhap: maPhieuNhap },
       };
     } catch (error) {
-      await connection.rollback();
-      connection.release();
+      await transaction.rollback();
       console.error("Error creating smart phieu nhap:", error);
       throw new Error("Không thể tạo phiếu nhập thông minh: " + error.message);
     }
   }
 
-  // Tạo mã sản phẩm tự động cho biến thể
+  // Tạo mã sản phẩm tự động cho biến thể - SEQUELIZE
   async generateVariantCode(productId, colorId, sizeId) {
     try {
-      // Lấy thông tin sản phẩm, màu sắc và kích cỡ
-      const [productInfo] = await db.execute(
-        `SELECT sp.Ten, th.Ten as ThuongHieu, ms.Ten as MauSac, kc.Ten as KichCo
-         FROM sanpham sp
-         JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-         CROSS JOIN mausac ms
-         CROSS JOIN kichco kc
-         WHERE sp.id = ? AND ms.id = ? AND kc.id = ?`,
-        [productId, colorId, sizeId]
-      );
+      // Lấy thông tin sử dụng Sequelize include
+      const product = await Product.findByPk(productId, {
+        include: [
+          {
+            model: Brand,
+            as: "brand",
+            attributes: ["Ten"],
+          },
+        ],
+      });
 
-      if (productInfo.length === 0) {
+      const color = await Color.findByPk(colorId);
+      const size = await Size.findByPk(sizeId);
+
+      if (!product || !color || !size) {
         throw new Error("Không thể tạo mã sản phẩm");
       }
 
-      const { ThuongHieu, MauSac, KichCo } = productInfo[0];
+      const { brand } = product;
+      const ThuongHieu = brand?.Ten || "UNKNOWN";
+      const MauSac = color.Ten;
+      const KichCo = size.Ten;
 
       // Tạo mã theo format: THUONGHIEU-MAUSAC-KICHCO-TIMESTAMP
       const timestamp = Date.now().toString().slice(-4);
@@ -321,76 +361,105 @@ class InventoryService {
     }
   }
 
-  // ✅ SỬA: Thống kê tồn kho sử dụng functions real-time
+  // Thống kê tồn kho sử dụng Sequelize ORM
   async thongKeTonKho(query = {}) {
     try {
-      let whereClause = "WHERE 1=1";
-      let queryParams = [];
+      let whereClause = {};
+      let productWhereClause = { TrangThai: 1 };
 
       // Lọc theo danh mục
       if (query.danhMuc) {
-        whereClause += " AND sp.id_DanhMuc = ?";
-        queryParams.push(query.danhMuc);
+        productWhereClause.id_DanhMuc = query.danhMuc;
       }
 
       // Lọc theo thương hiệu
       if (query.thuongHieu) {
-        whereClause += " AND sp.id_ThuongHieu = ?";
-        queryParams.push(query.thuongHieu);
+        productWhereClause.id_ThuongHieu = query.thuongHieu;
       }
 
       // Xử lý tham số sapHet một cách chính xác
       const sapHet = query.sapHet === "true" || query.sapHet === true;
       const tatCa = query.tatCa === "true" || query.tatCa === true;
 
-      // ✅ SỬA: Query mới sử dụng functions real-time
-      const sqlQuery = `
-        SELECT 
-          cts.id,
-          sp.Ten as TenSanPham,
-          th.Ten as TenThuongHieu,
-          dm.Ten as TenDanhMuc,
-          kc.Ten as KichCo,
-          ms.Ten as MauSac,
-          cts.MaSanPham,
-          -- Sử dụng function real-time thay vì cột TonKho cũ
-          fn_TinhTonKhoRealTime(cts.id) as TonKho,
-          sp.Gia
-        FROM chitietsanpham cts
-        JOIN sanpham sp ON cts.id_SanPham = sp.id
-        JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-        JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-        JOIN kichco kc ON cts.id_KichCo = kc.id
-        JOIN mausac ms ON cts.id_MauSac = ms.id
-        ${whereClause}
-        AND sp.TrangThai = 1
-      `;
+      // Query với Sequelize includes
+      const productDetails = await ProductDetail.findAll({
+        attributes: ["id", "MaSanPham"],
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "Ten", "HinhAnh", "Gia"],
+            where: productWhereClause,
+            include: [
+              {
+                model: Brand,
+                as: "brand",
+                attributes: ["Ten"],
+              },
+              {
+                model: Category,
+                as: "category",
+                attributes: ["Ten"],
+              },
+            ],
+          },
+          {
+            model: Size,
+            as: "size",
+            attributes: ["Ten"],
+          },
+          {
+            model: Color,
+            as: "color",
+            attributes: ["Ten"],
+          },
+        ],
+        where: whereClause,
+      });
 
-      const [allResults] = await db.execute(sqlQuery, queryParams);
+      // Lấy tồn kho real-time cho từng sản phẩm
+      const results = await Promise.all(
+        productDetails.map(async (item) => {
+          const tonKho = await this.calculateRealTimeStock(item.id);
 
-      // ✅ SỬA: Filter sau khi đã có tồn kho real-time
-      let results = allResults;
+          return {
+            id: item.id,
+            TenSanPham: item.product.Ten,
+            HinhAnh: item.product.HinhAnh,
+            TenThuongHieu: item.product.brand?.Ten || null,
+            TenDanhMuc: item.product.category?.Ten || null,
+            KichCo: item.size.Ten,
+            MauSac: item.color.Ten,
+            MaSanPham: item.MaSanPham,
+            TonKho: tonKho,
+            Gia: item.product.Gia,
+          };
+        })
+      );
+
+      // Filter sau khi đã có tồn kho real-time
+      let filteredResults = results;
 
       if (sapHet) {
         // Chỉ lấy sản phẩm sắp hết hàng (≤ 10)
-        results = allResults.filter(
+        filteredResults = results.filter(
           (item) => item.TonKho <= 10 && item.TonKho > 0
         );
       } else if (!tatCa) {
         // Mặc định: chỉ lấy sản phẩm còn hàng (>= 0)
-        results = allResults.filter((item) => item.TonKho >= 0);
+        filteredResults = results.filter((item) => item.TonKho >= 0);
       }
 
       // Sắp xếp theo tồn kho tăng dần
-      results.sort((a, b) => a.TonKho - b.TonKho);
+      filteredResults.sort((a, b) => a.TonKho - b.TonKho);
 
       return {
         success: true,
-        data: results,
+        data: filteredResults,
         filter: {
           sapHet: sapHet,
           tatCa: tatCa,
-          count: results.length,
+          count: filteredResults.length,
         },
       };
     } catch (error) {
@@ -398,24 +467,12 @@ class InventoryService {
     }
   }
 
-  // ✅ SỬA: Kiểm tra số lượng tồn kho sử dụng functions real-time
+  // Kiểm tra số lượng tồn kho sử dụng Sequelize calculations
   async checkStock(productVariantId, requestedQuantity) {
     try {
-      // Sử dụng functions real-time thay vì cột TonKho
-      const [result] = await db.execute(
-        `SELECT 
-          fn_TinhTonKhoRealTime(?) as TonKhoThucTe,
-          fn_CoTheBan(?, ?) as CoTheBan
-        `,
-        [productVariantId, productVariantId, requestedQuantity]
-      );
-
-      if (result.length === 0) {
-        throw new Error("Sản phẩm không tồn tại");
-      }
-
-      const tonKho = result[0].TonKhoThucTe || 0;
-      const isAvailable = result[0].CoTheBan === 1;
+      // Sử dụng Sequelize thay vì raw SQL
+      const tonKho = await this.calculateRealTimeStock(productVariantId);
+      const isAvailable = tonKho >= requestedQuantity;
 
       return {
         success: true,
@@ -430,66 +487,67 @@ class InventoryService {
     }
   }
 
-  // Cập nhật phiếu nhập
+  // Cập nhật phiếu nhập sử dụng Sequelize
   async updatePhieuNhap(phieuNhapId, updateData) {
+    const transaction = await sequelize.transaction();
+
     try {
       // Kiểm tra phiếu nhập tồn tại
-      const [phieuNhap] = await db.execute(
-        "SELECT * FROM phieunhap WHERE id = ?",
-        [phieuNhapId]
-      );
+      const phieuNhap = await ImportReceipt.findByPk(phieuNhapId, {
+        transaction,
+      });
 
-      if (phieuNhap.length === 0) {
+      if (!phieuNhap) {
         throw new Error("Phiếu nhập không tồn tại");
       }
 
       // Cập nhật thông tin phiếu nhập
       const { GhiChu, TrangThai } = updateData;
-      await db.execute(
-        "UPDATE phieunhap SET GhiChu = ?, TrangThai = ? WHERE id = ?",
-        [
-          GhiChu || phieuNhap[0].GhiChu,
-          TrangThai || phieuNhap[0].TrangThai,
-          phieuNhapId,
-        ]
+      await phieuNhap.update(
+        {
+          GhiChu: GhiChu || phieuNhap.GhiChu,
+          TrangThai: TrangThai || phieuNhap.TrangThai,
+        },
+        { transaction }
       );
 
       // Nếu phiếu nhập được xác nhận (TrangThai = 2), log thông tin
-      if (TrangThai === 2 && phieuNhap[0].TrangThai !== 2) {
+      if (TrangThai === 2 && phieuNhap.TrangThai !== 2) {
         await this.logImportConfirmation(phieuNhapId);
       }
+
+      await transaction.commit();
 
       return {
         success: true,
         message: "Cập nhật phiếu nhập thành công",
       };
     } catch (error) {
+      await transaction.rollback();
       throw new Error("Không thể cập nhật phiếu nhập: " + error.message);
     }
   }
 
-  // ✅ SỬA: Log xác nhận phiếu nhập thay vì cập nhật tồn kho trực tiếp
+  // Log xác nhận phiếu nhập sử dụng Sequelize
   async logImportConfirmation(phieuNhapId) {
     try {
-      // Lấy chi tiết phiếu nhập để log
-      const [chiTietList] = await db.execute(
-        `SELECT ctpn.id_ChiTietSanPham, ctpn.SoLuong,
-                fn_TinhTonKhoRealTime(ctpn.id_ChiTietSanPham) as TonKhoSauNhap
-         FROM chitietphieunhap ctpn 
-         WHERE ctpn.id_PhieuNhap = ?`,
-        [phieuNhapId]
-      );
+      // Lấy chi tiết phiếu nhập sử dụng Sequelize
+      const chiTietList = await ImportReceiptDetail.findAll({
+        where: { id_PhieuNhap: phieuNhapId },
+        attributes: ["id_ChiTietSanPham", "SoLuong"],
+      });
 
-      // ✅ KHÔNG CẬP NHẬT TRỰC TIẾP CỘT TonKho NỮA
-      // Tồn kho sẽ được tính real-time từ functions dựa trên dữ liệu phiếu nhập
       console.log(
-        `[INVENTORY REAL-TIME] Phiếu nhập #${phieuNhapId} đã được xác nhận. Tồn kho được tính real-time từ functions.`
+        `[INVENTORY REAL-TIME] Phiếu nhập #${phieuNhapId} đã được xác nhận. Tồn kho được tính real-time từ Sequelize.`
       );
 
       // Log chi tiết cho theo dõi
       for (const item of chiTietList) {
+        const tonKhoSauNhap = await this.calculateRealTimeStock(
+          item.id_ChiTietSanPham
+        );
         console.log(
-          `[INVENTORY REAL-TIME] Sản phẩm ${item.id_ChiTietSanPham}: +${item.SoLuong} (từ phiếu nhập), tồn kho hiện tại: ${item.TonKhoSauNhap}`
+          `[INVENTORY REAL-TIME] Sản phẩm ${item.id_ChiTietSanPham}: +${item.SoLuong} (từ phiếu nhập), tồn kho hiện tại: ${tonKhoSauNhap}`
         );
       }
 
@@ -503,104 +561,142 @@ class InventoryService {
     }
   }
 
-  // Lấy danh sách phiếu nhập
+  // Lấy danh sách phiếu nhập sử dụng Sequelize
   async getPhieuNhapList(query = {}) {
     try {
-      let whereClause = "WHERE 1=1";
-      let queryParams = [];
+      const whereClause = {};
 
       // Lọc theo trạng thái
       if (query.trangThai) {
-        whereClause += " AND pn.TrangThai = ?";
-        queryParams.push(query.trangThai);
+        whereClause.TrangThai = query.trangThai;
       }
 
       // Lọc theo nhà cung cấp
       if (query.nhaCungCap) {
-        whereClause += " AND pn.id_NhaCungCap = ?";
-        queryParams.push(query.nhaCungCap);
+        whereClause.id_NhaCungCap = query.nhaCungCap;
       }
 
       // Lọc theo thời gian
-      if (query.tuNgay) {
-        whereClause += " AND DATE(pn.NgayNhap) >= ?";
-        queryParams.push(query.tuNgay);
+      if (query.tuNgay || query.denNgay) {
+        const dateFilter = {};
+        if (query.tuNgay) {
+          dateFilter[Op.gte] = new Date(query.tuNgay);
+        }
+        if (query.denNgay) {
+          dateFilter[Op.lte] = new Date(query.denNgay + " 23:59:59");
+        }
+        whereClause.NgayNhap = dateFilter;
       }
 
-      if (query.denNgay) {
-        whereClause += " AND DATE(pn.NgayNhap) <= ?";
-        queryParams.push(query.denNgay);
-      }
+      const results = await ImportReceipt.findAll({
+        where: whereClause,
+        include: [
+          {
+            model: Supplier,
+            as: "supplier",
+            attributes: ["Ten"],
+          },
+          {
+            model: User,
+            as: "creator",
+            attributes: ["HoTen"],
+          },
+        ],
+        order: [["NgayNhap", "DESC"]],
+        attributes: [
+          "id",
+          "MaPhieuNhap",
+          "NgayNhap",
+          "TongTien",
+          "TrangThai",
+          "GhiChu",
+        ],
+      });
 
-      const sqlQuery = `
-        SELECT 
-          pn.id,
-          pn.MaPhieuNhap,
-          pn.NgayNhap,
-          pn.TongTien,
-          pn.TrangThai,
-          pn.GhiChu,
-          ncc.Ten as TenNhaCungCap,
-          nd.HoTen as NguoiTao
-        FROM phieunhap pn
-        JOIN nhacungcap ncc ON pn.id_NhaCungCap = ncc.id
-        JOIN nguoidung nd ON pn.id_NguoiTao = nd.id
-        ${whereClause}
-        ORDER BY pn.NgayNhap DESC
-      `;
-
-      const [results] = await db.execute(sqlQuery, queryParams);
       return {
         success: true,
-        data: results,
+        data: results.map((item) => ({
+          id: item.id,
+          MaPhieuNhap: item.MaPhieuNhap,
+          NgayNhap: item.NgayNhap,
+          TongTien: item.TongTien,
+          TrangThai: item.TrangThai,
+          GhiChu: item.GhiChu,
+          TenNhaCungCap: item.supplier?.Ten,
+          NguoiTao: item.creator?.HoTen,
+        })),
       };
     } catch (error) {
       throw new Error("Không thể lấy danh sách phiếu nhập: " + error.message);
     }
   }
 
-  // Lấy chi tiết phiếu nhập
+  // Lấy chi tiết phiếu nhập sử dụng Sequelize
   async getPhieuNhapDetail(phieuNhapId) {
     try {
       // Lấy thông tin phiếu nhập
-      const [phieuNhap] = await db.execute(
-        `SELECT 
-          pn.*,
-          ncc.Ten as TenNhaCungCap,
-          nd.HoTen as NguoiTao
-        FROM phieunhap pn
-        JOIN nhacungcap ncc ON pn.id_NhaCungCap = ncc.id
-        JOIN nguoidung nd ON pn.id_NguoiTao = nd.id
-        WHERE pn.id = ?`,
-        [phieuNhapId]
-      );
+      const phieuNhap = await ImportReceipt.findByPk(phieuNhapId, {
+        include: [
+          {
+            model: Supplier,
+            as: "supplier",
+            attributes: ["Ten"],
+          },
+          {
+            model: User,
+            as: "creator",
+            attributes: ["HoTen"],
+          },
+        ],
+      });
 
-      if (phieuNhap.length === 0) {
+      if (!phieuNhap) {
         throw new Error("Phiếu nhập không tồn tại");
       }
 
       // Lấy chi tiết phiếu nhập
-      const [chiTiet] = await db.execute(
-        `SELECT 
-          ctpn.*,
-          sp.Ten as TenSanPham,
-          kc.Ten as KichCo,
-          ms.Ten as MauSac,
-          cts.MaSanPham
-        FROM chitietphieunhap ctpn
-        JOIN chitietsanpham cts ON ctpn.id_ChiTietSanPham = cts.id
-        JOIN sanpham sp ON cts.id_SanPham = sp.id
-        JOIN kichco kc ON cts.id_KichCo = kc.id
-        JOIN mausac ms ON cts.id_MauSac = ms.id
-        WHERE ctpn.id_PhieuNhap = ?`,
-        [phieuNhapId]
-      );
+      const chiTiet = await ImportReceiptDetail.findAll({
+        where: { id_PhieuNhap: phieuNhapId },
+        include: [
+          {
+            model: ProductDetail,
+            as: "productDetail",
+            include: [
+              {
+                model: Product,
+                as: "product",
+                attributes: ["Ten"],
+              },
+              {
+                model: Size,
+                as: "size",
+                attributes: ["Ten"],
+              },
+              {
+                model: Color,
+                as: "color",
+                attributes: ["Ten"],
+              },
+            ],
+          },
+        ],
+      });
 
       return {
         success: true,
         data: {
-          phieuNhap: phieuNhap[0],
-          chiTiet: chiTiet,
+          phieuNhap: {
+            ...phieuNhap.toJSON(),
+            TenNhaCungCap: phieuNhap.supplier?.Ten,
+            NguoiTao: phieuNhap.creator?.HoTen,
+          },
+          chiTiet: chiTiet.map((item) => ({
+            ...item.toJSON(),
+            TenSanPham: item.productDetail?.product?.Ten,
+            KichCo: item.productDetail?.size?.Ten,
+            MauSac: item.productDetail?.color?.Ten,
+            MaSanPham: item.productDetail?.MaSanPham,
+          })),
         },
       };
     } catch (error) {
@@ -608,35 +704,41 @@ class InventoryService {
     }
   }
 
-  // Thống kê nhập kho theo thời gian
+  // Thống kê nhập kho theo thời gian sử dụng Sequelize
   async thongKeNhapKhoTheoThoiGian(query = {}) {
     try {
-      let whereClause = "WHERE pn.TrangThai = 2";
-      let queryParams = [];
+      const whereClause = { TrangThai: 2 }; // Chỉ lấy phiếu đã xác nhận
 
-      if (query.tuNgay) {
-        whereClause += " AND DATE(pn.NgayNhap) >= ?";
-        queryParams.push(query.tuNgay);
+      if (query.tuNgay || query.denNgay) {
+        const dateFilter = {};
+        if (query.tuNgay) {
+          dateFilter[Op.gte] = new Date(query.tuNgay);
+        }
+        if (query.denNgay) {
+          dateFilter[Op.lte] = new Date(query.denNgay + " 23:59:59");
+        }
+        whereClause.NgayNhap = dateFilter;
       }
 
-      if (query.denNgay) {
-        whereClause += " AND DATE(pn.NgayNhap) <= ?";
-        queryParams.push(query.denNgay);
-      }
+      const results = await ImportReceipt.findAll({
+        where: whereClause,
+        attributes: [
+          [sequelize.fn("DATE", sequelize.col("NgayNhap")), "NgayNhap"],
+          [sequelize.fn("COUNT", sequelize.col("id")), "SoPhieuNhap"],
+          [sequelize.fn("SUM", sequelize.col("TongTien")), "TongTien"],
+          [
+            sequelize.fn(
+              "COUNT",
+              sequelize.fn("DISTINCT", sequelize.col("id_NhaCungCap"))
+            ),
+            "SoNhaCungCap",
+          ],
+        ],
+        group: [sequelize.fn("DATE", sequelize.col("NgayNhap"))],
+        order: [[sequelize.fn("DATE", sequelize.col("NgayNhap")), "DESC"]],
+        raw: true,
+      });
 
-      const sqlQuery = `
-        SELECT 
-          DATE(pn.NgayNhap) as NgayNhap,
-          COUNT(pn.id) as SoPhieuNhap,
-          SUM(pn.TongTien) as TongTien,
-          COUNT(DISTINCT pn.id_NhaCungCap) as SoNhaCungCap
-        FROM phieunhap pn
-        ${whereClause}
-        GROUP BY DATE(pn.NgayNhap)
-        ORDER BY NgayNhap DESC
-      `;
-
-      const [results] = await db.execute(sqlQuery, queryParams);
       return {
         success: true,
         data: results,
@@ -646,153 +748,95 @@ class InventoryService {
     }
   }
 
-  // Lấy lịch sử nhập kho của sản phẩm
+  // Lấy lịch sử nhập kho của sản phẩm sử dụng Sequelize
   async getProductImportHistory(chiTietSanPhamId, query = {}) {
     try {
-      let whereClause = "WHERE ctpn.id_ChiTietSanPham = ? AND pn.TrangThai = 2";
-      let queryParams = [chiTietSanPhamId];
+      const whereClause = {
+        id_ChiTietSanPham: chiTietSanPhamId,
+      };
 
-      if (query.tuNgay) {
-        whereClause += " AND DATE(pn.NgayNhap) >= ?";
-        queryParams.push(query.tuNgay);
+      const includeClause = [
+        {
+          model: ImportReceipt,
+          as: "importReceipt",
+          attributes: ["MaPhieuNhap", "NgayNhap"],
+          where: { TrangThai: 2 },
+          include: [
+            {
+              model: Supplier,
+              as: "supplier",
+              attributes: ["Ten"],
+            },
+            {
+              model: User,
+              as: "creator",
+              attributes: ["HoTen"],
+            },
+          ],
+        },
+      ];
+
+      if (query.tuNgay || query.denNgay) {
+        const dateFilter = {};
+        if (query.tuNgay) {
+          dateFilter[Op.gte] = new Date(query.tuNgay);
+        }
+        if (query.denNgay) {
+          dateFilter[Op.lte] = new Date(query.denNgay + " 23:59:59");
+        }
+        includeClause[0].where.NgayNhap = dateFilter;
       }
 
-      if (query.denNgay) {
-        whereClause += " AND DATE(pn.NgayNhap) <= ?";
-        queryParams.push(query.denNgay);
-      }
+      const results = await ImportReceiptDetail.findAll({
+        where: whereClause,
+        include: includeClause,
+        order: [["importReceipt", "NgayNhap", "DESC"]],
+        attributes: ["id", "SoLuong", "GiaNhap", "ThanhTien"],
+      });
 
-      const sqlQuery = `
-        SELECT 
-          ctpn.id,
-          pn.MaPhieuNhap,
-          pn.NgayNhap,
-          ctpn.SoLuong,
-          ctpn.GiaNhap,
-          ctpn.ThanhTien,
-          ncc.Ten as TenNhaCungCap,
-          nd.HoTen as NguoiTao
-        FROM chitietphieunhap ctpn
-        JOIN phieunhap pn ON ctpn.id_PhieuNhap = pn.id
-        JOIN nhacungcap ncc ON pn.id_NhaCungCap = ncc.id
-        JOIN nguoidung nd ON pn.id_NguoiTao = nd.id
-        ${whereClause}
-        ORDER BY pn.NgayNhap DESC
-      `;
-
-      const [results] = await db.execute(sqlQuery, queryParams);
       return {
         success: true,
-        data: results,
+        data: results.map((item) => ({
+          id: item.id,
+          MaPhieuNhap: item.importReceipt?.MaPhieuNhap,
+          NgayNhap: item.importReceipt?.NgayNhap,
+          SoLuong: item.SoLuong,
+          GiaNhap: item.GiaNhap,
+          ThanhTien: item.ThanhTien,
+          TenNhaCungCap: item.importReceipt?.supplier?.Ten,
+          NguoiTao: item.importReceipt?.creator?.HoTen,
+        })),
       };
     } catch (error) {
       throw new Error("Không thể lấy lịch sử nhập kho: " + error.message);
     }
   }
 
-  // Lấy báo cáo tồn kho chi tiết KHÔNG dùng view, KHÔNG dùng cột TonKho cũ
-  async getTonKhoReport(query = {}) {
-    try {
-      let whereClause = "WHERE 1=1";
-      let queryParams = [];
-
-      // Lọc theo sản phẩm
-      if (query.sanPham) {
-        whereClause += " AND sp.Ten LIKE ?";
-        queryParams.push(`%${query.sanPham}%`);
-      }
-
-      // Lọc theo tồn kho thấp
-      if (query.tonKhoThap) {
-        whereClause += " AND fn_TinhTonKhoRealTime(cts.id) <= ?";
-        queryParams.push(parseInt(query.tonKhoThap) || 10);
-      }
-
-      const sqlQuery = `
-        SELECT 
-          cts.id as id_ChiTietSanPham,
-          sp.Ten as TenSanPham,
-          kc.Ten as KichCo,
-          ms.Ten as MauSac,
-          cts.MaSanPham,
-          fn_TinhTonKhoRealTime(cts.id) as TonKho
-        FROM chitietsanpham cts
-        JOIN sanpham sp ON cts.id_SanPham = sp.id
-        JOIN kichco kc ON cts.id_KichCo = kc.id
-        JOIN mausac ms ON cts.id_MauSac = ms.id
-        ${whereClause}
-        ORDER BY TonKho ASC, TenSanPham
-      `;
-
-      const [results] = await db.execute(sqlQuery, queryParams);
-
-      // Thống kê tổng quan
-      const tongSanPham = results.length;
-      const sapHetHang = results.filter(
-        (item) => item.TonKho <= 10 && item.TonKho > 0
-      ).length;
-      const hetHang = results.filter((item) => item.TonKho === 0).length;
-      const tonKhoTong = results.reduce((sum, item) => sum + item.TonKho, 0);
-
-      return {
-        success: true,
-        data: results,
-        thongKe: {
-          tongSanPham,
-          sapHetHang,
-          hetHang,
-          tonKhoTong,
-        },
-      };
-    } catch (error) {
-      throw new Error("Không thể lấy báo cáo tồn kho: " + error.message);
-    }
-  }
-
-  // Đồng bộ tồn kho (sử dụng khi cần thiết)
-  async syncTonKho() {
-    try {
-      // Gọi stored procedure để đồng bộ tồn kho
-      const [result] = await db.execute("CALL sp_DongBoTonKho()");
-
-      return {
-        success: true,
-        message: "Đồng bộ tồn kho thành công",
-        data: result,
-      };
-    } catch (error) {
-      throw new Error("Không thể đồng bộ tồn kho: " + error.message);
-    }
-  }
-
-  // Tìm kiếm sản phẩm cho phiếu nhập (có filter và pagination)
+  // Tìm kiếm sản phẩm cho phiếu nhập sử dụng Sequelize
   async searchProductsForImport(query = {}) {
     try {
-      let whereClause = "WHERE sp.TrangThai = 1";
-      let queryParams = [];
+      const whereClause = { TrangThai: 1 };
 
       // Lọc theo danh mục
       if (query.danhMuc) {
-        whereClause += " AND sp.id_DanhMuc = ?";
-        queryParams.push(query.danhMuc);
+        whereClause.id_DanhMuc = query.danhMuc;
       }
 
       // Lọc theo thương hiệu
       if (query.thuongHieu) {
-        whereClause += " AND sp.id_ThuongHieu = ?";
-        queryParams.push(query.thuongHieu);
+        whereClause.id_ThuongHieu = query.thuongHieu;
       }
 
       // Tìm kiếm theo tên sản phẩm
       if (query.keyword) {
-        whereClause += " AND sp.Ten LIKE ?";
-        queryParams.push(`%${query.keyword}%`);
+        whereClause.Ten = {
+          [Op.like]: `%${query.keyword}%`,
+        };
       }
 
       // Lọc theo nhà cung cấp
       if (query.nhaCungCap) {
-        whereClause += " AND sp.id_NhaCungCap = ?";
-        queryParams.push(query.nhaCungCap);
+        whereClause.id_NhaCungCap = query.nhaCungCap;
       }
 
       // Pagination
@@ -800,54 +844,66 @@ class InventoryService {
       const limit = parseInt(query.limit) || 20;
       const offset = (page - 1) * limit;
 
-      const sqlQuery = `
-        SELECT 
-          sp.id,
-          sp.Ten as TenSanPham,
-          sp.Gia,
-          sp.HinhAnh,
-          th.Ten as TenThuongHieu,
-          dm.Ten as TenDanhMuc,
-          ncc.Ten as TenNhaCungCap,
-          COUNT(cts.id) as SoBienTheHienTai
-        FROM sanpham sp
-        JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-        JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-        JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
-        LEFT JOIN chitietsanpham cts ON sp.id = cts.id_SanPham
-        ${whereClause}
-        GROUP BY sp.id, sp.Ten, sp.Gia, sp.HinhAnh, th.Ten, dm.Ten, ncc.Ten
-        ORDER BY sp.Ten ASC
-        LIMIT ? OFFSET ?
-      `;
-
-      const [products] = await db.execute(sqlQuery, [
-        ...queryParams,
+      const { count, rows: products } = await Product.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: Brand,
+            as: "brand",
+            attributes: ["Ten"],
+          },
+          {
+            model: Category,
+            as: "category",
+            attributes: ["Ten"],
+          },
+          {
+            model: Supplier,
+            as: "supplier",
+            attributes: ["Ten"],
+          },
+          {
+            model: ProductDetail,
+            as: "productDetails",
+            attributes: ["id"],
+            required: false,
+          },
+        ],
+        attributes: [
+          "id",
+          "Ten",
+          "Gia",
+          "HinhAnh",
+          [
+            sequelize.fn("COUNT", sequelize.col("productDetails.id")),
+            "SoBienTheHienTai",
+          ],
+        ],
+        group: ["Product.id", "brand.id", "category.id", "supplier.id"],
+        order: [["Ten", "ASC"]],
         limit,
         offset,
-      ]);
-
-      // Đếm tổng số sản phẩm
-      const [countResult] = await db.execute(
-        `SELECT COUNT(DISTINCT sp.id) as total FROM sanpham sp 
-         JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-         JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-         JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
-         ${whereClause}`,
-        queryParams
-      );
+        subQuery: false,
+        distinct: true,
+      });
 
       return {
         success: true,
         data: products.map((product) => ({
-          ...product,
+          id: product.id,
+          TenSanPham: product.Ten,
+          Gia: product.Gia,
           HinhAnh: this.parseProductImage(product.HinhAnh),
+          TenThuongHieu: product.brand?.Ten,
+          TenDanhMuc: product.category?.Ten,
+          TenNhaCungCap: product.supplier?.Ten,
+          SoBienTheHienTai: product.getDataValue("SoBienTheHienTai") || 0,
         })),
         pagination: {
           page,
           limit,
-          total: countResult[0].total,
-          totalPages: Math.ceil(countResult[0].total / limit),
+          total: count.length || count,
+          totalPages: Math.ceil((count.length || count) / limit),
         },
       };
     } catch (error) {
@@ -855,56 +911,95 @@ class InventoryService {
     }
   }
 
-  // Lấy thông tin chi tiết sản phẩm và các biến thể hiện có
+  // Lấy thông tin chi tiết sản phẩm và các biến thể hiện có sử dụng Sequelize
   async getProductVariantsForImport(productId) {
     try {
       // Lấy thông tin sản phẩm
-      const [product] = await db.execute(
-        `SELECT sp.*, th.Ten as TenThuongHieu, dm.Ten as TenDanhMuc, ncc.Ten as TenNhaCungCap
-         FROM sanpham sp
-         JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-         JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-         JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
-         WHERE sp.id = ? AND sp.TrangThai = 1`,
-        [productId]
-      );
+      const product = await Product.findOne({
+        where: { id: productId, TrangThai: 1 },
+        include: [
+          {
+            model: Brand,
+            as: "brand",
+            attributes: ["Ten"],
+          },
+          {
+            model: Category,
+            as: "category",
+            attributes: ["Ten"],
+          },
+          {
+            model: Supplier,
+            as: "supplier",
+            attributes: ["Ten"],
+          },
+        ],
+      });
 
-      if (product.length === 0) {
+      if (!product) {
         throw new Error("Sản phẩm không tồn tại");
       }
 
-      // ✅ SỬA: Lấy các biến thể hiện có với tồn kho real-time
-      const [existingVariants] = await db.execute(
-        `SELECT 
-          cts.id,
-          cts.MaSanPham,
-          -- Sử dụng function real-time thay vì cột TonKho cũ
-          fn_TinhTonKhoRealTime(cts.id) as TonKho,
-          kc.id as id_KichCo,
-          kc.Ten as TenKichCo,
-          ms.id as id_MauSac,
-          ms.Ten as TenMauSac,
-          ms.MaMau
-         FROM chitietsanpham cts
-         JOIN kichco kc ON cts.id_KichCo = kc.id
-         JOIN mausac ms ON cts.id_MauSac = ms.id
-         WHERE cts.id_SanPham = ?
-         ORDER BY kc.Ten, ms.Ten`,
-        [productId]
+      // Lấy các biến thể hiện có
+      const existingVariants = await ProductDetail.findAll({
+        where: { id_SanPham: productId },
+        include: [
+          {
+            model: Size,
+            as: "size",
+            attributes: ["id", "Ten"],
+          },
+          {
+            model: Color,
+            as: "color",
+            attributes: ["id", "Ten", "MaMau"],
+          },
+        ],
+        attributes: ["id", "MaSanPham"],
+        order: [
+          ["size", "Ten"],
+          ["color", "Ten"],
+        ],
+      });
+
+      // Lấy tồn kho real-time cho từng biến thể
+      const variantsWithStock = await Promise.all(
+        existingVariants.map(async (variant) => {
+          const tonKho = await this.calculateRealTimeStock(variant.id);
+
+          return {
+            id: variant.id,
+            MaSanPham: variant.MaSanPham,
+            TonKho: tonKho,
+            id_KichCo: variant.size?.id,
+            TenKichCo: variant.size?.Ten,
+            id_MauSac: variant.color?.id,
+            TenMauSac: variant.color?.Ten,
+            MaMau: variant.color?.MaMau,
+          };
+        })
       );
 
       // Lấy tất cả kích cỡ và màu sắc có sẵn
-      const [allSizes] = await db.execute("SELECT * FROM kichco ORDER BY Ten");
-      const [allColors] = await db.execute("SELECT * FROM mausac ORDER BY Ten");
+      const allSizes = await Size.findAll({
+        order: [["Ten", "ASC"]],
+      });
+
+      const allColors = await Color.findAll({
+        order: [["Ten", "ASC"]],
+      });
 
       return {
         success: true,
         data: {
           product: {
-            ...product[0],
-            HinhAnh: this.parseProductImage(product[0].HinhAnh),
+            ...product.toJSON(),
+            TenThuongHieu: product.brand?.Ten,
+            TenDanhMuc: product.category?.Ten,
+            TenNhaCungCap: product.supplier?.Ten,
+            HinhAnh: this.parseProductImage(product.HinhAnh),
           },
-          existingVariants,
+          existingVariants: variantsWithStock,
           allSizes,
           allColors,
         },
@@ -914,45 +1009,35 @@ class InventoryService {
     }
   }
 
-  // Kiểm tra tồn kho trước khi đặt hàng - DÙNG REAL-TIME
+  // Kiểm tra tồn kho trước khi đặt hàng sử dụng Sequelize
   async checkStockBeforeOrder(orderItems) {
     try {
       const stockCheck = [];
 
       for (const { id_ChiTietSanPham, SoLuong } of orderItems) {
-        // Sử dụng function real-time thay vì query cột TonKho
-        const [stockInfo] = await db.execute(
-          `SELECT 
-            cts.id,
-            cts.MaSanPham,
-            sp.Ten as TenSanPham,
-            kc.Ten as TenKichCo,
-            ms.Ten as TenMauSac,
-            -- Sử dụng function tính tồn kho real-time
-            fn_TinhTonKhoRealTime(cts.id) as TonKhoThucTe,
-            -- Sử dụng function kiểm tra có thể bán
-            fn_CoTheBan(cts.id, ?) as CoTheBan,
-            -- Tính số lượng đang chờ xác nhận
-            COALESCE(cho.TongCho, 0) as SoLuongDangCho
-          FROM chitietsanpham cts
-          JOIN sanpham sp ON cts.id_SanPham = sp.id
-          JOIN kichco kc ON cts.id_KichCo = kc.id
-          JOIN mausac ms ON cts.id_MauSac = ms.id
-          
-          -- Tính số lượng đang chờ xác nhận
-          LEFT JOIN (
-            SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
-            FROM chitietdonhang ctdh
-            JOIN donhang dh ON ctdh.id_DonHang = dh.id
-            WHERE dh.TrangThai = 1
-            GROUP BY ctdh.id_ChiTietSanPham
-          ) cho ON cts.id = cho.id_ChiTietSanPham
-          
-          WHERE cts.id = ?`,
-          [SoLuong, id_ChiTietSanPham]
-        );
+        // Lấy thông tin sản phẩm sử dụng Sequelize
+        const productDetail = await ProductDetail.findOne({
+          where: { id: id_ChiTietSanPham },
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["Ten"],
+            },
+            {
+              model: Size,
+              as: "size",
+              attributes: ["Ten"],
+            },
+            {
+              model: Color,
+              as: "color",
+              attributes: ["Ten"],
+            },
+          ],
+        });
 
-        if (stockInfo.length === 0) {
+        if (!productDetail) {
           stockCheck.push({
             id_ChiTietSanPham,
             error: "Sản phẩm không tồn tại",
@@ -961,23 +1046,29 @@ class InventoryService {
           continue;
         }
 
-        const product = stockInfo[0];
-        const canSell = product.CoTheBan === 1;
+        // Tính tồn kho và số lượng đang chờ
+        const tonKhoThucTe = await this.calculateRealTimeStock(
+          id_ChiTietSanPham
+        );
+        const soLuongDangCho = await this.calculatePendingQuantity(
+          id_ChiTietSanPham
+        );
+        const coTheBan = tonKhoThucTe - soLuongDangCho >= SoLuong;
 
         stockCheck.push({
           id_ChiTietSanPham,
-          TenSanPham: product.TenSanPham,
-          MaSanPham: product.MaSanPham,
-          KichCo: product.TenKichCo,
-          MauSac: product.TenMauSac,
-          TonKhoThucTe: product.TonKhoThucTe,
+          TenSanPham: productDetail.product.Ten,
+          MaSanPham: productDetail.MaSanPham,
+          KichCo: productDetail.size.Ten,
+          MauSac: productDetail.color.Ten,
+          TonKhoThucTe: tonKhoThucTe,
           SoLuongCanBan: SoLuong,
-          SoLuongDangCho: product.SoLuongDangCho,
-          CoTheBan: canSell,
-          isAvailable: canSell,
-          message: canSell
+          SoLuongDangCho: soLuongDangCho,
+          CoTheBan: coTheBan,
+          isAvailable: coTheBan,
+          message: coTheBan
             ? "Có thể đặt hàng"
-            : `Không đủ hàng. Tồn kho: ${product.TonKhoThucTe}, Đang chờ: ${product.SoLuongDangCho}`,
+            : `Không đủ hàng. Tồn kho: ${tonKhoThucTe}, Đang chờ: ${soLuongDangCho}`,
         });
       }
 
@@ -995,19 +1086,167 @@ class InventoryService {
     }
   }
 
-  // ❌ BỎ HOÀN TOÀN - Function này không cần thiết nữa với real-time calculation
-  // Đồng bộ tồn kho từ database (tính lại toàn bộ theo logic mới)
-  async syncInventoryFromOrders() {
-    console.log(
-      "🔄 Hệ thống đã chuyển sang Real-time calculation. Function sync không cần thiết nữa."
-    );
+  // Cập nhật phiếu nhập sử dụng Sequelize
+  async updatePhieuNhap(phieuNhapId, updateData) {
+    const transaction = await sequelize.transaction();
 
-    return {
-      success: true,
-      message:
-        "Hệ thống đã sử dụng Real-time calculation. Không cần đồng bộ cột TonKho nữa.",
-      note: "Tồn kho được tính real-time từ functions fn_TinhTonKhoRealTime() dựa trên phiếu nhập và đơn hàng.",
-    };
+    try {
+      // Kiểm tra phiếu nhập tồn tại
+      const phieuNhap = await ImportReceipt.findByPk(phieuNhapId, {
+        transaction,
+      });
+
+      if (!phieuNhap) {
+        throw new Error("Phiếu nhập không tồn tại");
+      }
+
+      // Cập nhật thông tin phiếu nhập
+      const { GhiChu, TrangThai } = updateData;
+      await phieuNhap.update(
+        {
+          GhiChu: GhiChu || phieuNhap.GhiChu,
+          TrangThai: TrangThai || phieuNhap.TrangThai,
+        },
+        { transaction }
+      );
+
+      // Nếu phiếu nhập được xác nhận (TrangThai = 2), log thông tin
+      if (TrangThai === 2 && phieuNhap.TrangThai !== 2) {
+        await this.logImportConfirmation(phieuNhapId);
+      }
+
+      await transaction.commit();
+
+      return {
+        success: true,
+        message: "Cập nhật phiếu nhập thành công",
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw new Error("Không thể cập nhật phiếu nhập: " + error.message);
+    }
+  }
+
+  // Log xác nhận phiếu nhập sử dụng Sequelize
+  async logImportConfirmation(phieuNhapId) {
+    try {
+      // Lấy chi tiết phiếu nhập sử dụng Sequelize
+      const chiTietList = await ImportReceiptDetail.findAll({
+        where: { id_PhieuNhap: phieuNhapId },
+        attributes: ["id_ChiTietSanPham", "SoLuong"],
+      });
+
+      console.log(
+        `[INVENTORY REAL-TIME] Phiếu nhập #${phieuNhapId} đã được xác nhận. Tồn kho được tính real-time từ Sequelize.`
+      );
+
+      // Log chi tiết cho theo dõi
+      for (const item of chiTietList) {
+        const tonKhoSauNhap = await this.calculateRealTimeStock(
+          item.id_ChiTietSanPham
+        );
+        console.log(
+          `[INVENTORY REAL-TIME] Sản phẩm ${item.id_ChiTietSanPham}: +${item.SoLuong} (từ phiếu nhập), tồn kho hiện tại: ${tonKhoSauNhap}`
+        );
+      }
+
+      return {
+        success: true,
+        message: "Phiếu nhập đã được xác nhận. Tồn kho được tính real-time.",
+        itemsAffected: chiTietList.length,
+      };
+    } catch (error) {
+      throw new Error("Không thể xử lý phiếu nhập: " + error.message);
+    }
+  }
+
+  // Lấy báo cáo tồn kho chi tiết sử dụng Sequelize
+  async getTonKhoReport(query = {}) {
+    try {
+      let productWhereClause = {};
+
+      // Lọc theo sản phẩm
+      if (query.sanPham) {
+        productWhereClause.Ten = {
+          [Op.like]: `%${query.sanPham}%`,
+        };
+      }
+
+      const productDetails = await ProductDetail.findAll({
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["Ten"],
+            where: productWhereClause,
+          },
+          {
+            model: Size,
+            as: "size",
+            attributes: ["Ten"],
+          },
+          {
+            model: Color,
+            as: "color",
+            attributes: ["Ten"],
+          },
+        ],
+        attributes: ["id", "MaSanPham"],
+        order: [["product", "Ten"]],
+      });
+
+      // Lấy tồn kho real-time cho từng sản phẩm
+      const results = await Promise.all(
+        productDetails.map(async (item) => {
+          const tonKho = await this.calculateRealTimeStock(item.id);
+
+          return {
+            id_ChiTietSanPham: item.id,
+            TenSanPham: item.product?.Ten,
+            KichCo: item.size?.Ten,
+            MauSac: item.color?.Ten,
+            MaSanPham: item.MaSanPham,
+            TonKho: tonKho,
+          };
+        })
+      );
+
+      // Lọc theo tồn kho thấp nếu có
+      let filteredResults = results;
+      if (query.tonKhoThap) {
+        const threshold = parseInt(query.tonKhoThap) || 10;
+        filteredResults = results.filter((item) => item.TonKho <= threshold);
+      }
+
+      // Sắp xếp theo tồn kho tăng dần
+      filteredResults.sort((a, b) => a.TonKho - b.TonKho);
+
+      // Thống kê tổng quan
+      const tongSanPham = filteredResults.length;
+      const sapHetHang = filteredResults.filter(
+        (item) => item.TonKho <= 10 && item.TonKho > 0
+      ).length;
+      const hetHang = filteredResults.filter(
+        (item) => item.TonKho === 0
+      ).length;
+      const tonKhoTong = filteredResults.reduce(
+        (sum, item) => sum + item.TonKho,
+        0
+      );
+
+      return {
+        success: true,
+        data: filteredResults,
+        thongKe: {
+          tongSanPham,
+          sapHetHang,
+          hetHang,
+          tonKhoTong,
+        },
+      };
+    } catch (error) {
+      throw new Error("Không thể lấy báo cáo tồn kho: " + error.message);
+    }
   }
 
   // Utility function để parse hình ảnh
@@ -1021,6 +1260,239 @@ class InventoryService {
     } catch (error) {
       return null;
     }
+  }
+
+  // Tính tồn kho thực tế của một chi tiết sản phẩm sử dụng Sequelize
+  async calculateRealTimeStock(productDetailId) {
+    try {
+      // Tổng số lượng đã nhập kho (từ phiếu nhập đã xác nhận)
+      const importedResult = await ImportReceiptDetail.sum("SoLuong", {
+        where: { id_ChiTietSanPham: productDetailId },
+        include: [
+          {
+            model: ImportReceipt,
+            as: "importReceipt",
+            where: { TrangThai: 2 },
+            attributes: [],
+          },
+        ],
+      });
+
+      // Tổng số lượng đã bán (từ đơn hàng đã giao)
+      const soldResult = await OrderDetail.sum("SoLuong", {
+        where: { id_ChiTietSanPham: productDetailId },
+        include: [
+          {
+            model: Order,
+            as: "order",
+            where: { TrangThai: 4 },
+            attributes: [],
+          },
+        ],
+      });
+
+      const imported = importedResult || 0;
+      const sold = soldResult || 0;
+
+      return Math.max(0, imported - sold);
+    } catch (error) {
+      console.error("Error calculating real-time stock:", error);
+      return 0;
+    }
+  }
+
+  // Tính số lượng đang chờ (trong đơn hàng chờ xác nhận) sử dụng Sequelize
+  async calculatePendingQuantity(productDetailId) {
+    try {
+      const result = await OrderDetail.sum("SoLuong", {
+        where: { id_ChiTietSanPham: productDetailId },
+        include: [
+          {
+            model: Order,
+            as: "order",
+            where: { TrangThai: 1 },
+            attributes: [],
+          },
+        ],
+      });
+
+      return result || 0;
+    } catch (error) {
+      console.error("Error calculating pending quantity:", error);
+      return 0;
+    }
+  }
+
+  // Kiểm tra có thể bán hay không sử dụng Sequelize
+  async canSell(productDetailId, requestedQuantity) {
+    try {
+      const realTimeStock = await this.calculateRealTimeStock(productDetailId);
+      const pendingQuantity = await this.calculatePendingQuantity(
+        productDetailId
+      );
+
+      // Tồn kho khả dụng = Tồn kho thực tế - Số lượng đang chờ
+      const availableStock = realTimeStock - pendingQuantity;
+
+      return {
+        canSell: availableStock >= requestedQuantity,
+        realTimeStock,
+        pendingQuantity,
+        availableStock,
+        requestedQuantity,
+      };
+    } catch (error) {
+      console.error("Error checking if can sell:", error);
+      return {
+        canSell: false,
+        realTimeStock: 0,
+        pendingQuantity: 0,
+        availableStock: 0,
+        requestedQuantity,
+      };
+    }
+  }
+
+  // Lấy thông tin tồn kho chi tiết của một sản phẩm
+  async getStockInfo(productDetailId) {
+    try {
+      const realTimeStock = await this.calculateRealTimeStock(productDetailId);
+      const pendingQuantity = await this.calculatePendingQuantity(
+        productDetailId
+      );
+
+      return {
+        productDetailId,
+        realTimeStock,
+        pendingQuantity,
+        availableStock: realTimeStock - pendingQuantity,
+      };
+    } catch (error) {
+      console.error("Error getting stock info:", error);
+      return {
+        productDetailId,
+        realTimeStock: 0,
+        pendingQuantity: 0,
+        availableStock: 0,
+      };
+    }
+  }
+
+  // Lấy danh sách sản phẩm sắp hết hàng sử dụng Sequelize
+  async getLowStockProducts(threshold = 10) {
+    try {
+      const productDetails = await ProductDetail.findAll({
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["Ten"],
+            where: { TrangThai: 1 },
+            include: [
+              {
+                model: Brand,
+                as: "brand",
+                attributes: ["Ten"],
+              },
+            ],
+          },
+          {
+            model: Size,
+            as: "size",
+            attributes: ["Ten"],
+          },
+          {
+            model: Color,
+            as: "color",
+            attributes: ["Ten"],
+          },
+        ],
+        attributes: ["id", "MaSanPham"],
+      });
+
+      const results = [];
+
+      for (const item of productDetails) {
+        const tongNhap =
+          (await ImportReceiptDetail.sum("SoLuong", {
+            where: { id_ChiTietSanPham: item.id },
+            include: [
+              {
+                model: ImportReceipt,
+                as: "importReceipt",
+                where: { TrangThai: 2 },
+                attributes: [],
+              },
+            ],
+          })) || 0;
+
+        const tongBan =
+          (await OrderDetail.sum("SoLuong", {
+            where: { id_ChiTietSanPham: item.id },
+            include: [
+              {
+                model: Order,
+                as: "order",
+                where: { TrangThai: 4 },
+                attributes: [],
+              },
+            ],
+          })) || 0;
+
+        const soLuongCho =
+          (await OrderDetail.sum("SoLuong", {
+            where: { id_ChiTietSanPham: item.id },
+            include: [
+              {
+                model: Order,
+                as: "order",
+                where: { TrangThai: 1 },
+                attributes: [],
+              },
+            ],
+          })) || 0;
+
+        const tonKhoThucTe = tongNhap - tongBan;
+
+        if (tonKhoThucTe <= threshold && tonKhoThucTe > 0) {
+          results.push({
+            id_ChiTietSanPham: item.id,
+            MaSanPham: item.MaSanPham,
+            TenSanPham: item.product.Ten,
+            ThuongHieu: item.product.brand?.Ten,
+            KichCo: item.size.Ten,
+            MauSac: item.color.Ten,
+            TongNhap: tongNhap,
+            TongBan: tongBan,
+            SoLuongCho: soLuongCho,
+            TonKhoThucTe: tonKhoThucTe,
+            TonKhoKhaDung: tonKhoThucTe - soLuongCho,
+          });
+        }
+      }
+
+      // Sắp xếp theo tồn kho tăng dần
+      results.sort((a, b) => a.TonKhoThucTe - b.TonKhoThucTe);
+
+      return results;
+    } catch (error) {
+      console.error("Error getting low stock products:", error);
+      return [];
+    }
+  }
+
+  // Đồng bộ tồn kho (không cần thiết với real-time calculation)
+  async syncInventoryFromOrders() {
+    console.log(
+      "🔄 Hệ thống đã chuyển sang Real-time calculation với Sequelize ORM. Function sync không cần thiết nữa."
+    );
+
+    return {
+      success: true,
+      message:
+        "Hệ thống đã sử dụng Real-time calculation với Sequelize. Không cần đồng bộ cột TonKho nữa.",
+      note: "Tồn kho được tính real-time từ Sequelize aggregations dựa trên phiếu nhập và đơn hàng.",
+    };
   }
 }
 

@@ -1,4 +1,4 @@
-const db = require("../config/database");
+const { PaymentMethod, Order, sequelize } = require("../models");
 const crypto = require("crypto");
 const qs = require("qs");
 const {
@@ -25,103 +25,127 @@ class PaymentService {
   }
 
   async taoPhuongThucThanhToan(paymentData) {
-    const [result] = await db.execute(
-      `INSERT INTO hinhthucthanhtoan (Ten, MoTa, TrangThai) VALUES (?, ?, ?)`,
-      [paymentData.Ten, paymentData.MoTa || null, paymentData.TrangThai ?? 1]
-    );
+    try {
+      const paymentMethod = await PaymentMethod.create({
+        Ten: paymentData.Ten,
+        MoTa: paymentData.MoTa || null,
+        TrangThai: paymentData.TrangThai ?? 1,
+      });
 
-    return {
-      id: result.insertId,
-      ...paymentData,
-      TrangThai: paymentData.TrangThai ?? 1,
-    };
+      return paymentMethod.toJSON();
+    } catch (error) {
+      throw new Error("Không thể tạo phương thức thanh toán: " + error.message);
+    }
   }
 
   async capNhatPhuongThucThanhToan(id, paymentData) {
-    const [result] = await db.execute(
-      `UPDATE hinhthucthanhtoan SET Ten = ?, MoTa = ?, TrangThai = ? WHERE id = ?`,
-      [
-        paymentData.Ten,
-        paymentData.MoTa || null,
-        paymentData.TrangThai ?? 1,
-        id,
-      ]
-    );
+    try {
+      const paymentMethod = await PaymentMethod.findByPk(id);
 
-    if (result.affectedRows === 0) {
-      throw new Error("Không tìm thấy phương thức thanh toán");
+      if (!paymentMethod) {
+        throw new Error("Không tìm thấy phương thức thanh toán");
+      }
+
+      await paymentMethod.update({
+        Ten: paymentData.Ten,
+        MoTa: paymentData.MoTa || null,
+        TrangThai: paymentData.TrangThai ?? 1,
+      });
+
+      return paymentMethod.toJSON();
+    } catch (error) {
+      throw new Error(
+        "Không thể cập nhật phương thức thanh toán: " + error.message
+      );
     }
-
-    return this.layChiTietPhuongThucThanhToan(id);
   }
 
   async xoaPhuongThucThanhToan(id) {
-    const [orders] = await db.execute(
-      "SELECT COUNT(*) as count FROM donhang WHERE id_ThanhToan = ?",
-      [id]
-    );
+    try {
+      // Kiểm tra xem có đơn hàng nào đang sử dụng phương thức này không
+      const orderCount = await Order.count({
+        where: { id_ThanhToan: id },
+      });
 
-    if (orders[0].count > 0) {
-      throw new Error("Không thể xóa phương thức thanh toán đang được sử dụng");
+      if (orderCount > 0) {
+        throw new Error(
+          "Không thể xóa phương thức thanh toán đang được sử dụng"
+        );
+      }
+
+      const paymentMethod = await PaymentMethod.findByPk(id);
+
+      if (!paymentMethod) {
+        throw new Error("Không tìm thấy phương thức thanh toán");
+      }
+
+      await paymentMethod.destroy();
+
+      return { message: "Xóa phương thức thanh toán thành công" };
+    } catch (error) {
+      throw new Error("Không thể xóa phương thức thanh toán: " + error.message);
     }
-
-    const [result] = await db.execute(
-      "DELETE FROM hinhthucthanhtoan WHERE id = ?",
-      [id]
-    );
-
-    if (result.affectedRows === 0) {
-      throw new Error("Không tìm thấy phương thức thanh toán");
-    }
-
-    return { message: "Xóa phương thức thanh toán thành công" };
   }
 
   async capNhatTrangThai(id, trangThai) {
-    const [result] = await db.execute(
-      "UPDATE hinhthucthanhtoan SET TrangThai = ? WHERE id = ?",
-      [trangThai, id]
-    );
+    try {
+      const paymentMethod = await PaymentMethod.findByPk(id);
 
-    if (result.affectedRows === 0) {
-      throw new Error("Không tìm thấy phương thức thanh toán");
+      if (!paymentMethod) {
+        throw new Error("Không tìm thấy phương thức thanh toán");
+      }
+
+      await paymentMethod.update({ TrangThai: trangThai });
+
+      return { id, TrangThai: trangThai };
+    } catch (error) {
+      throw new Error("Không thể cập nhật trạng thái: " + error.message);
     }
-
-    return { id, TrangThai: trangThai };
   }
 
   async layChiTietPhuongThucThanhToan(id) {
-    const [methods] = await db.execute(
-      "SELECT * FROM hinhthucthanhtoan WHERE id = ?",
-      [id]
-    );
+    try {
+      const paymentMethod = await PaymentMethod.findByPk(id);
 
-    if (methods.length === 0) {
-      throw new Error("Không tìm thấy phương thức thanh toán");
+      if (!paymentMethod) {
+        throw new Error("Không tìm thấy phương thức thanh toán");
+      }
+
+      return paymentMethod.toJSON();
+    } catch (error) {
+      throw new Error(
+        "Không thể lấy chi tiết phương thức thanh toán: " + error.message
+      );
     }
-
-    return methods[0];
   }
 
   async layDanhSachPhuongThucThanhToan(filters = {}) {
-    let query = "SELECT * FROM hinhthucthanhtoan WHERE 1=1";
-    const params = [];
+    try {
+      const whereClause = {};
 
-    if (filters.trangThai !== undefined) {
-      query += " AND TrangThai = ?";
-      params.push(filters.trangThai);
+      if (filters.trangThai !== undefined) {
+        whereClause.TrangThai = filters.trangThai;
+      }
+
+      if (filters.tuKhoa) {
+        const { Op } = require("sequelize");
+        whereClause[Op.or] = [
+          { Ten: { [Op.like]: `%${filters.tuKhoa}%` } },
+          { MoTa: { [Op.like]: `%${filters.tuKhoa}%` } },
+        ];
+      }
+
+      const paymentMethods = await PaymentMethod.findAll({
+        where: whereClause,
+        order: [["id", "DESC"]],
+      });
+
+      return paymentMethods.map((method) => method.toJSON());
+    } catch (error) {
+      throw new Error(
+        "Không thể lấy danh sách phương thức thanh toán: " + error.message
+      );
     }
-
-    if (filters.tuKhoa) {
-      query += " AND (Ten LIKE ? OR MoTa LIKE ?)";
-      const searchTerm = `%${filters.tuKhoa}%`;
-      params.push(searchTerm, searchTerm);
-    }
-
-    query += " ORDER BY id DESC";
-
-    const [methods] = await db.execute(query, params);
-    return methods;
   }
 
   async createPayment(
@@ -130,72 +154,62 @@ class PaymentService {
     paymentMethodId,
     clientIp = "127.0.0.1"
   ) {
-    orderId = orderId ?? null;
-    userId = userId ?? null;
-    paymentMethodId = paymentMethodId ?? null;
+    try {
+      orderId = orderId ?? null;
+      userId = userId ?? null;
+      paymentMethodId = paymentMethodId ?? null;
 
-    // ✅ SỬA: Kiểm tra đơn hàng tồn tại trước
-    const [orderExists] = await db.execute(
-      "SELECT * FROM donhang WHERE id = ?",
-      [orderId]
-    );
+      const order = await Order.findByPk(orderId);
 
-    if (orderExists.length === 0) {
-      throw new Error(
-        `Đơn hàng với ID ${orderId} không tồn tại trong hệ thống`
-      );
+      if (!order) {
+        throw new Error(
+          `Đơn hàng với ID ${orderId} không tồn tại trong hệ thống`
+        );
+      }
+
+      if (userId && order.id_NguoiMua && order.id_NguoiMua !== userId) {
+        throw new Error("Bạn không có quyền truy cập đơn hàng này");
+      }
+
+      if (order.TrangThai !== 1) {
+        throw new Error("Đơn hàng không ở trạng thái chờ thanh toán");
+      }
+
+      const paymentMethod = await PaymentMethod.findOne({
+        where: {
+          id: paymentMethodId,
+          TrangThai: 1,
+        },
+      });
+
+      if (!paymentMethod) {
+        throw new Error(
+          "Phương thức thanh toán không hợp lệ hoặc đã bị vô hiệu hóa"
+        );
+      }
+
+      let paymentData = {};
+
+      switch (paymentMethod.Ten) {
+        case "VNPay":
+          paymentData = await this.createVNPayPayment(order, clientIp);
+          break;
+        case "Tiền mặt mặt ":
+        case "COD":
+          if (!order.EmailNguoiNhan || !order.SDTNguoiNhan) {
+            throw new Error("COD yêu cầu thông tin liên lạc hợp lệ");
+          }
+          await order.update({ TrangThai: 2 });
+          paymentData = { message: "Đặt hàng thành công với thanh toán COD" };
+          break;
+        default:
+          throw new Error("Phương thức thanh toán không được hỗ trợ");
+      }
+
+      return paymentData;
+    } catch (error) {
+      throw new Error("Không thể tạo thanh toán: " + error.message);
     }
-
-    const order = orderExists[0];
-
-    // ✅ SỬA: Logic linh hoạt cho cả guest và logged user
-    // Chỉ cần đảm bảo người thanh toán có quyền với đơn hàng này
-    if (userId && order.id_NguoiMua && order.id_NguoiMua !== userId) {
-      throw new Error("Bạn không có quyền truy cập đơn hàng này");
-    }
-
-    // Cho phép guest user thanh toán bất kỳ đơn hàng nào (trừ trường hợp trên)
-    // Cho phép logged user thanh toán đơn hàng của họ hoặc đơn hàng guest
-
-    if (order.TrangThai !== 1) {
-      throw new Error("Đơn hàng không ở trạng thái chờ thanh toán");
-    }
-
-    const [paymentMethods] = await db.execute(
-      "SELECT * FROM hinhthucthanhtoan WHERE id = ? AND TrangThai = 1",
-      [paymentMethodId]
-    );
-
-    if (paymentMethods.length === 0) {
-      throw new Error(
-        "Phương thức thanh toán không hợp lệ hoặc đã bị vô hiệu hóa"
-      );
-    }
-
-    const paymentMethod = paymentMethods[0];
-    let paymentData = {};
-
-    switch (paymentMethod.Ten) {
-      case "VNPay":
-        paymentData = await this.createVNPayPayment(order, clientIp);
-        break;
-      case "Tiền mặt mặt ":
-      case "COD":
-        // COD chỉ cần có thông tin liên lạc
-        if (!order.EmailNguoiNhan || !order.SDTNguoiNhan) {
-          throw new Error("COD yêu cầu thông tin liên lạc hợp lệ");
-        }
-        await db.execute("UPDATE donhang SET TrangThai = ? WHERE id = ?", [
-          2,
-          orderId,
-        ]);
-        paymentData = { message: "Đặt hàng thành công với thanh toán COD" };
-        break;
-      default:
-        throw new Error("Phương thức thanh toán không được hỗ trợ");
-    }
-
-    return paymentData;
   }
 
   async createVNPayPayment(order, clientIp = "127.0.0.1") {
@@ -210,16 +224,9 @@ class PaymentService {
       }
 
       const now = new Date();
-      const expire = new Date(now.getTime() + 15 * 60 * 1000);
+      const expire = new Date(now.getTime() + 30 * 60 * 1000); // 30 phút
 
-      // ✅ SỬA: Cập nhật return URL về đúng port customer
       const customerReturnUrl = "http://localhost:5714/vnpay-return";
-
-      console.log("🔗 VNPay FORCED Customer Return URL:", customerReturnUrl);
-      console.log("🎯 Order ID:", orderId, "Amount:", amount);
-      console.log(
-        "⚠️  NOTICE: All VNPay returns will go to CUSTOMER frontend (port 5714) only"
-      );
 
       const paymentUrl = await this.vnpay.buildPaymentUrl({
         vnp_Amount: amount,
@@ -232,9 +239,6 @@ class PaymentService {
         vnp_CreateDate: dateFormat(now),
         vnp_ExpireDate: dateFormat(expire),
       });
-
-      console.log("✅ VNPay Payment URL created:", paymentUrl);
-      console.log("🔄 This URL will return to:", customerReturnUrl);
 
       return {
         success: true,
@@ -258,27 +262,28 @@ class PaymentService {
       const rspCode = ipnData.vnp_ResponseCode;
       const amount = parseInt(ipnData.vnp_Amount) / 100;
 
-      const [orders] = await db.execute("SELECT * FROM donhang WHERE id = ?", [
-        orderId,
-      ]);
-      if (orders.length === 0)
-        return { RspCode: "01", Message: "Order not found" };
+      const order = await Order.findByPk(orderId);
 
-      const order = orders[0];
+      if (!order) {
+        return { RspCode: "01", Message: "Order not found" };
+      }
+
       if (Math.abs(order.TongThanhToan - amount) > 1) {
         return { RspCode: "04", Message: "Invalid amount" };
       }
 
       if (rspCode === "00") {
-        await db.execute(
-          `UPDATE donhang SET TrangThai = 2, TrangThaiThanhToan = 1, ThoiGianThanhToan = NOW() WHERE id = ?`,
-          [order.id]
-        );
+        await order.update({
+          TrangThai: 2,
+          TrangThaiThanhToan: 1,
+          ThoiGianThanhToan: new Date(),
+        });
       } else {
-        await db.execute(
-          `UPDATE donhang SET TrangThai = 5, TrangThaiThanhToan = 0, LyDoHuy = ? WHERE id = ?`,
-          [`Thanh toán VNPay thất bại - Mã lỗi: ${rspCode}`, order.id]
-        );
+        await order.update({
+          TrangThai: 5,
+          TrangThaiThanhToan: 0,
+          LyDoHuy: `Thanh toán VNPay thất bại - Mã lỗi: ${rspCode}`,
+        });
       }
 
       return { RspCode: "00", Message: "Confirm Success" };
@@ -296,77 +301,41 @@ class PaymentService {
       const rspCode = returnData.vnp_ResponseCode;
       const amount = parseInt(returnData.vnp_Amount) / 100;
 
-      console.log("🔄 VNPay Return Processing:", {
-        orderId,
-        rspCode,
-        amount,
-        isValid,
-      });
+      const order = await Order.findByPk(orderId);
 
-      const [orders] = await db.execute("SELECT * FROM donhang WHERE id = ?", [
-        orderId,
-      ]);
-      if (orders.length === 0) {
+      if (!order) {
         return { success: false, message: "Không tìm thấy đơn hàng", orderId };
       }
 
-      const order = orders[0];
-
-      // ✅ SỬA: Cập nhật trạng thái đơn hàng dựa trên kết quả VNPay
       if (rspCode === "00") {
-        // Thanh toán thành công - cập nhật trạng thái
-        await db.execute(
-          `UPDATE donhang SET 
-            TrangThai = 2, 
-            TrangThaiThanhToan = 1, 
-            ThoiGianThanhToan = NOW() 
-           WHERE id = ?`,
-          [orderId]
-        );
-
-        console.log("✅ Payment Success - Order updated:", {
-          orderId,
-          newStatus: 2,
-          paymentStatus: 1,
+        await order.update({
+          TrangThai: 2,
+          TrangThaiThanhToan: 1,
+          ThoiGianThanhToan: new Date(),
         });
       } else {
-        // Thanh toán thất bại - đánh dấu thất bại
-        await db.execute(
-          `UPDATE donhang SET 
-            TrangThai = 5, 
-            TrangThaiThanhToan = 2, 
-            LyDoHuy = ? 
-           WHERE id = ?`,
-          [`Thanh toán VNPay thất bại - Mã lỗi: ${rspCode}`, orderId]
-        );
-
-        console.log("❌ Payment Failed - Order updated:", {
-          orderId,
-          newStatus: 5,
-          paymentStatus: 2,
-          errorCode: rspCode,
+        await order.update({
+          TrangThai: 5,
+          TrangThaiThanhToan: 2,
+          LyDoHuy: `Thanh toán VNPay thất bại - Mã lỗi: ${rspCode}`,
         });
       }
 
       // Lấy lại thông tin đơn hàng sau khi cập nhật
-      const [updatedOrders] = await db.execute(
-        "SELECT * FROM donhang WHERE id = ?",
-        [orderId]
-      );
-      const updatedOrder = updatedOrders[0];
+      await order.reload();
 
       const response = {
         orderId,
         amount,
         order: {
-          id: updatedOrder.id,
-          MaDonHang: updatedOrder.MaDonHang,
-          TrangThai: updatedOrder.TrangThai,
-          TrangThaiThanhToan: updatedOrder.TrangThaiThanhToan,
-          TongThanhToan: updatedOrder.TongThanhToan,
-          TenNguoiNhan: updatedOrder.TenNguoiNhan,
-          EmailNguoiNhan: updatedOrder.EmailNguoiNhan,
-          DiaChiNhan: updatedOrder.DiaChiNhan,
+          id: order.id,
+          MaDonHang: order.MaDonHang,
+          TrangThai: order.TrangThai,
+          TrangThaiThanhToan: order.TrangThaiThanhToan,
+          TongThanhToan: order.TongThanhToan,
+          TenNguoiNhan: order.TenNguoiNhan,
+          EmailNguoiNhan: order.EmailNguoiNhan,
+          DiaChiNhan: order.DiaChiNhan,
         },
       };
 
@@ -379,7 +348,6 @@ class PaymentService {
             ...response,
           };
     } catch (error) {
-      console.error("❌ VNPay Return Handler Error:", error);
       return {
         success: false,
         message: "Lỗi xử lý kết quả thanh toán",

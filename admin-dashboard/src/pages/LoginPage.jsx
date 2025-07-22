@@ -19,7 +19,7 @@ const LoginPage = () => {
         e.preventDefault();
         try {
             await loginAdmin(email, password);
-            navigate('/dashboard');
+            // Không navigate ở đây vì useEffect sẽ handle
         } catch (err) {
             alert('Sai tài khoản hoặc mật khẩu');
         }

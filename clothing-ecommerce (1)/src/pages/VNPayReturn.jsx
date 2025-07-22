@@ -40,7 +40,7 @@ const VNPayReturn = () => {
                 console.log("✅ VNPay Return Result:", data);
                 setResult(data);
 
-                // ✅ SỬA: Redirect logic an toàn với port đúng
+                // ✅ SỬA: Redirect logic an toàn với port đúng và thời gian chờ lâu hơn
                 if (data.success) {
                     const { isAuthenticated } = getAuthInfo();
                     setTimeout(() => {
@@ -51,7 +51,7 @@ const VNPayReturn = () => {
                             // Guest user về customer homepage
                             window.location.href = 'http://localhost:5714/';
                         }
-                    }, 5000);
+                    }, 10000); // ✅ SỬA: Tăng từ 5000ms (5 giây) lên 10000ms (10 giây)
                 }
             } catch (error) {
                 console.error("❌ VNPay Return Error:", error);
@@ -172,7 +172,7 @@ const VNPayReturn = () => {
                         {renderActionButtons()}
 
                         <p className="text-sm text-gray-500 mt-4">
-                            Bạn sẽ được chuyển hướng tự động sau 5 giây...
+                            Bạn sẽ được chuyển hướng tự động sau 10 giây...
                         </p>
                     </>
                 ) : (

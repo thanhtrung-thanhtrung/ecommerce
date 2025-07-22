@@ -1,293 +1,374 @@
-const db = require("../config/database");
+const { Wishlist, Product, Brand, Category, User } = require("../models");
+const { Op } = require("sequelize");
 
-class WishlistService {
-  // Thêm sản phẩm vào danh sách yêu thích
-  async themVaoWishlist(userId, productId) {
-    // Kiểm tra sản phẩm đã tồn tại trong wishlist chưa
-    const [existing] = await db.execute(
-      "SELECT * FROM wishlist WHERE id_NguoiDung = ? AND id_SanPham = ?",
-      [userId, productId]
-    );
+const wishlistService = {
+  // Thêm sản phẩm vào wishlist
+  async addToWishlist(userId, productId) {
+    try {
+      // Kiểm tra xem sản phẩm đã có trong wishlist chưa
+      const existingItem = await Wishlist.findOne({
+        where: {
+          id_NguoiDung: userId,
+          id_SanPham: productId,
+        },
+      });
 
-    if (existing.length > 0) {
-      throw new Error("Sản phẩm đã có trong danh sách yêu thích");
-    }
-
-    // Kiểm tra sản phẩm có tồn tại không
-    const [product] = await db.execute(
-      "SELECT id FROM sanpham WHERE id = ? AND TrangThai = 1",
-      [productId]
-    );
-
-    if (product.length === 0) {
-      throw new Error("Không tìm thấy sản phẩm");
-    }
-
-    // Thêm vào wishlist
-    const [result] = await db.execute(
-      "INSERT INTO wishlist (id_NguoiDung, id_SanPham) VALUES (?, ?)",
-      [userId, productId]
-    );
-
-    return {
-      id: result.insertId,
-      id_NguoiDung: userId,
-      id_SanPham: productId,
-      NgayThem: new Date(),
-    };
-  }
-
-  // Xóa sản phẩm khỏi danh sách yêu thích
-  async xoaKhoiWishlist(userId, productId) {
-    const [result] = await db.execute(
-      "DELETE FROM wishlist WHERE id_NguoiDung = ? AND id_SanPham = ?",
-      [userId, productId]
-    );
-
-    if (result.affectedRows === 0) {
-      throw new Error("Không tìm thấy sản phẩm trong danh sách yêu thích");
-    }
-
-    return true;
-  }
-
-  // Lấy danh sách wishlist của người dùng
-  async layDanhSachWishlist(userId, options = {}) {
-    let query = `
-      SELECT 
-        w.id,
-        w.NgayThem,
-        sp.id as id_SanPham,
-        sp.Ten as tenSanPham,
-        sp.HinhAnh,
-        sp.Gia,
-        sp.GiaKhuyenMai,
-        sp.MoTa,
-        sp.TrangThai as trangThaiSanPham,
-        dm.Ten as tenDanhMuc,
-        th.Ten as tenThuongHieu,
-        sp.SoLuongDaBan,
-        -- ✅ SỬA: Sử dụng function real-time để kiểm tra tồn kho
-        COALESCE(SUM(fn_TinhTonKhoRealTime(cts.id)), 0) as tongTonKho,
-        -- Điểm đánh giá trung bình
-        ROUND(AVG(dg.SoSao), 1) as diemDanhGia,
-        COUNT(DISTINCT dg.id) as soLuotDanhGia
-      FROM wishlist w
-      JOIN sanpham sp ON w.id_SanPham = sp.id
-      LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-      LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-      LEFT JOIN chitietsanpham cts ON sp.id = cts.id_SanPham
-      LEFT JOIN danhgia dg ON sp.id = dg.id_SanPham AND dg.TrangThai = 1
-      WHERE w.id_NguoiDung = ?
-    `;
-
-    const params = [userId];
-
-    // Lọc theo danh mục
-    if (options.danhMuc) {
-      query += " AND dm.id = ?";
-      params.push(options.danhMuc);
-    }
-
-    // Lọc theo thương hiệu
-    if (options.thuongHieu) {
-      query += " AND th.id = ?";
-      params.push(options.thuongHieu);
-    }
-
-    query += " GROUP BY w.id, sp.id";
-    query += " ORDER BY w.NgayThem DESC";
-
-    // Phân trang
-    if (options.limit) {
-      query += " LIMIT ?";
-      params.push(parseInt(options.limit));
-
-      if (options.offset) {
-        query += " OFFSET ?";
-        params.push(parseInt(options.offset));
+      if (existingItem) {
+        return {
+          success: false,
+          message: "Sản phẩm đã có trong danh sách yêu thích",
+        };
       }
+
+      // Thêm sản phẩm vào wishlist
+      const wishlistItem = await Wishlist.create({
+        id_NguoiDung: userId,
+        id_SanPham: productId,
+      });
+
+      return {
+        success: true,
+        message: "Đã thêm sản phẩm vào danh sách yêu thích",
+        data: wishlistItem,
+      };
+    } catch (error) {
+      console.error("Error adding to wishlist:", error);
+      throw error;
     }
+  },
 
-    const [wishlist] = await db.execute(query, params);
+  // Xóa sản phẩm khỏi wishlist
+  async removeFromWishlist(userId, productId) {
+    try {
+      const deleted = await Wishlist.destroy({
+        where: {
+          id_NguoiDung: userId,
+          id_SanPham: productId,
+        },
+      });
 
-    // Parse JSON cho hình ảnh
-    const processedWishlist = wishlist.map((item) => ({
-      ...item,
-      HinhAnh: item.HinhAnh ? JSON.parse(item.HinhAnh) : null,
-      coTonKho: item.tongTonKho > 0,
-    }));
+      if (deleted === 0) {
+        return {
+          success: false,
+          message: "Không tìm thấy sản phẩm trong danh sách yêu thích",
+        };
+      }
 
-    return processedWishlist;
-  }
+      return {
+        success: true,
+        message: "Đã xóa sản phẩm khỏi danh sách yêu thích",
+      };
+    } catch (error) {
+      console.error("Error removing from wishlist:", error);
+      throw error;
+    }
+  },
+
+  // Lấy danh sách wishlist của user
+  async getUserWishlist(userId, options = {}) {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "NgayThem",
+        sortOrder = "DESC",
+      } = options;
+      const offset = (page - 1) * limit;
+
+      const wishlistItems = await Wishlist.findAndCountAll({
+        where: {
+          id_NguoiDung: userId,
+        },
+        include: [
+          {
+            model: Product,
+            as: "product",
+            include: [
+              {
+                model: Brand,
+                as: "brand",
+                attributes: ["id", "Ten"],
+              },
+              {
+                model: Category,
+                as: "category",
+                attributes: ["id", "Ten"],
+              },
+            ],
+          },
+        ],
+        order: [[sortBy, sortOrder]],
+        limit: parseInt(limit),
+        offset: offset,
+        distinct: true,
+      });
+
+      return {
+        success: true,
+        data: {
+          items: wishlistItems.rows,
+          pagination: {
+            total: wishlistItems.count,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(wishlistItems.count / limit),
+          },
+        },
+      };
+    } catch (error) {
+      console.error("Error getting user wishlist:", error);
+      throw error;
+    }
+  },
 
   // Kiểm tra sản phẩm có trong wishlist không
-  async kiemTraTrongWishlist(userId, productId) {
-    const [result] = await db.execute(
-      "SELECT id FROM wishlist WHERE id_NguoiDung = ? AND id_SanPham = ?",
-      [userId, productId]
-    );
+  async isInWishlist(userId, productId) {
+    try {
+      const item = await Wishlist.findOne({
+        where: {
+          id_NguoiDung: userId,
+          id_SanPham: productId,
+        },
+      });
 
-    return result.length > 0;
-  }
-
-  // Kiểm tra nhiều sản phẩm có trong wishlist không
-  async kiemTraNhieuSanPham(userId, productIds) {
-    if (!productIds || productIds.length === 0) {
-      return {};
+      return {
+        success: true,
+        data: {
+          isInWishlist: !!item,
+        },
+      };
+    } catch (error) {
+      console.error("Error checking wishlist:", error);
+      throw error;
     }
+  },
 
-    const placeholders = productIds.map(() => "?").join(",");
-    const [results] = await db.execute(
-      `SELECT id_SanPham FROM wishlist 
-       WHERE id_NguoiDung = ? AND id_SanPham IN (${placeholders})`,
-      [userId, ...productIds]
-    );
+  // Xóa nhiều sản phẩm khỏi wishlist
+  async removeMultipleFromWishlist(userId, productIds) {
+    try {
+      const deleted = await Wishlist.destroy({
+        where: {
+          id_NguoiDung: userId,
+          id_SanPham: {
+            [Op.in]: productIds,
+          },
+        },
+      });
 
-    const wishlistProducts = results.map((row) => row.id_SanPham);
-    const wishlistStatus = {};
-
-    productIds.forEach((id) => {
-      wishlistStatus[id] = wishlistProducts.includes(id);
-    });
-
-    return wishlistStatus;
-  }
-
-  // Xóa toàn bộ wishlist
-  async xoaToanBoWishlist(userId) {
-    const [result] = await db.execute(
-      "DELETE FROM wishlist WHERE id_NguoiDung = ?",
-      [userId]
-    );
-
-    return result.affectedRows;
-  }
+      return {
+        success: true,
+        message: `Đã xóa ${deleted} sản phẩm khỏi danh sách yêu thích`,
+        deletedCount: deleted,
+      };
+    } catch (error) {
+      console.error("Error removing multiple from wishlist:", error);
+      throw error;
+    }
+  },
 
   // Đếm số lượng sản phẩm trong wishlist
-  async demSoLuongWishlist(userId) {
-    const [result] = await db.execute(
-      "SELECT COUNT(*) as soLuong FROM wishlist WHERE id_NguoiDung = ?",
-      [userId]
-    );
+  async getWishlistCount(userId) {
+    try {
+      const count = await Wishlist.count({
+        where: {
+          id_NguoiDung: userId,
+        },
+      });
 
-    return result[0].soLuong;
-  }
-
-  // Lấy wishlist với thông tin chi tiết (cho admin)
-  async layWishlistChiTiet(options = {}) {
-    let query = `
-      SELECT 
-        w.id,
-        w.NgayThem,
-        nd.id as id_NguoiDung,
-        nd.HoTen as tenNguoiDung,
-        nd.Email as emailNguoiDung,
-        sp.id as id_SanPham,
-        sp.Ten as tenSanPham,
-        sp.Gia,
-        dm.Ten as tenDanhMuc,
-        th.Ten as tenThuongHieu
-      FROM wishlist w
-      JOIN nguoidung nd ON w.id_NguoiDung = nd.id
-      JOIN sanpham sp ON w.id_SanPham = sp.id
-      LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-      LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-      WHERE 1=1
-    `;
-
-    const params = [];
-
-    // Lọc theo người dùng
-    if (options.userId) {
-      query += " AND nd.id = ?";
-      params.push(options.userId);
+      return {
+        success: true,
+        data: {
+          count,
+        },
+      };
+    } catch (error) {
+      console.error("Error getting wishlist count:", error);
+      throw error;
     }
+  },
 
-    // Lọc theo sản phẩm
-    if (options.productId) {
-      query += " AND sp.id = ?";
-      params.push(options.productId);
+  // Xóa toàn bộ wishlist của user
+  async clearWishlist(userId) {
+    try {
+      const deleted = await Wishlist.destroy({
+        where: {
+          id_NguoiDung: userId,
+        },
+      });
+
+      return {
+        success: true,
+        message: `Đã xóa ${deleted} sản phẩm khỏi danh sách yêu thích`,
+        deletedCount: deleted,
+      };
+    } catch (error) {
+      console.error("Error clearing wishlist:", error);
+      throw error;
     }
+  },
 
-    // Lọc theo thời gian
-    if (options.tuNgay) {
-      query += " AND DATE(w.NgayThem) >= ?";
-      params.push(options.tuNgay);
+  // Lấy danh sách sản phẩm được yêu thích nhiều nhất
+  async getMostWishedProducts(options = {}) {
+    try {
+      const { limit = 10 } = options;
+
+      const products = await Product.findAll({
+        include: [
+          {
+            model: Wishlist,
+            as: "wishlistItems",
+            attributes: [],
+          },
+          {
+            model: Brand,
+            as: "brand",
+            attributes: ["id", "Ten"],
+          },
+          {
+            model: Category,
+            as: "category",
+            attributes: ["id", "Ten"],
+          },
+        ],
+        attributes: [
+          "id",
+          "Ten",
+          "Gia",
+          "GiaKhuyenMai",
+          "HinhAnh",
+          [
+            require("sequelize").fn(
+              "COUNT",
+              require("sequelize").col("wishlistItems.id")
+            ),
+            "wishlistCount",
+          ],
+        ],
+        group: ["Product.id", "brand.id", "category.id"],
+        order: [[require("sequelize").literal("wishlistCount"), "DESC"]],
+        limit: parseInt(limit),
+        having: require("sequelize").literal("wishlistCount > 0"),
+        subQuery: false,
+      });
+
+      return {
+        success: true,
+        data: products,
+      };
+    } catch (error) {
+      console.error("Error getting most wished products:", error);
+      throw error;
     }
+  },
 
-    if (options.denNgay) {
-      query += " AND DATE(w.NgayThem) <= ?";
-      params.push(options.denNgay);
-    }
-
-    query += " ORDER BY w.NgayThem DESC";
-
-    // Phân trang
-    if (options.limit) {
-      query += " LIMIT ?";
-      params.push(parseInt(options.limit));
-
-      if (options.offset) {
-        query += " OFFSET ?";
-        params.push(parseInt(options.offset));
-      }
-    }
-
-    const [wishlist] = await db.execute(query, params);
-    return wishlist;
-  }
-
-  // Thống kê wishlist
-  async thongKeWishlist() {
-    const [stats] = await db.execute(`
-      SELECT 
-        COUNT(*) as tongSoWishlist,
-        COUNT(DISTINCT w.id_NguoiDung) as soNguoiDungCoWishlist,
-        COUNT(DISTINCT w.id_SanPham) as soSanPhamTrongWishlist,
-        AVG(wishlist_count.so_wishlist) as trungBinhWishlistMoiNguoi
-      FROM wishlist w
-      JOIN (
-        SELECT id_NguoiDung, COUNT(*) as so_wishlist
-        FROM wishlist
-        GROUP BY id_NguoiDung
-      ) wishlist_count ON w.id_NguoiDung = wishlist_count.id_NguoiDung
-    `);
-
-    // Top sản phẩm được yêu thích nhất
-    const [topProducts] = await db.execute(`
-      SELECT 
-        sp.id,
-        sp.Ten,
-        sp.HinhAnh,
-        COUNT(w.id) as soLuotYeuThich
-      FROM wishlist w
-      JOIN sanpham sp ON w.id_SanPham = sp.id
-      GROUP BY sp.id, sp.Ten, sp.HinhAnh
-      ORDER BY soLuotYeuThich DESC
-      LIMIT 10
-    `);
-
-    return {
-      thongKeTongQuan: stats[0],
-      topSanPhamYeuThich: topProducts.map((item) => ({
-        ...item,
-        HinhAnh: item.HinhAnh ? JSON.parse(item.HinhAnh) : null,
-      })),
-    };
-  }
+  // Hiển thị tất cả wishlist (cho admin)
   async hienThiWishlist() {
-    const [wishlist] = await db.execute(
-      `SELECT id_SanPham, COUNT(*) AS so_luot_yeu_thich
-FROM wishlist
-GROUP BY id_SanPham;
- `
-    )
-    return  wishlist.map(item => ({
-    id_SanPham: item.id_SanPham,
-    so_luot_yeu_thich: item.so_luot_yeu_thich
-  }));
+    try {
+      const wishlistItems = await Wishlist.findAll({
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "Ten", "Gia", "GiaKhuyenMai", "HinhAnh"],
+            include: [
+              {
+                model: Brand,
+                as: "brand",
+                attributes: ["id", "Ten"],
+              },
+              {
+                model: Category,
+                as: "category",
+                attributes: ["id", "Ten"],
+              },
+            ],
+          },
+          {
+            model: User,
+            as: "user",
+            attributes: ["id", "HoTen", "Email"],
+          },
+        ],
+        order: [["NgayThem", "DESC"]],
+      });
 
-}
-}
-module.exports = new WishlistService();
+      return {
+        success: true,
+        data: wishlistItems,
+      };
+    } catch (error) {
+      console.error("Error getting all wishlist items:", error);
+      throw error;
+    }
+  },
+
+  // Thống kê wishlist (cho admin)
+  async thongKeWishlist() {
+    try {
+      const { sequelize } = require("../models");
+
+      // Thống kê tổng quan
+      const tongSoWishlist = await Wishlist.count();
+      const soNguoiDungCoWishlist = await Wishlist.count({
+        distinct: true,
+        col: "id_NguoiDung",
+      });
+
+      // Top sản phẩm được yêu thích nhiều nhất
+      const topSanPhamYeuThich = await Product.findAll({
+        include: [
+          {
+            model: Wishlist,
+            as: "wishlistItems",
+            attributes: [],
+          },
+        ],
+        attributes: [
+          "id",
+          "Ten",
+          "HinhAnh",
+          [
+            sequelize.fn("COUNT", sequelize.col("wishlistItems.id")),
+            "soLuotYeuThich",
+          ],
+        ],
+        group: ["Product.id"],
+        order: [[sequelize.literal("soLuotYeuThich"), "DESC"]],
+        limit: 10,
+        having: sequelize.literal("soLuotYeuThich > 0"),
+        subQuery: false,
+      });
+
+      // Thống kê theo thời gian (30 ngày gần đây)
+      const thongKeTheoNgay = await Wishlist.findAll({
+        attributes: [
+          [sequelize.fn("DATE", sequelize.col("NgayThem")), "ngay"],
+          [sequelize.fn("COUNT", "*"), "soLuong"],
+        ],
+        where: {
+          NgayThem: {
+            [Op.gte]: sequelize.literal("DATE_SUB(NOW(), INTERVAL 30 DAY)"),
+          },
+        },
+        group: [sequelize.fn("DATE", sequelize.col("NgayThem"))],
+        order: [[sequelize.fn("DATE", sequelize.col("NgayThem")), "ASC"]],
+        raw: true,
+      });
+
+      return {
+        success: true,
+        data: {
+          tongSoWishlist,
+          soNguoiDungCoWishlist,
+          topSanPhamYeuThich,
+          thongKeTheoNgay,
+        },
+      };
+    } catch (error) {
+      console.error("Error getting wishlist statistics:", error);
+      throw error;
+    }
+  },
+};
+
+module.exports = wishlistService;

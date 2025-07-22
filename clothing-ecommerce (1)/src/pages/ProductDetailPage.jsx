@@ -38,66 +38,63 @@ const ProductDetailPage = () => {
   );
 
   // Function to get product images based on available data
-  const getProductImages = (hinhAnh, currentProduct) => {
+  const getProductImages = (product) => {
     let images = [];
 
-    // Try to parse HinhAnh first
-    if (hinhAnh && typeof hinhAnh === 'string' && hinhAnh.trim() !== '' && hinhAnh !== '{}') {
+    // Try to parse HinhAnh from the product
+    if (product && product.HinhAnh) {
       try {
-        const imageData = JSON.parse(hinhAnh);
+        let imageData;
 
-        // Add main image
-        if (imageData.anhChinh && imageData.anhChinh.trim() !== '') {
-          images.push(imageData.anhChinh);
+        // Parse HinhAnh if it's a string
+        if (typeof product.HinhAnh === 'string' && product.HinhAnh.trim() !== '' && product.HinhAnh !== '{}') {
+          imageData = JSON.parse(product.HinhAnh);
+        } else if (typeof product.HinhAnh === 'object') {
+          imageData = product.HinhAnh;
         }
 
-        // Add additional images
-        if (imageData.anhPhu && Array.isArray(imageData.anhPhu)) {
-          const validAdditionalImages = imageData.anhPhu.filter(img => img && img.trim() !== '');
-          images.push(...validAdditionalImages);
-        }
-
-        // Add any other images (like anh1, anh2, etc.)
-        Object.keys(imageData).forEach(key => {
-          if (key.startsWith('anh') && key !== 'anhChinh' && key !== 'anhPhu' && !key.includes('public_id')) {
-            if (imageData[key] && imageData[key].trim() !== '' && !images.includes(imageData[key])) {
-              images.push(imageData[key]);
-            }
+        if (imageData) {
+          // Add main image (anhChinh)
+          if (imageData.anhChinh && imageData.anhChinh.trim() !== '') {
+            images.push(imageData.anhChinh);
           }
-        });
 
-        const filteredImages = images.filter(img => img && img.trim() !== '');
-
-        if (filteredImages.length > 0) {
-          return filteredImages;
+          // Add additional images (anhPhu)
+          if (imageData.anhPhu && Array.isArray(imageData.anhPhu)) {
+            const validAdditionalImages = imageData.anhPhu.filter(img =>
+              img && img.trim() !== '' && img.startsWith('http')
+            );
+            images.push(...validAdditionalImages);
+          }
         }
       } catch (error) {
         console.error('❌ Error parsing HinhAnh JSON:', error);
       }
     }
 
-    // Try to use already parsed images from currentProduct
-    if (currentProduct && currentProduct.images) {
-      if (Array.isArray(currentProduct.images)) {
-        images = currentProduct.images.filter(img => img && img.trim() !== '');
-      } else if (typeof currentProduct.images === 'object') {
-        // Handle object structure similar to above
-        if (currentProduct.images.anhChinh) {
-          images.push(currentProduct.images.anhChinh);
+    // Try to use already parsed images from product.images (fallback)
+    if (images.length === 0 && product && product.images) {
+      if (Array.isArray(product.images)) {
+        images = product.images.filter(img => img && img.trim() !== '');
+      } else if (typeof product.images === 'object') {
+        if (product.images.anhChinh) {
+          images.push(product.images.anhChinh);
         }
-        if (currentProduct.images.anhPhu && Array.isArray(currentProduct.images.anhPhu)) {
-          images.push(...currentProduct.images.anhPhu);
+        if (product.images.anhPhu && Array.isArray(product.images.anhPhu)) {
+          images.push(...product.images.anhPhu);
         }
-      }
-
-      const filteredImages = images.filter(img => img && img.trim() !== '');
-      if (filteredImages.length > 0) {
-        return filteredImages;
       }
     }
 
-    // Fallback to placeholder if no images found
-    return ["/placeholder.jpg"];
+    // Filter out any invalid images and ensure they're URLs
+    const validImages = images.filter(img =>
+      img &&
+      img.trim() !== '' &&
+      (img.startsWith('http') || img.startsWith('/'))
+    );
+
+    // Return valid images or fallback to placeholder
+    return validImages.length > 0 ? validImages : ["/placeholder.jpg"];
   };
 
   // Helper function to parse technical specifications
@@ -235,7 +232,7 @@ const ProductDetailPage = () => {
 
   const availableSizes = getAvailableSizes(currentProduct.bienThe);
   const availableColors = getAvailableColors(currentProduct.bienThe);
-  const productImages = getProductImages(currentProduct.HinhAnh);
+  const productImages = getProductImages(currentProduct);
   const specifications = parseThongSoKyThuat(currentProduct.ThongSoKyThuat);
 
   return (
@@ -374,7 +371,7 @@ const ProductDetailPage = () => {
                 className="w-10 h-10 border border-gray-300 rounded-lg flex items-center justify-center hover:border-primary-600"
                 disabled={quantity <= 1}
               >
-                -
+
               </button>
               <input
                 type="number"

@@ -1,102 +1,86 @@
-const db = require("../config/database");
+const { Supplier, ImportReceipt, Product, sequelize } = require("../models");
+const { Op } = require("sequelize");
 
 class SupplierService {
   // Tạo nhà cung cấp mới
   async taoNhaCungCap(supplierData) {
     // Kiểm tra email đã tồn tại chưa
-    const [existingEmail] = await db.execute(
-      "SELECT id FROM nhacungcap WHERE Email = ?",
-      [supplierData.Email]
-    );
+    const existingEmail = await Supplier.findOne({
+      where: { Email: supplierData.Email },
+    });
 
-    if (existingEmail.length > 0) {
+    if (existingEmail) {
       throw new Error("Email đã được sử dụng bởi nhà cung cấp khác");
     }
 
     // Kiểm tra số điện thoại đã tồn tại chưa
-    const [existingPhone] = await db.execute(
-      "SELECT id FROM nhacungcap WHERE SDT = ?",
-      [supplierData.SDT]
-    );
+    const existingPhone = await Supplier.findOne({
+      where: { SDT: supplierData.SDT },
+    });
 
-    if (existingPhone.length > 0) {
+    if (existingPhone) {
       throw new Error("Số điện thoại đã được sử dụng bởi nhà cung cấp khác");
     }
 
-    const [result] = await db.execute(
-      `INSERT INTO nhacungcap (
-        Ten, Email, SDT, DiaChi, TrangThai
-      ) VALUES (?, ?, ?, ?, ?)`,
-      [
-        supplierData.Ten,
-        supplierData.Email,
-        supplierData.SDT,
-        supplierData.DiaChi,
-        supplierData.TrangThai ?? 1,
-      ]
-    );
+    const result = await Supplier.create({
+      Ten: supplierData.Ten,
+      Email: supplierData.Email,
+      SDT: supplierData.SDT,
+      DiaChi: supplierData.DiaChi,
+      TrangThai: supplierData.TrangThai ?? 1,
+    });
 
     return {
       success: true,
       message: "Tạo nhà cung cấp thành công",
-      data: {
-        id: result.insertId,
-        ...supplierData,
-        TrangThai: supplierData.TrangThai ?? 1,
-      },
+      data: result.toJSON(),
     };
   }
 
   // Cập nhật nhà cung cấp
   async capNhatNhaCungCap(id, supplierData) {
     // Kiểm tra nhà cung cấp tồn tại
-    const [existing] = await db.execute(
-      "SELECT id FROM nhacungcap WHERE id = ?",
-      [id]
-    );
+    const existing = await Supplier.findByPk(id);
 
-    if (existing.length === 0) {
+    if (!existing) {
       throw new Error("Không tìm thấy nhà cung cấp");
     }
 
     // Kiểm tra email đã tồn tại chưa (trừ nhà cung cấp hiện tại)
     if (supplierData.Email) {
-      const [existingEmail] = await db.execute(
-        "SELECT id FROM nhacungcap WHERE Email = ? AND id != ?",
-        [supplierData.Email, id]
-      );
+      const existingEmail = await Supplier.findOne({
+        where: {
+          Email: supplierData.Email,
+          id: { [Op.ne]: id },
+        },
+      });
 
-      if (existingEmail.length > 0) {
+      if (existingEmail) {
         throw new Error("Email đã được sử dụng bởi nhà cung cấp khác");
       }
     }
 
     // Kiểm tra số điện thoại đã tồn tại chưa (trừ nhà cung cấp hiện tại)
     if (supplierData.SDT) {
-      const [existingPhone] = await db.execute(
-        "SELECT id FROM nhacungcap WHERE SDT = ? AND id != ?",
-        [supplierData.SDT, id]
-      );
+      const existingPhone = await Supplier.findOne({
+        where: {
+          SDT: supplierData.SDT,
+          id: { [Op.ne]: id },
+        },
+      });
 
-      if (existingPhone.length > 0) {
+      if (existingPhone) {
         throw new Error("Số điện thoại đã được sử dụng bởi nhà cung cấp khác");
       }
     }
 
-    const [result] = await db.execute(
-      `UPDATE nhacungcap SET 
-        Ten = ?, Email = ?, SDT = ?, 
-        DiaChi = ?, TrangThai = ?
-      WHERE id = ?`,
-      [
-        supplierData.Ten,
-        supplierData.Email,
-        supplierData.SDT,
-        supplierData.DiaChi,
-        supplierData.TrangThai ?? 1,
-        id,
-      ]
-    );
+    await existing.update({
+      Ten: supplierData.Ten,
+      Email: supplierData.Email,
+      SDT: supplierData.SDT,
+      DiaChi: supplierData.DiaChi,
+      TrangThai: supplierData.TrangThai ?? 1,
+    });
 
     const updatedSupplier = await this.layChiTietNhaCungCap(id);
 
@@ -110,30 +94,28 @@ class SupplierService {
   // Xóa nhà cung cấp
   async xoaNhaCungCap(id) {
     // Kiểm tra xem nhà cung cấp có đang được sử dụng trong phiếu nhập không
-    const [imports] = await db.execute(
-      "SELECT COUNT(*) as count FROM phieunhap WHERE id_NhaCungCap = ?",
-      [id]
-    );
+    const importCount = await ImportReceipt.count({
+      where: { id_NhaCungCap: id },
+    });
 
-    if (imports[0].count > 0) {
+    if (importCount > 0) {
       throw new Error("Không thể xóa nhà cung cấp đang có phiếu nhập");
     }
 
     // Kiểm tra xem nhà cung cấp có đang được sử dụng trong sản phẩm không
-    const [products] = await db.execute(
-      "SELECT COUNT(*) as count FROM sanpham WHERE id_NhaCungCap = ?",
-      [id]
-    );
+    const productCount = await Product.count({
+      where: { id_NhaCungCap: id },
+    });
 
-    if (products[0].count > 0) {
+    if (productCount > 0) {
       throw new Error("Không thể xóa nhà cung cấp đang có sản phẩm");
     }
 
-    const [result] = await db.execute("DELETE FROM nhacungcap WHERE id = ?", [
-      id,
-    ]);
+    const result = await Supplier.destroy({
+      where: { id },
+    });
 
-    if (result.affectedRows === 0) {
+    if (result === 0) {
       throw new Error("Không tìm thấy nhà cung cấp");
     }
 
@@ -145,12 +127,12 @@ class SupplierService {
 
   // Cập nhật trạng thái
   async capNhatTrangThai(id, trangThai) {
-    const [result] = await db.execute(
-      "UPDATE nhacungcap SET TrangThai = ? WHERE id = ?",
-      [trangThai, id]
+    const [affectedRows] = await Supplier.update(
+      { TrangThai: trangThai },
+      { where: { id } }
     );
 
-    if (result.affectedRows === 0) {
+    if (affectedRows === 0) {
       throw new Error("Không tìm thấy nhà cung cấp");
     }
 
@@ -163,109 +145,170 @@ class SupplierService {
 
   // Lấy chi tiết nhà cung cấp
   async layChiTietNhaCungCap(id) {
-    const [suppliers] = await db.execute(
-      `SELECT ncc.*, 
-        COUNT(DISTINCT pn.id) as soPhieuNhap,
-        COALESCE(SUM(CASE WHEN pn.TrangThai = 2 THEN pn.TongTien ELSE 0 END), 0) as tongGiaTriNhap,
-        COUNT(DISTINCT sp.id) as soSanPham
-      FROM nhacungcap ncc
-      LEFT JOIN phieunhap pn ON ncc.id = pn.id_NhaCungCap
-      LEFT JOIN sanpham sp ON ncc.id = sp.id_NhaCungCap
-      WHERE ncc.id = ?
-      GROUP BY ncc.id`,
-      [id]
-    );
+    const supplier = await Supplier.findOne({
+      where: { id },
+      include: [
+        {
+          model: ImportReceipt,
+          as: "importReceipts",
+          attributes: [],
+          required: false,
+        },
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          required: false,
+        },
+      ],
+      attributes: [
+        "id",
+        "Ten",
+        "Email",
+        "SDT",
+        "DiaChi",
+        "TrangThai",
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.fn("DISTINCT", sequelize.col("importReceipts.id"))
+          ),
+          "soPhieuNhap",
+        ],
+        [
+          sequelize.fn(
+            "COALESCE",
+            sequelize.fn(
+              "SUM",
+              sequelize.literal(
+                "CASE WHEN importReceipts.TrangThai = 2 THEN importReceipts.TongTien ELSE 0 END"
+              )
+            ),
+            0
+          ),
+          "tongGiaTriNhap",
+        ],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.fn("DISTINCT", sequelize.col("products.id"))
+          ),
+          "soSanPham",
+        ],
+      ],
+      group: ["Supplier.id"],
+      raw: false,
+    });
 
-    if (suppliers.length === 0) {
+    if (!supplier) {
       throw new Error("Không tìm thấy nhà cung cấp");
     }
 
     return {
       success: true,
-      data: suppliers[0],
+      data: supplier.toJSON(),
     };
   }
 
   // Lấy danh sách nhà cung cấp
   async layDanhSachNhaCungCap(filters = {}) {
-    let query = `
-      SELECT ncc.*, 
-        COUNT(DISTINCT pn.id) as soPhieuNhap,
-        COALESCE(SUM(CASE WHEN pn.TrangThai = 2 THEN pn.TongTien ELSE 0 END), 0) as tongGiaTriNhap,
-        COUNT(DISTINCT sp.id) as soSanPham
-      FROM nhacungcap ncc
-      LEFT JOIN phieunhap pn ON ncc.id = pn.id_NhaCungCap
-      LEFT JOIN sanpham sp ON ncc.id = sp.id_NhaCungCap
-      WHERE 1=1
-    `;
-    const params = [];
+    const whereConditions = {};
 
     if (filters.trangThai !== undefined) {
-      query += " AND ncc.TrangThai = ?";
-      params.push(filters.trangThai);
+      whereConditions.TrangThai = filters.trangThai;
     }
 
     if (filters.tuKhoa) {
-      query += ` AND (
-        ncc.Ten LIKE ? OR 
-        ncc.DiaChi LIKE ? OR 
-        ncc.SDT LIKE ? OR 
-        ncc.Email LIKE ?
-      )`;
-      const searchTerm = `%${filters.tuKhoa}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      whereConditions[Op.or] = [
+        { Ten: { [Op.like]: `%${filters.tuKhoa}%` } },
+        { DiaChi: { [Op.like]: `%${filters.tuKhoa}%` } },
+        { SDT: { [Op.like]: `%${filters.tuKhoa}%` } },
+        { Email: { [Op.like]: `%${filters.tuKhoa}%` } },
+      ];
     }
 
-    query += " GROUP BY ncc.id ORDER BY ncc.id DESC";
+    const queryOptions = {
+      where: whereConditions,
+      include: [
+        {
+          model: ImportReceipt,
+          as: "importReceipts",
+          attributes: [],
+          required: false,
+        },
+        {
+          model: Product,
+          as: "products",
+          attributes: [],
+          required: false,
+        },
+      ],
+      attributes: [
+        "id",
+        "Ten",
+        "Email",
+        "SDT",
+        "DiaChi",
+        "TrangThai",
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.fn("DISTINCT", sequelize.col("importReceipts.id"))
+          ),
+          "soPhieuNhap",
+        ],
+        [
+          sequelize.fn(
+            "COALESCE",
+            sequelize.fn(
+              "SUM",
+              sequelize.literal(
+                "CASE WHEN importReceipts.TrangThai = 2 THEN importReceipts.TongTien ELSE 0 END"
+              )
+            ),
+            0
+          ),
+          "tongGiaTriNhap",
+        ],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.fn("DISTINCT", sequelize.col("products.id"))
+          ),
+          "soSanPham",
+        ],
+      ],
+      group: ["Supplier.id"],
+      order: [["id", "DESC"]],
+      subQuery: false,
+      raw: false,
+    };
 
     // Phân trang
     if (filters.limit) {
-      query += " LIMIT ?";
-      params.push(parseInt(filters.limit));
+      queryOptions.limit = parseInt(filters.limit);
 
       if (filters.offset) {
-        query += " OFFSET ?";
-        params.push(parseInt(filters.offset));
+        queryOptions.offset = parseInt(filters.offset);
       }
     }
 
-    const [suppliers] = await db.execute(query, params);
+    const suppliers = await Supplier.findAll(queryOptions);
 
     // Đếm tổng số bản ghi
-    let countQuery = `
-      SELECT COUNT(DISTINCT ncc.id) as total
-      FROM nhacungcap ncc
-      WHERE 1=1
-    `;
-    const countParams = [];
-
-    if (filters.trangThai !== undefined) {
-      countQuery += " AND ncc.TrangThai = ?";
-      countParams.push(filters.trangThai);
-    }
-
-    if (filters.tuKhoa) {
-      countQuery += ` AND (
-        ncc.Ten LIKE ? OR 
-        ncc.DiaChi LIKE ? OR 
-        ncc.SDT LIKE ? OR 
-        ncc.Email LIKE ?
-      )`;
-      const searchTerm = `%${filters.tuKhoa}%`;
-      countParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
-    }
-
-    const [countResult] = await db.execute(countQuery, countParams);
+    const total = await Supplier.count({
+      where: whereConditions,
+    });
 
     return {
       success: true,
-      data: suppliers,
+      data: suppliers.map((s) => s.toJSON()),
       pagination: {
-        total: countResult[0].total,
+        total,
         page: filters.page ? parseInt(filters.page) : 1,
         limit: filters.limit ? parseInt(filters.limit) : suppliers.length,
         totalPages: filters.limit
-          ? Math.ceil(countResult[0].total / parseInt(filters.limit))
+          ? Math.ceil(total / parseInt(filters.limit))
           : 1,
       },
     };
@@ -273,61 +316,136 @@ class SupplierService {
 
   // Thống kê nhà cung cấp
   async thongKeNhaCungCap() {
-    const [stats] = await db.execute(`
-      SELECT 
-        COUNT(*) as tongSoNhaCungCap,
-        SUM(CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END) as soNhaCungCapHoatDong,
-        SUM(CASE WHEN TrangThai = 0 THEN 1 ELSE 0 END) as soNhaCungCapKhongHoatDong
-      FROM nhacungcap
-    `);
+    const stats = await Supplier.findOne({
+      attributes: [
+        [sequelize.fn("COUNT", sequelize.col("id")), "tongSoNhaCungCap"],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("CASE WHEN TrangThai = 1 THEN 1 ELSE 0 END")
+          ),
+          "soNhaCungCapHoatDong",
+        ],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("CASE WHEN TrangThai = 0 THEN 1 ELSE 0 END")
+          ),
+          "soNhaCungCapKhongHoatDong",
+        ],
+      ],
+      raw: true,
+    });
 
     // Thống kê phiếu nhập trong năm
-    const [importStats] = await db.execute(`
-      SELECT 
-        COUNT(DISTINCT id_NhaCungCap) as soNhaCungCapTrongNam,
-        COUNT(*) as soPhieuNhapTrongNam,
-        SUM(TongTien) as tongGiaTriNhapTrongNam
-      FROM phieunhap 
-      WHERE YEAR(NgayNhap) = YEAR(CURRENT_DATE)
-        AND TrangThai = 2
-    `);
+    const importStats = await ImportReceipt.findOne({
+      where: {
+        NgayNhap: {
+          [Op.and]: [
+            sequelize.where(
+              sequelize.fn("YEAR", sequelize.col("NgayNhap")),
+              sequelize.fn("YEAR", sequelize.fn("NOW"))
+            ),
+          ],
+        },
+        TrangThai: 2,
+      },
+      attributes: [
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.fn("DISTINCT", sequelize.col("id_NhaCungCap"))
+          ),
+          "soNhaCungCapTrongNam",
+        ],
+        [sequelize.fn("COUNT", sequelize.col("id")), "soPhieuNhapTrongNam"],
+        [
+          sequelize.fn("SUM", sequelize.col("TongTien")),
+          "tongGiaTriNhapTrongNam",
+        ],
+      ],
+      raw: true,
+    });
 
     // Top nhà cung cấp theo giá trị nhập
-    const [topSuppliers] = await db.execute(`
-      SELECT 
-        ncc.id,
-        ncc.Ten,
-        COUNT(pn.id) as soPhieuNhap,
-        SUM(pn.TongTien) as tongGiaTriNhap
-      FROM nhacungcap ncc
-      INNER JOIN phieunhap pn ON ncc.id = pn.id_NhaCungCap
-      WHERE YEAR(pn.NgayNhap) = YEAR(CURRENT_DATE)
-        AND pn.TrangThai = 2
-      GROUP BY ncc.id, ncc.Ten
-      ORDER BY tongGiaTriNhap DESC
-      LIMIT 5
-    `);
+    const topSuppliers = await Supplier.findAll({
+      include: [
+        {
+          model: ImportReceipt,
+          as: "importReceipts",
+          where: {
+            NgayNhap: {
+              [Op.and]: [
+                sequelize.where(
+                  sequelize.fn(
+                    "YEAR",
+                    sequelize.col("importReceipts.NgayNhap")
+                  ),
+                  sequelize.fn("YEAR", sequelize.fn("NOW"))
+                ),
+              ],
+            },
+            TrangThai: 2,
+          },
+          attributes: [],
+          required: true,
+        },
+      ],
+      attributes: [
+        "id",
+        "Ten",
+        [
+          sequelize.fn("COUNT", sequelize.col("importReceipts.id")),
+          "soPhieuNhap",
+        ],
+        [
+          sequelize.fn("SUM", sequelize.col("importReceipts.TongTien")),
+          "tongGiaTriNhap",
+        ],
+      ],
+      group: ["Supplier.id", "Supplier.Ten"],
+      order: [[sequelize.literal("tongGiaTriNhap"), "DESC"]],
+      limit: 5,
+      subQuery: false,
+      raw: true,
+    });
 
     // Thống kê theo tháng trong năm
-    const [monthlyStats] = await db.execute(`
-      SELECT 
-        MONTH(NgayNhap) as thang,
-        COUNT(DISTINCT id_NhaCungCap) as soNhaCungCap,
-        COUNT(*) as soPhieuNhap,
-        SUM(TongTien) as tongGiaTri
-      FROM phieunhap 
-      WHERE YEAR(NgayNhap) = YEAR(CURRENT_DATE)
-        AND TrangThai = 2
-      GROUP BY MONTH(NgayNhap)
-      ORDER BY thang
-    `);
+    const monthlyStats = await ImportReceipt.findAll({
+      where: {
+        NgayNhap: {
+          [Op.and]: [
+            sequelize.where(
+              sequelize.fn("YEAR", sequelize.col("NgayNhap")),
+              sequelize.fn("YEAR", sequelize.fn("NOW"))
+            ),
+          ],
+        },
+        TrangThai: 2,
+      },
+      attributes: [
+        [sequelize.fn("MONTH", sequelize.col("NgayNhap")), "thang"],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.fn("DISTINCT", sequelize.col("id_NhaCungCap"))
+          ),
+          "soNhaCungCap",
+        ],
+        [sequelize.fn("COUNT", sequelize.col("id")), "soPhieuNhap"],
+        [sequelize.fn("SUM", sequelize.col("TongTien")), "tongGiaTri"],
+      ],
+      group: [sequelize.fn("MONTH", sequelize.col("NgayNhap"))],
+      order: [[sequelize.literal("thang"), "ASC"]],
+      raw: true,
+    });
 
     return {
       success: true,
       data: {
         tongQuat: {
-          ...stats[0],
-          ...importStats[0],
+          ...stats,
+          ...importStats,
         },
         topNhaCungCap: topSuppliers,
         thongKeTheoThang: monthlyStats,
@@ -337,13 +455,15 @@ class SupplierService {
 
   // Lấy danh sách nhà cung cấp hoạt động (cho dropdown)
   async layDanhSachNhaCungCapHoatDong() {
-    const [suppliers] = await db.execute(
-      "SELECT id, Ten FROM nhacungcap WHERE TrangThai = 1 ORDER BY Ten ASC"
-    );
+    const suppliers = await Supplier.findAll({
+      where: { TrangThai: 1 },
+      attributes: ["id", "Ten"],
+      order: [["Ten", "ASC"]],
+    });
 
     return {
       success: true,
-      data: suppliers,
+      data: suppliers.map((s) => s.toJSON()),
     };
   }
 }

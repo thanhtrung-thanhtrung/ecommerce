@@ -88,9 +88,11 @@ class SupplierController {
       const result = await supplierService.layDanhSachNhaCungCap(filters);
       res.json(result);
     } catch (error) {
-      res.status(500).json({
+      const message = error?.errors?.[0]?.msg || "Đã có lỗi xảy ra";
+
+      res.status(400).json({
         success: false,
-        message: error.message,
+        message,
       });
     }
   }

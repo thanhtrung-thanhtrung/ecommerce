@@ -11,8 +11,6 @@ const {
   checkAdminRole,
 } = require("../middlewares/auth.middleware");
 
-// Routes admin - yêu cầu quyền admin (Admin hoặc Nhân viên)
-// Tìm kiếm voucher (chỉ cho admin)
 router.get(
   "/",
   verifyToken,
@@ -21,7 +19,6 @@ router.get(
   VoucherController.timKiemVoucher
 );
 
-// Tạo voucher mới
 router.post(
   "/",
   verifyToken,
@@ -30,7 +27,6 @@ router.post(
   VoucherController.taoVoucher
 );
 
-// Cập nhật voucher
 router.put(
   "/:maVoucher",
   verifyToken,
@@ -39,7 +35,6 @@ router.put(
   VoucherController.capNhatVoucher
 );
 
-// Cập nhật trạng thái voucher
 router.patch(
   "/:maVoucher/status",
   verifyToken,
@@ -48,7 +43,6 @@ router.patch(
   VoucherController.capNhatTrangThai
 );
 
-// Áp dụng voucher - route công khai cho frontend
 router.post("/:maVoucher/apply", VoucherController.applyVoucher);
 
 module.exports = router;

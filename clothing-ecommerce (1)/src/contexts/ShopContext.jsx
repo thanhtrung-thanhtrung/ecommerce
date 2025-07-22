@@ -110,16 +110,23 @@ export const ShopProvider = ({ children }) => {
     const loginUser = useCallback(async (credentials) => {
         try {
             setLoading(true);
+
+            // Chuyển đổi tên trường từ frontend sang backend format
+            const loginData = {
+                Email: credentials.email,
+                MatKhau: credentials.matKhau
+            };
+
             const response = await apiCall("/api/auth/login", {
                 method: "POST",
-                body: JSON.stringify(credentials),
+                body: JSON.stringify(loginData),
             });
 
             // Sửa logic kiểm tra thành công: chỉ cần có token và user là thành công
-            if (response.token && response.user) {
+            if (response.accessToken && response.user) {
                 setUser(response.user);
                 setIsAuthenticated(true);
-                localStorage.setItem("token", response.token);
+                localStorage.setItem("token", response.accessToken);
                 localStorage.setItem("user", JSON.stringify(response.user));
                 toast.success("Đăng nhập thành công!");
                 return response;

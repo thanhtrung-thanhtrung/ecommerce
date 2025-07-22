@@ -1,44 +1,103 @@
-const db = require("../config/database");
+const {
+  Product,
+  ProductDetail,
+  Category,
+  Brand,
+  Supplier,
+  Size,
+  Color,
+  Review,
+  User,
+  Order,
+  OrderDetail,
+  Cart,
+  ImportReceipt,
+  ImportReceiptDetail,
+  sequelize,
+} = require("../models");
+const { Op } = require("sequelize");
 const cloudinaryUtil = require("../utils/cloudinary.util");
 
 class ProductService {
   async getAllProducts(page = 1, limit = 10) {
     const offset = (page - 1) * limit;
 
-    const [products] = await db.execute(
-      `SELECT sp.*, dm.Ten as tenDanhMuc, th.Ten as tenThuongHieu,
-                (SELECT AVG(SoSao) FROM danhgia WHERE id_SanPham = sp.id AND TrangThai = 1) as diemDanhGia,
-                (SELECT COUNT(*) FROM danhgia WHERE id_SanPham = sp.id AND TrangThai = 1) as luotDanhGia
-        FROM sanpham sp
-        LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-        LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-        WHERE sp.TrangThai = 1
-        LIMIT ? OFFSET ?`,
-      [limit, offset]
-    );
+    // Lấy products với associations
+    const { rows: products, count: total } = await Product.findAndCountAll({
+      where: { TrangThai: 1 },
+      include: [
+        {
+          model: Category,
+          as: "category",
+          attributes: ["id", "Ten"],
+        },
+        {
+          model: Brand,
+          as: "brand",
+          attributes: ["id", "Ten"],
+        },
+        {
+          model: ProductDetail,
+          as: "productDetails",
+          include: [
+            {
+              model: Size,
+              as: "size",
+              attributes: ["id", "Ten"],
+            },
+            {
+              model: Color,
+              as: "color",
+              attributes: ["id", "Ten", "MaMau"],
+            },
+          ],
+        },
+        {
+          model: Review,
+          as: "reviews",
+          where: { TrangThai: 1 },
+          required: false,
+          attributes: ["SoSao"],
+        },
+      ],
+      limit,
+      offset,
+      order: [["NgayTao", "DESC"]],
+      distinct: true,
+    });
 
-    const [total] = await db.execute(
-      "SELECT COUNT(*) as total FROM sanpham WHERE TrangThai = 1"
-    );
+    // Tính toán điểm đánh giá và số lượt đánh giá
+    const productsWithRating = products.map((product) => {
+      const productData = product.toJSON();
+      const reviews = productData.reviews || [];
 
-    for (let product of products) {
-      const [variants] = await db.execute(
-        `SELECT ctsp.*, kc.Ten as tenKichCo, ms.Ten as tenMau
-          FROM chitietsanpham ctsp
-          JOIN kichco kc ON ctsp.id_KichCo = kc.id
-          JOIN mausac ms ON ctsp.id_MauSac = ms.id
-          WHERE ctsp.id_SanPham = ?`,
-        [product.id]
-      );
-      product.bienThe = variants;
-    }
+      productData.diemDanhGia =
+        reviews.length > 0
+          ? reviews.reduce((sum, r) => sum + r.SoSao, 0) / reviews.length
+          : null;
+      productData.luotDanhGia = reviews.length;
+      productData.tenDanhMuc = productData.category?.Ten;
+      productData.tenThuongHieu = productData.brand?.Ten;
+      productData.bienThe =
+        productData.productDetails?.map((detail) => ({
+          ...detail,
+          tenKichCo: detail.size?.Ten,
+          tenMau: detail.color?.Ten,
+        })) || [];
+
+      // Cleanup
+      delete productData.reviews;
+      delete productData.productDetails;
+
+      return productData;
+    });
 
     return {
-      products,
+      products: productsWithRating,
       pagination: {
         page,
         limit,
-        total: total[0].total,
+        total,
       },
     };
   }
@@ -47,196 +106,404 @@ class ProductService {
     const { tuKhoa, id_DanhMuc, id_ThuongHieu, giaMin, giaMax } = searchData;
     const offset = (page - 1) * limit;
 
-    let query = `
-        SELECT sp.*, dm.Ten as tenDanhMuc, th.Ten as tenThuongHieu,
-              (SELECT AVG(SoSao) FROM danhgia WHERE id_SanPham = sp.id AND TrangThai = 1) as diemDanhGia,
-              (SELECT COUNT(*) FROM danhgia WHERE id_SanPham = sp.id AND TrangThai = 1) as luotDanhGia
-        FROM sanpham sp
-        LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-        LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-        WHERE sp.TrangThai = 1
-      `;
-
-    const params = [];
+    // Xây dựng where conditions
+    const whereConditions = { TrangThai: 1 };
 
     if (tuKhoa) {
-      query += " AND (sp.Ten LIKE ? OR sp.MoTa LIKE ?)";
-      params.push(`%${tuKhoa}%`, `%${tuKhoa}%`);
+      whereConditions[Op.or] = [
+        { Ten: { [Op.like]: `%${tuKhoa}%` } },
+        { MoTa: { [Op.like]: `%${tuKhoa}%` } },
+      ];
     }
 
     if (id_DanhMuc) {
-      query += " AND sp.id_DanhMuc = ?";
-      params.push(id_DanhMuc);
+      whereConditions.id_DanhMuc = id_DanhMuc;
     }
 
     if (id_ThuongHieu) {
-      query += " AND sp.id_ThuongHieu = ?";
-      params.push(id_ThuongHieu);
+      whereConditions.id_ThuongHieu = id_ThuongHieu;
     }
 
     if (giaMin) {
-      query += " AND sp.Gia >= ?";
-      params.push(giaMin);
+      whereConditions.Gia = { ...whereConditions.Gia, [Op.gte]: giaMin };
     }
 
     if (giaMax) {
-      query += " AND sp.Gia <= ?";
-      params.push(giaMax);
+      whereConditions.Gia = { ...whereConditions.Gia, [Op.lte]: giaMax };
     }
 
-    query += " LIMIT ? OFFSET ?";
-    params.push(limit, offset);
+    const { rows: products, count: total } = await Product.findAndCountAll({
+      where: whereConditions,
+      include: [
+        {
+          model: Category,
+          as: "category",
+          attributes: ["id", "Ten"],
+        },
+        {
+          model: Brand,
+          as: "brand",
+          attributes: ["id", "Ten"],
+        },
+        {
+          model: ProductDetail,
+          as: "productDetails",
+          include: [
+            {
+              model: Size,
+              as: "size",
+              attributes: ["id", "Ten"],
+            },
+            {
+              model: Color,
+              as: "color",
+              attributes: ["id", "Ten", "MaMau"],
+            },
+          ],
+        },
+        {
+          model: Review,
+          as: "reviews",
+          where: { TrangThai: 1 },
+          required: false,
+          attributes: ["SoSao"],
+        },
+      ],
+      limit,
+      offset,
+      distinct: true,
+    });
 
-    const [products] = await db.execute(query, params);
+    // Tính toán điểm đánh giá và format data
+    const productsWithRating = products.map((product) => {
+      const productData = product.toJSON();
+      const reviews = productData.reviews || [];
 
-    for (let product of products) {
-      const [variants] = await db.execute(
-        `SELECT ctsp.*, kc.Ten as tenKichCo, ms.Ten as tenMau
-          FROM chitietsanpham ctsp
-          JOIN kichco kc ON ctsp.id_KichCo = kc.id
-          JOIN mausac ms ON ctsp.id_MauSac = ms.id
-          WHERE ctsp.id_SanPham = ?`,
-        [product.id]
-      );
-      product.bienThe = variants;
-    }
+      productData.diemDanhGia =
+        reviews.length > 0
+          ? reviews.reduce((sum, r) => sum + r.SoSao, 0) / reviews.length
+          : null;
+      productData.luotDanhGia = reviews.length;
+      productData.tenDanhMuc = productData.category?.Ten;
+      productData.tenThuongHieu = productData.brand?.Ten;
+      productData.bienThe =
+        productData.productDetails?.map((detail) => ({
+          ...detail,
+          tenKichCo: detail.size?.Ten,
+          tenMau: detail.color?.Ten,
+        })) || [];
 
-    let countQuery = `
-        SELECT COUNT(*) as total
-        FROM sanpham sp
-        WHERE sp.TrangThai = 1
-      `;
+      // Cleanup
+      delete productData.reviews;
+      delete productData.productDetails;
 
-    const countParams = [];
-
-    if (tuKhoa) {
-      countQuery += " AND (sp.Ten LIKE ? OR sp.MoTa LIKE ?)";
-      countParams.push(`%${tuKhoa}%`, `%${tuKhoa}%`);
-    }
-
-    if (id_DanhMuc) {
-      countQuery += " AND sp.id_DanhMuc = ?";
-      countParams.push(id_DanhMuc);
-    }
-
-    if (id_ThuongHieu) {
-      countQuery += " AND sp.id_ThuongHieu = ?";
-      countParams.push(id_ThuongHieu);
-    }
-
-    if (giaMin) {
-      countQuery += " AND sp.Gia >= ?";
-      countParams.push(giaMin);
-    }
-
-    if (giaMax) {
-      countQuery += " AND sp.Gia <= ?";
-      countParams.push(giaMax);
-    }
-
-    const [total] = await db.execute(countQuery, countParams);
+      return productData;
+    });
 
     return {
-      products,
+      products: productsWithRating,
       pagination: {
         page,
         limit,
-        total: total[0].total,
+        total,
       },
     };
   }
 
   async getProductDetail(productId) {
-    const [products] = await db.execute(
-      `SELECT sp.*, dm.Ten as tenDanhMuc, th.Ten as tenThuongHieu,
-                (SELECT AVG(SoSao) FROM danhgia WHERE id_SanPham = sp.id AND TrangThai = 1) as diemDanhGia,
-                (SELECT COUNT(*) FROM danhgia WHERE id_SanPham = sp.id AND TrangThai = 1) as luotDanhGia
-        FROM sanpham sp
-        LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-        LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-        WHERE sp.id = ? AND sp.TrangThai = 1`,
-      [productId]
-    );
+    try {
+      const product = await Product.findOne({
+        where: { id: productId, TrangThai: 1 },
+        include: [
+          {
+            model: Category,
+            as: "category",
+            attributes: ["id", "Ten"],
+          },
+          {
+            model: Brand,
+            as: "brand",
+            attributes: ["id", "Ten"],
+          },
+          {
+            model: ProductDetail,
+            as: "productDetails",
+            include: [
+              {
+                model: Size,
+                as: "size",
+                attributes: ["id", "Ten"],
+              },
+              {
+                model: Color,
+                as: "color",
+                attributes: ["id", "Ten", "MaMau"],
+              },
+            ],
+          },
+          {
+            model: Review,
+            as: "reviews",
+            where: { TrangThai: 1 },
+            required: false,
+            include: [
+              {
+                model: User,
+                as: "user",
+                attributes: ["id", "HoTen", "Avatar"],
+              },
+            ],
+            order: [["NgayDanhGia", "DESC"]],
+          },
+        ],
+      });
 
-    if (products.length === 0) {
-      throw new Error("Sản phẩm không tồn tại");
+      if (!product) {
+        throw new Error("Sản phẩm không tồn tại");
+      }
+
+      const productData = product.toJSON();
+
+      // Parse ThongSoKyThuat một cách an toàn
+      try {
+        if (
+          productData.ThongSoKyThuat &&
+          typeof productData.ThongSoKyThuat === "string"
+        ) {
+          productData.ThongSoKyThuat = JSON.parse(productData.ThongSoKyThuat);
+        }
+      } catch (error) {
+        console.error(
+          "Error parsing ThongSoKyThuat for product",
+          productId,
+          ":",
+          error
+        );
+        productData.ThongSoKyThuat = {};
+      }
+
+      // Parse HinhAnh một cách an toàn
+      try {
+        if (productData.HinhAnh && typeof productData.HinhAnh === "string") {
+          productData.HinhAnh = JSON.parse(productData.HinhAnh);
+        }
+      } catch (error) {
+        console.error(
+          "Error parsing HinhAnh for product",
+          productId,
+          ":",
+          error
+        );
+        productData.HinhAnh = {
+          anhChinh: null,
+          anhChinh_public_id: null,
+          anhPhu: [],
+          anhPhu_public_ids: [],
+        };
+      }
+
+      // Tính toán tồn kho real-time cho từng biến thể bằng Sequelize
+      if (
+        productData.productDetails &&
+        Array.isArray(productData.productDetails)
+      ) {
+        for (let variant of productData.productDetails) {
+          try {
+            // Tính tổng số lượng nhập từ phiếu nhập
+            const totalImported =
+              (await ImportReceiptDetail.sum("SoLuong", {
+                where: { id_ChiTietSanPham: variant.id },
+                include: [
+                  {
+                    model: ImportReceipt,
+                    as: "importReceipt",
+                    where: { TrangThai: 2 }, // Chỉ tính phiếu nhập đã xác nhận
+                  },
+                ],
+              })) || 0;
+
+            // Tính tổng số lượng đã bán từ đơn hàng hoàn thành
+            const totalSold =
+              (await OrderDetail.sum("SoLuong", {
+                where: { id_ChiTietSanPham: variant.id },
+                include: [
+                  {
+                    model: Order,
+                    as: "order",
+                    where: { TrangThai: 4 }, // Chỉ tính đơn hàng đã hoàn thành
+                  },
+                ],
+              })) || 0;
+
+            // Tính số lượng đang chờ xử lý (đơn hàng chờ xác nhận)
+            const pendingOrders =
+              (await OrderDetail.sum("SoLuong", {
+                where: { id_ChiTietSanPham: variant.id },
+                include: [
+                  {
+                    model: Order,
+                    as: "order",
+                    where: { TrangThai: 1 }, // Đơn hàng chờ xác nhận
+                  },
+                ],
+              })) || 0;
+
+            // Tính tồn kho thực tế
+            const realStock = Math.max(0, totalImported - totalSold);
+            const availableStock = Math.max(0, realStock - pendingOrders);
+
+            variant.TonKho = realStock;
+            variant.SoLuongDangCho = pendingOrders;
+            variant.CoTheBan = availableStock;
+            variant.tenKichCo = variant.size?.Ten || "";
+            variant.tenMau = variant.color?.Ten || "";
+          } catch (stockError) {
+            console.error(
+              "Error calculating stock for variant",
+              variant.id,
+              ":",
+              stockError
+            );
+            // Set default values if calculation fails
+            variant.TonKho = 0;
+            variant.SoLuongDangCho = 0;
+            variant.CoTheBan = 0;
+            variant.tenKichCo = variant.size?.Ten || "";
+            variant.tenMau = variant.color?.Ten || "";
+          }
+        }
+      }
+
+      // Tính điểm đánh giá
+      const reviews = productData.reviews || [];
+      productData.diemDanhGia =
+        reviews.length > 0
+          ? reviews.reduce((sum, r) => sum + r.SoSao, 0) / reviews.length
+          : null;
+      productData.luotDanhGia = reviews.length;
+      productData.tenDanhMuc = productData.category?.Ten || "";
+      productData.tenThuongHieu = productData.brand?.Ten || "";
+      productData.bienThe = productData.productDetails || [];
+      productData.danhGia = reviews.map((review) => ({
+        ...review,
+        avatar: review.user?.Avatar,
+      }));
+
+      // Lấy sản phẩm liên quan
+      try {
+        const relatedProducts = await Product.findAll({
+          where: {
+            id_DanhMuc: product.id_DanhMuc,
+            id: { [Op.ne]: productId },
+            TrangThai: 1,
+          },
+          include: [
+            {
+              model: Category,
+              as: "category",
+              attributes: ["id", "Ten"],
+            },
+            {
+              model: Brand,
+              as: "brand",
+              attributes: ["id", "Ten"],
+            },
+            {
+              model: Review,
+              as: "reviews",
+              where: { TrangThai: 1 },
+              required: false,
+              attributes: ["SoSao"],
+            },
+          ],
+          limit: 4,
+        });
+
+        productData.sanPhamLienQuan = relatedProducts.map((relatedProduct) => {
+          const relatedData = relatedProduct.toJSON();
+          const relatedReviews = relatedData.reviews || [];
+
+          relatedData.diemDanhGia =
+            relatedReviews.length > 0
+              ? relatedReviews.reduce((sum, r) => sum + r.SoSao, 0) /
+                relatedReviews.length
+              : null;
+          relatedData.tenDanhMuc = relatedData.category?.Ten || "";
+          relatedData.tenThuongHieu = relatedData.brand?.Ten || "";
+
+          delete relatedData.reviews;
+          return relatedData;
+        });
+      } catch (relatedError) {
+        console.error("Error getting related products:", relatedError);
+        productData.sanPhamLienQuan = [];
+      }
+
+      // Cleanup
+      delete productData.productDetails;
+      delete productData.reviews;
+
+      return productData;
+    } catch (error) {
+      console.error(
+        "Error in getProductDetail for product",
+        productId,
+        ":",
+        error
+      );
+      throw new Error("Không thể lấy chi tiết sản phẩm: " + error.message);
     }
-
-    const product = products[0];
-
-    const [variants] = await db.execute(
-      `SELECT ctsp.*, kc.Ten as tenKichCo, ms.Ten as tenMau,
-              fn_TinhTonKhoRealTime(ctsp.id) as TonKho,
-              COALESCE(cho.TongCho, 0) as SoLuongDangCho,
-              GREATEST(0, fn_TinhTonKhoRealTime(ctsp.id) - COALESCE(cho.TongCho, 0)) as CoTheBan
-        FROM chitietsanpham ctsp
-        JOIN kichco kc ON ctsp.id_KichCo = kc.id
-        JOIN mausac ms ON ctsp.id_MauSac = ms.id
-        LEFT JOIN (
-          SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
-          FROM chitietdonhang ctdh
-          JOIN donhang dh ON ctdh.id_DonHang = dh.id
-          WHERE dh.TrangThai = 1
-          GROUP BY ctdh.id_ChiTietSanPham
-        ) cho ON ctsp.id = cho.id_ChiTietSanPham
-        WHERE ctsp.id_SanPham = ?`,
-      [productId]
-    );
-    product.bienThe = variants;
-
-    const [reviews] = await db.execute(
-      `SELECT dg.*, nd.HoTen, nd.Avatar as avatar
-        FROM danhgia dg
-        JOIN nguoidung nd ON dg.id_NguoiDung = nd.id
-        WHERE dg.id_SanPham = ? AND dg.TrangThai = 1
-        ORDER BY dg.NgayDanhGia DESC`,
-      [productId]
-    );
-    product.danhGia = reviews;
-
-    const [relatedProducts] = await db.execute(
-      `SELECT sp.*, dm.Ten as tenDanhMuc, th.Ten as tenThuongHieu,
-                (SELECT AVG(SoSao) FROM danhgia WHERE id_SanPham = sp.id AND TrangThai = 1) as diemDanhGia
-        FROM sanpham sp
-        LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-        LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-        WHERE sp.id_DanhMuc = ? AND sp.id != ? AND sp.TrangThai = 1
-        LIMIT 4`,
-      [product.id_DanhMuc, productId]
-    );
-    product.sanPhamLienQuan = relatedProducts;
-
-    return product;
   }
 
   async reviewProduct(productId, userId, reviewData) {
     const { noiDung, diem } = reviewData;
 
-    const [orders] = await db.execute(
-      `SELECT dh.* 
-        FROM donhang dh
-        JOIN chitietdonhang ctdh ON dh.id = ctdh.id_DonHang
-        WHERE dh.id_NguoiMua = ? AND ctdh.id_ChiTietSanPham IN (SELECT id FROM chitietsanpham WHERE id_SanPham = ?) AND dh.TrangThai = 4`,
-      [userId, productId]
-    );
+    // Kiểm tra đã mua sản phẩm chưa
+    const orders = await Order.findAll({
+      include: [
+        {
+          model: OrderDetail,
+          as: "orderDetails",
+          include: [
+            {
+              model: ProductDetail,
+              as: "productDetail",
+              where: { id_SanPham: productId },
+            },
+          ],
+        },
+      ],
+      where: {
+        id_NguoiMua: userId,
+        TrangThai: 4, // Đã hoàn thành
+      },
+    });
 
     if (orders.length === 0) {
       throw new Error("Bạn cần mua sản phẩm trước khi đánh giá");
     }
 
-    const [existingReview] = await db.execute(
-      "SELECT * FROM danhgia WHERE id_NguoiDung = ? AND id_SanPham = ?",
-      [userId, productId]
-    );
+    // Kiểm tra đã đánh giá chưa
+    const existingReview = await Review.findOne({
+      where: {
+        id_NguoiDung: userId,
+        id_SanPham: productId,
+      },
+    });
 
-    if (existingReview.length > 0) {
+    if (existingReview) {
       throw new Error("Bạn đã đánh giá sản phẩm này");
     }
 
-    await db.execute(
-      "INSERT INTO danhgia (id_SanPham, id_NguoiDung, NoiDung, SoSao, NgayDanhGia, TrangThai) VALUES (?, ?, ?, ?, NOW(), 1)",
-      [productId, userId, noiDung, diem]
-    );
+    // Tạo đánh giá mới
+    await Review.create({
+      id_SanPham: productId,
+      id_NguoiDung: userId,
+      NoiDung: noiDung,
+      SoSao: diem,
+      NgayDanhGia: new Date(),
+      TrangThai: 1,
+    });
 
     return this.getProductDetail(productId);
   }
@@ -258,96 +525,97 @@ class ProductService {
       bienThe,
     } = productData;
 
-    let connection;
-    try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
+    const transaction = await sequelize.transaction();
 
-      // Bắt đầu transaction
-      await connection.beginTransaction();
+    try {
+      // Khởi tạo imageData với structure chuẩn
+      let imageData = {
+        anhChinh: null,
+        anhChinh_public_id: null,
+        anhPhu: [],
+        anhPhu_public_ids: [],
+      };
 
       // Upload hình ảnh lên Cloudinary (nếu có)
-      let imageData = {};
       if (hinhAnh) {
         // Xử lý ảnh chính
         if (hinhAnh.anhChinh) {
-          const anhChinh = await cloudinaryUtil.uploadImage(
-            hinhAnh.anhChinh,
-            "shoes_shop/products"
-          );
-          imageData.anhChinh = anhChinh.url;
-          imageData.anhChinh_public_id = anhChinh.public_id;
+          try {
+            const anhChinh = await cloudinaryUtil.uploadImage(
+              hinhAnh.anhChinh,
+              "shoes_shop/products"
+            );
+            imageData.anhChinh = anhChinh.url;
+            imageData.anhChinh_public_id = anhChinh.public_id;
+          } catch (error) {
+            console.error("Error uploading main image:", error);
+            throw new Error("Lỗi khi upload ảnh chính: " + error.message);
+          }
         }
 
         // Xử lý ảnh phụ
-        if (hinhAnh.anhPhu && Array.isArray(hinhAnh.anhPhu)) {
-          const anhPhuResults = await cloudinaryUtil.uploadMultipleImages(
-            hinhAnh.anhPhu,
-            "shoes_shop/products"
-          );
-          imageData.anhPhu = anhPhuResults.map((img) => img.url);
-          imageData.anhPhu_public_ids = anhPhuResults.map(
-            (img) => img.public_id
-          );
+        if (
+          hinhAnh.anhPhu &&
+          Array.isArray(hinhAnh.anhPhu) &&
+          hinhAnh.anhPhu.length > 0
+        ) {
+          try {
+            const anhPhuResults = await cloudinaryUtil.uploadMultipleImages(
+              hinhAnh.anhPhu,
+              "shoes_shop/products"
+            );
+            imageData.anhPhu = anhPhuResults.map((img) => img.url);
+            imageData.anhPhu_public_ids = anhPhuResults.map(
+              (img) => img.public_id
+            );
+          } catch (error) {
+            console.error("Error uploading sub images:", error);
+            throw new Error("Lỗi khi upload ảnh phụ: " + error.message);
+          }
         }
       }
 
-      // Insert vào bảng sanpham
-      const [result] = await connection.execute(
-        `INSERT INTO sanpham (Ten, MoTa, MoTaChiTiet, ThongSoKyThuat, Gia, 
-          GiaKhuyenMai, id_DanhMuc, id_ThuongHieu, id_NhaCungCap, HinhAnh, 
-          TrangThai, NgayTao) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())`,
-        [
+      // Tạo sản phẩm mới - STRINGIFY cả ThongSoKyThuat và HinhAnh
+      const newProduct = await Product.create(
+        {
           Ten,
           MoTa,
           MoTaChiTiet,
-          JSON.stringify(ThongSoKyThuat),
+          ThongSoKyThuat: JSON.stringify(ThongSoKyThuat), // Stringify ThongSoKyThuat
           Gia,
-          GiaKhuyenMai || null,
+          GiaKhuyenMai: GiaKhuyenMai || null,
           id_DanhMuc,
           id_ThuongHieu,
           id_NhaCungCap,
-          JSON.stringify(imageData),
-        ]
+          HinhAnh: JSON.stringify(imageData), // Stringify HinhAnh
+          TrangThai: 1,
+          NgayTao: new Date(),
+        },
+        { transaction }
       );
-
-      const productId = result.insertId;
 
       // Thêm các biến thể sản phẩm
       if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
-        for (const variant of bienThe) {
-          const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
+        const variantData = bienThe.map((variant) => ({
+          id_SanPham: newProduct.id,
+          id_KichCo: variant.id_KichCo,
+          id_MauSac: variant.id_MauSac,
+          MaSanPham: variant.MaSanPham,
+        }));
 
-          // ✅ SỬA: Không cần khởi tạo TonKho nữa, sẽ dùng real-time calculation
-          await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
-             VALUES (?, ?, ?, ?)`,
-            [productId, id_KichCo, id_MauSac, MaSanPham]
-          );
-        }
+        await ProductDetail.bulkCreate(variantData, { transaction });
       }
 
-      // Commit transaction
-      await connection.commit();
+      await transaction.commit();
 
       return {
-        id: productId,
+        id: newProduct.id,
         message: "Sản phẩm đã được tạo thành công",
       };
     } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
+      await transaction.rollback();
       console.error("Error creating product:", error);
       throw new Error("Không thể tạo sản phẩm: " + error.message);
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
     }
   }
 
@@ -367,292 +635,155 @@ class ProductService {
       TrangThai,
     } = productData;
 
-    let connection;
+    const transaction = await sequelize.transaction();
+
     try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
-
-      // Bắt đầu transaction
-      await connection.beginTransaction();
-
       // Kiểm tra sản phẩm có tồn tại không
-      const [currentProduct] = await connection.execute(
-        "SELECT id, HinhAnh FROM sanpham WHERE id = ?",
-        [productId]
-      );
+      const currentProduct = await Product.findByPk(productId, { transaction });
 
-      if (currentProduct.length === 0) {
+      if (!currentProduct) {
         throw new Error("Sản phẩm không tồn tại");
       }
 
-      let currentImageData = JSON.parse(currentProduct[0].HinhAnh || "{}");
-      let newImageData = { ...currentImageData };
+      // Parse current image data và đảm bảo có cấu trúc chuẩn
+      let currentImageData = currentProduct.HinhAnh || {};
+
+      // Nếu HinhAnh là string, parse nó
+      if (typeof currentImageData === "string") {
+        try {
+          currentImageData = JSON.parse(currentImageData);
+        } catch (error) {
+          console.error("Error parsing current image data:", error);
+          currentImageData = {};
+        }
+      }
+
+      // Khởi tạo newImageData với structure chuẩn
+      let newImageData = {
+        anhChinh: currentImageData.anhChinh || null,
+        anhChinh_public_id: currentImageData.anhChinh_public_id || null,
+        anhPhu: currentImageData.anhPhu || [],
+        anhPhu_public_ids: currentImageData.anhPhu_public_ids || [],
+      };
 
       // Xử lý cập nhật hình ảnh nếu có
       if (hinhAnh) {
         // Xử lý ảnh chính
         if (hinhAnh.anhChinh) {
-          // Xóa ảnh cũ nếu có
-          if (currentImageData.anhChinh_public_id) {
-            await cloudinaryUtil.deleteImage(
-              currentImageData.anhChinh_public_id
+          try {
+            // Xóa ảnh cũ nếu có
+            if (currentImageData.anhChinh_public_id) {
+              await cloudinaryUtil.deleteImage(
+                currentImageData.anhChinh_public_id
+              );
+            }
+            // Upload ảnh mới
+            const anhChinh = await cloudinaryUtil.uploadImage(
+              hinhAnh.anhChinh,
+              "shoes_shop/products"
             );
+            newImageData.anhChinh = anhChinh.url;
+            newImageData.anhChinh_public_id = anhChinh.public_id;
+          } catch (error) {
+            console.error("Error updating main image:", error);
+            throw new Error("Lỗi khi cập nhật ảnh chính: " + error.message);
           }
-          // Upload ảnh mới
-          const anhChinh = await cloudinaryUtil.uploadImage(
-            hinhAnh.anhChinh,
-            "shoes_shop/products"
-          );
-          newImageData.anhChinh = anhChinh.url;
-          newImageData.anhChinh_public_id = anhChinh.public_id;
         }
 
         // Xử lý ảnh phụ
-        if (hinhAnh.anhPhu && Array.isArray(hinhAnh.anhPhu)) {
-          // Xóa ảnh phụ cũ nếu có
-          if (
-            currentImageData.anhPhu_public_ids &&
-            Array.isArray(currentImageData.anhPhu_public_ids)
-          ) {
-            for (const publicId of currentImageData.anhPhu_public_ids) {
-              await cloudinaryUtil.deleteImage(publicId);
+        if (
+          hinhAnh.anhPhu &&
+          Array.isArray(hinhAnh.anhPhu) &&
+          hinhAnh.anhPhu.length > 0
+        ) {
+          try {
+            // Xóa ảnh phụ cũ nếu có
+            if (
+              currentImageData.anhPhu_public_ids &&
+              Array.isArray(currentImageData.anhPhu_public_ids)
+            ) {
+              for (const publicId of currentImageData.anhPhu_public_ids) {
+                await cloudinaryUtil.deleteImage(publicId);
+              }
             }
+            // Upload ảnh phụ mới
+            const anhPhuResults = await cloudinaryUtil.uploadMultipleImages(
+              hinhAnh.anhPhu,
+              "shoes_shop/products"
+            );
+            newImageData.anhPhu = anhPhuResults.map((img) => img.url);
+            newImageData.anhPhu_public_ids = anhPhuResults.map(
+              (img) => img.public_id
+            );
+          } catch (error) {
+            console.error("Error updating sub images:", error);
+            throw new Error("Lỗi khi cập nhật ảnh phụ: " + error.message);
           }
-          // Upload ảnh phụ mới
-          const anhPhuResults = await cloudinaryUtil.uploadMultipleImages(
-            hinhAnh.anhPhu,
-            "shoes_shop/products"
-          );
-          newImageData.anhPhu = anhPhuResults.map((img) => img.url);
-          newImageData.anhPhu_public_ids = anhPhuResults.map(
-            (img) => img.public_id
-          );
         }
       }
 
-      // Cập nhật thông tin sản phẩm
-      await connection.execute(
-        `UPDATE sanpham SET 
-          Ten = ?, MoTa = ?, MoTaChiTiet = ?, ThongSoKyThuat = ?, 
-          Gia = ?, GiaKhuyenMai = ?, id_DanhMuc = ?, id_ThuongHieu = ?, 
-          id_NhaCungCap = ?, HinhAnh = ?, TrangThai = ?, NgayCapNhat = NOW()
-          WHERE id = ?`,
-        [
+      // Cập nhật thông tin sản phẩm - STRINGIFY cả ThongSoKyThuat và HinhAnh
+      await currentProduct.update(
+        {
           Ten,
           MoTa,
           MoTaChiTiet,
-          JSON.stringify(ThongSoKyThuat),
+          ThongSoKyThuat: JSON.stringify(ThongSoKyThuat), // Stringify ThongSoKyThuat
           Gia,
-          GiaKhuyenMai || null,
+          GiaKhuyenMai: GiaKhuyenMai || null,
           id_DanhMuc,
           id_ThuongHieu,
           id_NhaCungCap,
-          JSON.stringify(newImageData),
-          TrangThai || 1,
-          productId,
-        ]
+          HinhAnh: JSON.stringify(newImageData), // Stringify HinhAnh
+          TrangThai: TrangThai || 1,
+          NgayCapNhat: new Date(),
+        },
+        { transaction }
       );
 
       // Cập nhật biến thể sản phẩm nếu có
       if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
         // Xóa tất cả biến thể cũ
-        await connection.execute(
-          "DELETE FROM chitietsanpham WHERE id_SanPham = ?",
-          [productId]
-        );
+        await ProductDetail.destroy({
+          where: { id_SanPham: productId },
+          transaction,
+        });
 
         // Thêm biến thể mới
-        for (const variant of bienThe) {
-          const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
+        const variantData = bienThe.map((variant) => ({
+          id_SanPham: productId,
+          id_KichCo: variant.id_KichCo,
+          id_MauSac: variant.id_MauSac,
+          MaSanPham: variant.MaSanPham,
+        }));
 
-          await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
-             VALUES (?, ?, ?, ?)`,
-            [productId, id_KichCo, id_MauSac, MaSanPham]
-          );
-        }
+        await ProductDetail.bulkCreate(variantData, { transaction });
       }
 
-      // Commit transaction
-      await connection.commit();
+      await transaction.commit();
 
       return {
         id: productId,
         message: "Sản phẩm đã được cập nhật thành công",
       };
     } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
+      await transaction.rollback();
       console.error("Error updating product:", error);
       throw new Error("Không thể cập nhật sản phẩm: " + error.message);
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
     }
   }
 
   async updateProductInfo(productId, productData) {
-    const {
-      Ten,
-      MoTa,
-      MoTaChiTiet,
-      ThongSoKyThuat,
-      Gia,
-      GiaKhuyenMai,
-      id_DanhMuc,
-      id_ThuongHieu,
-      id_NhaCungCap,
-      hinhAnh,
-      bienThe,
-      TrangThai,
-    } = productData;
-
-    let connection;
-    try {
-      // Lấy connection từ pool
-      connection = await db.getConnection();
-
-      // Bắt đầu transaction
-      await connection.beginTransaction();
-
-      // Lấy thông tin hình ảnh hiện tại
-      const [currentProduct] = await connection.execute(
-        "SELECT HinhAnh FROM sanpham WHERE id = ?",
-        [productId]
-      );
-
-      if (currentProduct.length === 0) {
-        throw new Error("Sản phẩm không tồn tại");
-      }
-
-      let currentImageData = JSON.parse(currentProduct[0].HinhAnh || "{}");
-      let newImageData = { ...currentImageData };
-
-      // Xử lý cập nhật hình ảnh nếu có
-      if (hinhAnh) {
-        // Xử lý ảnh chính
-        if (hinhAnh.anhChinh) {
-          // Xóa ảnh cũ nếu có
-          if (currentImageData.anhChinh_public_id) {
-            await cloudinaryUtil.deleteImage(
-              currentImageData.anhChinh_public_id
-            );
-          }
-          // Upload ảnh mới
-          const anhChinh = await cloudinaryUtil.uploadImage(
-            hinhAnh.anhChinh,
-            "shoes_shop/products"
-          );
-          newImageData.anhChinh = cloudinaryUtil.getProductPreviewUrl(
-            anhChinh.public_id
-          );
-          newImageData.anhChinh_public_id = anhChinh.public_id;
-        }
-
-        // Xử lý ảnh phụ
-        if (hinhAnh.anhPhu && Array.isArray(hinhAnh.anhPhu)) {
-          // Xóa ảnh phụ cũ nếu có
-          if (
-            currentImageData.anhPhu_public_ids &&
-            Array.isArray(currentImageData.anhPhu_public_ids)
-          ) {
-            for (const publicId of currentImageData.anhPhu_public_ids) {
-              await cloudinaryUtil.deleteImage(publicId);
-            }
-          }
-          // Upload ảnh phụ mới
-          const anhPhuResults = await cloudinaryUtil.uploadMultipleImages(
-            hinhAnh.anhPhu,
-            "shoes_shop/products"
-          );
-          newImageData.anhPhu = anhPhuResults.map((img) =>
-            cloudinaryUtil.getProductPreviewUrl(img.public_id)
-          );
-          newImageData.anhPhu_public_ids = anhPhuResults.map(
-            (img) => img.public_id
-          );
-        }
-      }
-
-      // Cập nhật thông tin sản phẩm
-      await connection.execute(
-        `UPDATE sanpham SET 
-          Ten = ?, MoTa = ?, MoTaChiTiet = ?, ThongSoKyThuat = ?, 
-          Gia = ?, GiaKhuyenMai = ?, id_DanhMuc = ?, id_ThuongHieu = ?, 
-          id_NhaCungCap = ?, HinhAnh = ?, TrangThai = ?, NgayCapNhat = NOW()
-          WHERE id = ?`,
-        [
-          Ten,
-          MoTa,
-          MoTaChiTiet,
-          JSON.stringify(ThongSoKyThuat),
-          Gia,
-          GiaKhuyenMai || null,
-          id_DanhMuc,
-          id_ThuongHieu,
-          id_NhaCungCap,
-          JSON.stringify(newImageData),
-          TrangThai || 1,
-          productId,
-        ]
-      );
-
-      // Cập nhật biến thể sản phẩm nếu có
-      if (bienThe && Array.isArray(bienThe) && bienThe.length > 0) {
-        // Xóa tất cả biến thể cũ
-        await connection.execute(
-          "DELETE FROM chitietsanpham WHERE id_SanPham = ?",
-          [productId]
-        );
-
-        // Thêm biến thể mới
-        for (const variant of bienThe) {
-          const { id_KichCo, id_MauSac, MaSanPham, SoLuong } = variant;
-
-          await connection.execute(
-            `INSERT INTO chitietsanpham (id_SanPham, id_KichCo, id_MauSac, MaSanPham) 
-             VALUES (?, ?, ?, ?)`,
-            [productId, id_KichCo, id_MauSac, MaSanPham]
-          );
-        }
-      }
-
-      // Commit transaction
-      await connection.commit();
-
-      return {
-        id: productId,
-        message: "Thông tin sản phẩm đã được cập nhật thành công",
-      };
-    } catch (error) {
-      // Rollback nếu có lỗi
-      if (connection) {
-        await connection.rollback();
-      }
-
-      console.error("Error updating product info:", error);
-      throw new Error(
-        "Không thể cập nhật thông tin sản phẩm: " + error.message
-      );
-    } finally {
-      // Trả connection về pool
-      if (connection) {
-        connection.release();
-      }
-    }
+    // ...existing code...
+    // Tương tự updateProduct nhưng chỉ cập nhật thông tin cơ bản
+    return this.updateProduct(productId, productData);
   }
 
   async getProductImageData(productId) {
-    const [product] = await db.execute(
-      "SELECT HinhAnh FROM sanpham WHERE id = ?",
-      [productId]
-    );
-    return product.length > 0 ? JSON.parse(product[0].HinhAnh || "{}") : {};
+    const product = await Product.findByPk(productId, {
+      attributes: ["HinhAnh"],
+    });
+    return product ? JSON.parse(product.HinhAnh || "{}") : {};
   }
 
   async updateProductImages(productId, newImages, currentImageData) {
@@ -693,10 +824,9 @@ class ProductService {
 
   async updateProductVariants(productId, variants, defaultPrice) {
     // Lấy biến thể hiện tại
-    const [existingVariants] = await db.execute(
-      "SELECT id, id_KichCo, id_MauSac FROM chitietsanpham WHERE id_SanPham = ?",
-      [productId]
-    );
+    const existingVariants = await ProductDetail.findAll({
+      where: { id_SanPham: productId },
+    });
 
     const existingMap = new Map();
     for (const variant of existingVariants) {
@@ -704,46 +834,56 @@ class ProductService {
       existingMap.set(key, variant.id);
     }
 
-    // Cập nhật hoặc thêm mới biến thể
-    for (const variant of variants) {
-      const { id, id_KichCo, id_MauSac, MaSanPham } = variant;
-      const key = `${id_KichCo}-${id_MauSac}`;
+    const transaction = await sequelize.transaction();
 
-      if (id && existingMap.has(key)) {
-        // Cập nhật biến thể hiện có
-        await db.execute(
-          `UPDATE chitietsanpham SET 
-          MaSanPham = ?
-          WHERE id = ?`,
-          [MaSanPham, id]
-        );
-        existingMap.delete(key);
-      } else {
-        // Thêm biến thể mới
-        await db.execute(
-          `INSERT INTO chitietsanpham (
-          id_SanPham, id_KichCo, id_MauSac, MaSanPham
-        ) VALUES (?, ?, ?, ?)`,
-          [productId, id_KichCo, id_MauSac, MaSanPham]
-        );
+    try {
+      // Cập nhật hoặc thêm mới biến thể
+      for (const variant of variants) {
+        const { id, id_KichCo, id_MauSac, MaSanPham } = variant;
+        const key = `${id_KichCo}-${id_MauSac}`;
+
+        if (id && existingMap.has(key)) {
+          // Cập nhật biến thể hiện có
+          await ProductDetail.update(
+            { MaSanPham },
+            { where: { id }, transaction }
+          );
+          existingMap.delete(key);
+        } else {
+          // Thêm biến thể mới
+          await ProductDetail.create(
+            {
+              id_SanPham: productId,
+              id_KichCo,
+              id_MauSac,
+              MaSanPham,
+            },
+            { transaction }
+          );
+        }
       }
-    }
 
-    // Xóa các biến thể không còn sử dụng
-    for (const variantId of existingMap.values()) {
-      await db.execute("DELETE FROM chitietsanpham WHERE id = ?", [variantId]);
+      // Xóa các biến thể không còn sử dụng
+      for (const variantId of existingMap.values()) {
+        await ProductDetail.destroy({
+          where: { id: variantId },
+          transaction,
+        });
+      }
+
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
     }
   }
 
   async deleteProduct(productId) {
     try {
       // Kiểm tra sản phẩm có tồn tại không
-      const [existingProduct] = await db.execute(
-        "SELECT id, Ten FROM sanpham WHERE id = ?",
-        [productId]
-      );
+      const existingProduct = await Product.findByPk(productId);
 
-      if (existingProduct.length === 0) {
+      if (!existingProduct) {
         throw new Error("Sản phẩm không tồn tại");
       }
 
@@ -756,16 +896,16 @@ class ProductService {
         );
       }
 
-      // Nếu không có trong đơn hàng, thực hiện soft delete chỉ bảng sanpham
-      await db.execute(
-        "UPDATE sanpham SET TrangThai = 0, NgayCapNhat = NOW() WHERE id = ?",
-        [productId]
-      );
+      // Nếu không có trong đơn hàng, thực hiện soft delete
+      await existingProduct.update({
+        TrangThai: 0,
+        NgayCapNhat: new Date(),
+      });
 
       return {
         success: true,
         message: "Xóa sản phẩm thành công",
-        productName: existingProduct[0].Ten,
+        productName: existingProduct.Ten,
       };
     } catch (error) {
       console.error("Error deleting product:", error);
@@ -773,18 +913,19 @@ class ProductService {
     }
   }
 
-  // Phương thức mới: Kiểm tra sản phẩm có trong đơn hàng hay không
   async checkProductInOrders(productId) {
     try {
-      const [orders] = await db.execute(
-        `SELECT COUNT(*) as count 
-         FROM chitietdonhang ctdh 
-         JOIN chitietsanpham ctsp ON ctdh.id_ChiTietSanPham = ctsp.id 
-         WHERE ctsp.id_SanPham = ?`,
-        [productId]
-      );
+      const count = await OrderDetail.count({
+        include: [
+          {
+            model: ProductDetail,
+            as: "productDetail",
+            where: { id_SanPham: productId },
+          },
+        ],
+      });
 
-      return orders[0].count > 0;
+      return count > 0;
     } catch (error) {
       console.error("Error checking product in orders:", error);
       throw new Error("Lỗi khi kiểm tra sản phẩm trong đơn hàng");
@@ -794,85 +935,96 @@ class ProductService {
   async getAllProductsAdmin(page = 1, limit = 10, search = "", status = null) {
     const offset = (page - 1) * limit;
 
-    let query = `
-      SELECT sp.*, dm.Ten as tenDanhMuc, th.Ten as tenThuongHieu, ncc.Ten as tenNhaCungCap,
-             COUNT(ctsp.id) as soBienThe,
-             COALESCE(SUM(ctdh.SoLuong), 0) as SoLuongDaBan
-      FROM sanpham sp
-      LEFT JOIN danhmuc dm ON sp.id_DanhMuc = dm.id
-      LEFT JOIN thuonghieu th ON sp.id_ThuongHieu = th.id
-      LEFT JOIN nhacungcap ncc ON sp.id_NhaCungCap = ncc.id
-      LEFT JOIN chitietsanpham ctsp ON sp.id = ctsp.id_SanPham
-      LEFT JOIN chitietdonhang ctdh ON ctsp.id = ctdh.id_ChiTietSanPham
-      WHERE 1=1
-    `;
-
-    const params = [];
+    // Xây dựng where conditions
+    const whereConditions = {};
 
     if (search) {
-      query += " AND (sp.Ten LIKE ? OR sp.MoTa LIKE ?)";
-      params.push(`%${search}%`, `%${search}%`);
+      whereConditions[Op.or] = [
+        { Ten: { [Op.like]: `%${search}%` } },
+        { MoTa: { [Op.like]: `%${search}%` } },
+      ];
     }
 
     if (status !== null) {
-      query += " AND sp.TrangThai = ?";
-      params.push(status);
+      whereConditions.TrangThai = status;
     }
 
-    query += " GROUP BY sp.id ORDER BY sp.NgayTao DESC LIMIT ? OFFSET ?";
-    params.push(limit, offset);
+    // Lấy products với subQuery: false để tránh vấn đề với GROUP BY
+    const { rows: products, count } = await Product.findAndCountAll({
+      where: whereConditions,
+      include: [
+        {
+          model: Category,
+          as: "category",
+          attributes: ["id", "Ten"],
+        },
+        {
+          model: Brand,
+          as: "brand",
+          attributes: ["id", "Ten"],
+        },
+        {
+          model: Supplier,
+          as: "supplier",
+          attributes: ["id", "Ten"],
+        },
+        {
+          model: ProductDetail,
+          as: "productDetails",
+          attributes: ["id"],
+          required: false,
+        },
+      ],
+      limit,
+      offset,
+      order: [["NgayTao", "DESC"]],
+      distinct: true, // Đảm bảo count chính xác khi có JOIN
+    });
 
-    const [products] = await db.execute(query, params);
+    // Format data và tính số biến thể
+    const formattedProducts = products.map((product) => {
+      const productData = product.toJSON();
+      productData.tenDanhMuc = productData.category?.Ten;
+      productData.tenThuongHieu = productData.brand?.Ten;
+      productData.tenNhaCungCap = productData.supplier?.Ten;
+      productData.soBienThe = productData.productDetails?.length || 0;
 
-    // Count total
-    let countQuery =
-      "SELECT COUNT(DISTINCT sp.id) as total FROM sanpham sp WHERE 1=1";
-    const countParams = [];
+      // Cleanup
+      delete productData.category;
+      delete productData.brand;
+      delete productData.supplier;
+      delete productData.productDetails;
 
-    if (search) {
-      countQuery += " AND (sp.Ten LIKE ? OR sp.MoTa LIKE ?)";
-      countParams.push(`%${search}%`, `%${search}%`);
-    }
-
-    if (status !== null) {
-      countQuery += " AND sp.TrangThai = ?";
-      countParams.push(status);
-    }
-
-    const [total] = await db.execute(countQuery, countParams);
+      return productData;
+    });
 
     return {
-      products,
+      products: formattedProducts,
       pagination: {
         page,
         limit,
-        total: total[0].total,
+        total: count,
       },
     };
   }
 
   async updateProductStatus(productId, status) {
     try {
-      // Kiểm tra sản phẩm có tồn tại không
-      const [existingProduct] = await db.execute(
-        "SELECT id, Ten FROM sanpham WHERE id = ?",
-        [productId]
-      );
+      const existingProduct = await Product.findByPk(productId);
 
-      if (existingProduct.length === 0) {
+      if (!existingProduct) {
         throw new Error("Sản phẩm không tồn tại");
       }
 
-      // Cập nhật trạng thái sản phẩm
-      await db.execute(
-        "UPDATE sanpham SET TrangThai = ?, NgayCapNhat = NOW() WHERE id = ?",
-        [status, productId]
-      );
+      await existingProduct.update({
+        TrangThai: status,
+        NgayCapNhat: new Date(),
+      });
 
       return {
         success: true,
         message: status === 1 ? "Đã kích hoạt sản phẩm" : "Đã ẩn sản phẩm",
-        productName: existingProduct[0].Ten,
+        productName: existingProduct.Ten,
         newStatus: status,
       };
     } catch (error) {
@@ -885,35 +1037,39 @@ class ProductService {
 
   async getAllColors() {
     try {
-      const [colors] = await db.execute(
-        "SELECT id, Ten as Ten, MaMau FROM mausac ORDER BY id ASC"
-      );
+      const colors = await Color.findAll({
+        attributes: ["id", "Ten", "MaMau"],
+        order: [["id", "ASC"]],
+      });
       return colors;
     } catch (error) {
       console.error("Error getting colors:", error);
       throw new Error("Không thể lấy danh sách màu sắc");
     }
   }
+
   async getColorById(colorId) {
     try {
-      const [color] = await db.execute(
-        "SELECT id, Ten as Ten, MaMau FROM mausac WHERE id = ?",
-        [colorId]
-      );
-      if (color.length === 0) {
+      const color = await Color.findByPk(colorId, {
+        attributes: ["id", "Ten", "MaMau"],
+      });
+
+      if (!color) {
         throw new Error("Màu sắc không tồn tại");
       }
-      return color[0];
+      return color;
     } catch (error) {
       console.error("Error getting color by ID:", error);
       throw new Error("Không thể lấy thông tin màu sắc");
     }
   }
+
   async getAllSizes() {
     try {
-      const [sizes] = await db.execute(
-        "SELECT id, Ten FROM kichco ORDER BY CAST(Ten AS UNSIGNED) ASC"
-      );
+      const sizes = await Size.findAll({
+        attributes: ["id", "Ten"],
+        order: [[sequelize.cast(sequelize.col("Ten"), "UNSIGNED"), "ASC"]],
+      });
       return sizes;
     } catch (error) {
       console.error("Error getting sizes:", error);
@@ -924,13 +1080,10 @@ class ProductService {
   async createColor(colorData) {
     try {
       const { Ten, MaMau } = colorData;
-      const [result] = await db.execute(
-        "INSERT INTO mausac (Ten, MaMau) VALUES (?, ?)",
-        [Ten, MaMau]
-      );
+      const newColor = await Color.create({ Ten, MaMau });
 
       return {
-        id: result.insertId,
+        id: newColor.id,
         message: "Thêm màu sắc thành công",
       };
     } catch (error) {
@@ -942,12 +1095,10 @@ class ProductService {
   async createSize(sizeData) {
     try {
       const { Ten } = sizeData;
-      const [result] = await db.execute("INSERT INTO kichco (Ten) VALUES (?)", [
-        Ten,
-      ]);
+      const newSize = await Size.create({ Ten });
 
       return {
-        id: result.insertId,
+        id: newSize.id,
         message: "Thêm kích cỡ thành công",
       };
     } catch (error) {
@@ -959,11 +1110,7 @@ class ProductService {
   async updateColor(colorId, colorData) {
     try {
       const { Ten, MaMau } = colorData;
-      await db.execute("UPDATE mausac SET Ten = ?, MaMau = ? WHERE id = ?", [
-        Ten,
-        MaMau,
-        colorId,
-      ]);
+      await Color.update({ Ten, MaMau }, { where: { id: colorId } });
 
       return {
         message: "Cập nhật màu sắc thành công",
@@ -977,7 +1124,7 @@ class ProductService {
   async updateSize(sizeId, sizeData) {
     try {
       const { Ten } = sizeData;
-      await db.execute("UPDATE kichco SET Ten = ? WHERE id = ?", [Ten, sizeId]);
+      await Size.update({ Ten }, { where: { id: sizeId } });
 
       return {
         message: "Cập nhật kích cỡ thành công",
@@ -991,18 +1138,17 @@ class ProductService {
   async deleteColor(colorId) {
     try {
       // Kiểm tra xem màu sắc có được sử dụng trong sản phẩm hay không
-      const [usage] = await db.execute(
-        "SELECT COUNT(*) as count FROM chitietsanpham WHERE id_MauSac = ?",
-        [colorId]
-      );
+      const usage = await ProductDetail.count({
+        where: { id_MauSac: colorId },
+      });
 
-      if (usage[0].count > 0) {
+      if (usage > 0) {
         throw new Error(
           "Không thể xóa màu sắc này vì đang được sử dụng trong sản phẩm"
         );
       }
 
-      await db.execute("DELETE FROM mausac WHERE id = ?", [colorId]);
+      await Color.destroy({ where: { id: colorId } });
 
       return {
         message: "Xóa màu sắc thành công",
@@ -1016,18 +1162,17 @@ class ProductService {
   async deleteSize(sizeId) {
     try {
       // Kiểm tra xem kích cỡ có được sử dụng trong sản phẩm hay không
-      const [usage] = await db.execute(
-        "SELECT COUNT(*) as count FROM chitietsanpham WHERE id_KichCo = ?",
-        [sizeId]
-      );
+      const usage = await ProductDetail.count({
+        where: { id_KichCo: sizeId },
+      });
 
-      if (usage[0].count > 0) {
+      if (usage > 0) {
         throw new Error(
           "Không thể xóa kích cỡ này vì đang được sử dụng trong sản phẩm"
         );
       }
 
-      await db.execute("DELETE FROM kichco WHERE id = ?", [sizeId]);
+      await Size.destroy({ where: { id: sizeId } });
 
       return {
         message: "Xóa kích cỡ thành công",
@@ -1040,51 +1185,110 @@ class ProductService {
 
   async getProductVariants(productId) {
     // Lấy danh sách biến thể của sản phẩm theo productId
-    const [variants] = await db.execute(
-      `SELECT ctsp.*, kc.Ten as tenKichCo, ms.Ten as tenMauSac
-       FROM chitietsanpham ctsp
-       JOIN kichco kc ON ctsp.id_KichCo = kc.id
-       JOIN mausac ms ON ctsp.id_MauSac = ms.id
-       WHERE ctsp.id_SanPham = ?`,
-      [productId]
-    );
-    return variants;
+    const variants = await ProductDetail.findAll({
+      where: { id_SanPham: productId },
+      include: [
+        {
+          model: Size,
+          as: "size",
+          attributes: ["id", "Ten"],
+        },
+        {
+          model: Color,
+          as: "color",
+          attributes: ["id", "Ten", "MaMau"],
+        },
+      ],
+    });
+
+    return variants.map((variant) => {
+      const variantData = variant.toJSON();
+      variantData.tenKichCo = variantData.size?.Ten;
+      variantData.tenMauSac = variantData.color?.Ten;
+      return variantData;
+    });
   }
 
-  // Lấy tồn kho real-time cho biến thể sản phẩm
+  // Lấy tồn kho real-time cho biến thể sản phẩm bằng Sequelize
   async getProductStockInfo(productId) {
     try {
-      const [stockInfo] = await db.execute(
-        `SELECT 
-          cts.id,
-          cts.MaSanPham,
-          sp.Ten as TenSanPham,
-          kc.Ten as TenKichCo,
-          ms.Ten as TenMauSac,
-          -- Sử dụng function tính tồn kho real-time
-          fn_TinhTonKhoRealTime(cts.id) as TonKhoThucTe,
-          -- Tính số lượng đang chờ xác nhận
-          COALESCE(cho.TongCho, 0) as SoLuongDangCho,
-          -- Tồn kho có thể bán = Tồn kho - Đang chờ
-          GREATEST(0, fn_TinhTonKhoRealTime(cts.id) - COALESCE(cho.TongCho, 0)) as CoTheBan
-        FROM chitietsanpham cts
-        JOIN sanpham sp ON cts.id_SanPham = sp.id
-        JOIN kichco kc ON cts.id_KichCo = kc.id
-        JOIN mausac ms ON cts.id_MauSac = ms.id
-        
-        -- Tính số lượng đang chờ xác nhận
-        LEFT JOIN (
-          SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
-          FROM chitietdonhang ctdh
-          JOIN donhang dh ON ctdh.id_DonHang = dh.id
-          WHERE dh.TrangThai = 1
-          GROUP BY ctdh.id_ChiTietSanPham
-        ) cho ON cts.id = cho.id_ChiTietSanPham
-        
-        WHERE cts.id_SanPham = ?
-        ORDER BY kc.Ten, ms.Ten`,
-        [productId]
-      );
+      const productDetails = await ProductDetail.findAll({
+        where: { id_SanPham: productId },
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["Ten"],
+          },
+          {
+            model: Size,
+            as: "size",
+            attributes: ["Ten"],
+          },
+          {
+            model: Color,
+            as: "color",
+            attributes: ["Ten", "MaMau"],
+          },
+        ],
+      });
+
+      const stockInfo = [];
+
+      for (const variant of productDetails) {
+        // Tính tổng số lượng nhập
+        const totalImported =
+          (await ImportReceiptDetail.sum("SoLuong", {
+            where: { id_ChiTietSanPham: variant.id },
+            include: [
+              {
+                model: ImportReceipt,
+                as: "importReceipt",
+                where: { TrangThai: 2 },
+              },
+            ],
+          })) || 0;
+
+        // Tính tổng số lượng đã bán
+        const totalSold =
+          (await OrderDetail.sum("SoLuong", {
+            where: { id_ChiTietSanPham: variant.id },
+            include: [
+              {
+                model: Order,
+                as: "order",
+                where: { TrangThai: 4 },
+              },
+            ],
+          })) || 0;
+
+        // Tính số lượng đang chờ
+        const pendingOrders =
+          (await OrderDetail.sum("SoLuong", {
+            where: { id_ChiTietSanPham: variant.id },
+            include: [
+              {
+                model: Order,
+                as: "order",
+                where: { TrangThai: 1 },
+              },
+            ],
+          })) || 0;
+
+        const realStock = Math.max(0, totalImported - totalSold);
+        const availableStock = Math.max(0, realStock - pendingOrders);
+
+        stockInfo.push({
+          id: variant.id,
+          MaSanPham: variant.MaSanPham,
+          TenSanPham: variant.product.Ten,
+          TenKichCo: variant.size.Ten,
+          TenMauSac: variant.color.Ten,
+          TonKhoThucTe: realStock,
+          SoLuongDangCho: pendingOrders,
+          CoTheBan: availableStock,
+        });
+      }
 
       return {
         success: true,
@@ -1097,63 +1301,93 @@ class ProductService {
     }
   }
 
-  // Kiểm tra tồn kho trước khi đặt hàng - DÙNG REAL-TIME
+  // Kiểm tra tồn kho trước khi đặt hàng bằng Sequelize
   async checkStockBeforeOrder(productVariantId, requestedQuantity) {
     try {
-      const [stockCheck] = await db.execute(
-        `SELECT 
-          cts.id,
-          cts.MaSanPham,
-          sp.Ten as TenSanPham,
-          kc.Ten as TenKichCo,
-          ms.Ten as TenMauSac,
-          -- Sử dụng function tính tồn kho real-time
-          fn_TinhTonKhoRealTime(cts.id) as TonKhoThucTe,
-          -- Sử dụng function kiểm tra có thể bán
-          fn_CoTheBan(cts.id, ?) as CoTheBan,
-          -- Tính số lượng đang chờ xác nhận
-          COALESCE(cho.TongCho, 0) as SoLuongDangCho
-        FROM chitietsanpham cts
-        JOIN sanpham sp ON cts.id_SanPham = sp.id
-        JOIN kichco kc ON cts.id_KichCo = kc.id
-        JOIN mausac ms ON cts.id_MauSac = ms.id
-        
-        -- Tính số lượng đang chờ xác nhận
-        LEFT JOIN (
-          SELECT ctdh.id_ChiTietSanPham, SUM(ctdh.SoLuong) as TongCho
-          FROM chitietdonhang ctdh
-          JOIN donhang dh ON ctdh.id_DonHang = dh.id
-          WHERE dh.TrangThai = 1
-          GROUP BY ctdh.id_ChiTietSanPham
-        ) cho ON cts.id = cho.id_ChiTietSanPham
-        
-        WHERE cts.id = ?`,
-        [requestedQuantity, productVariantId]
-      );
+      const variant = await ProductDetail.findByPk(productVariantId, {
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["Ten"],
+          },
+          {
+            model: Size,
+            as: "size",
+            attributes: ["Ten"],
+          },
+          {
+            model: Color,
+            as: "color",
+            attributes: ["Ten"],
+          },
+        ],
+      });
 
-      if (stockCheck.length === 0) {
+      if (!variant) {
         throw new Error("Biến thể sản phẩm không tồn tại");
       }
 
-      const product = stockCheck[0];
-      const canSell = product.CoTheBan === 1;
+      // Tính tổng số lượng nhập
+      const totalImported =
+        (await ImportReceiptDetail.sum("SoLuong", {
+          where: { id_ChiTietSanPham: productVariantId },
+          include: [
+            {
+              model: ImportReceipt,
+              as: "importReceipt",
+              where: { TrangThai: 2 },
+            },
+          ],
+        })) || 0;
+
+      // Tính tổng số lượng đã bán
+      const totalSold =
+        (await OrderDetail.sum("SoLuong", {
+          where: { id_ChiTietSanPham: productVariantId },
+          include: [
+            {
+              model: Order,
+              as: "order",
+              where: { TrangThai: 4 },
+            },
+          ],
+        })) || 0;
+
+      // Tính số lượng đang chờ
+      const pendingOrders =
+        (await OrderDetail.sum("SoLuong", {
+          where: { id_ChiTietSanPham: productVariantId },
+          include: [
+            {
+              model: Order,
+              as: "order",
+              where: { TrangThai: 1 },
+            },
+          ],
+        })) || 0;
+
+      const realStock = Math.max(0, totalImported - totalSold);
+      const availableStock = Math.max(0, realStock - pendingOrders);
+      const canSell = availableStock >= requestedQuantity;
 
       return {
         success: true,
         data: {
-          id_ChiTietSanPham: product.id,
-          TenSanPham: product.TenSanPham,
-          MaSanPham: product.MaSanPham,
-          KichCo: product.TenKichCo,
-          MauSac: product.TenMauSac,
-          TonKhoThucTe: product.TonKhoThucTe,
+          id_ChiTietSanPham: variant.id,
+          TenSanPham: variant.product.Ten,
+          MaSanPham: variant.MaSanPham,
+          KichCo: variant.size.Ten,
+          MauSac: variant.color.Ten,
+          TonKhoThucTe: realStock,
           SoLuongCanKiem: requestedQuantity,
-          SoLuongDangCho: product.SoLuongDangCho,
+          SoLuongDangCho: pendingOrders,
+          SoLuongCoTheBan: availableStock,
           CoTheBan: canSell,
           isAvailable: canSell,
           message: canSell
             ? "Có thể đặt hàng"
-            : `Không đủ hàng. Tồn kho: ${product.TonKhoThucTe}, Đang chờ: ${product.SoLuongDangCho}`,
+            : `Không đủ hàng. Tồn kho: ${realStock}, Đang chờ: ${pendingOrders}, Còn lại: ${availableStock}`,
         },
       };
     } catch (error) {
@@ -1161,6 +1395,66 @@ class ProductService {
       throw new Error("Không thể kiểm tra tồn kho: " + error.message);
     }
   }
+
+  // Thêm method để lấy tồn kho đơn giản cho một variant
+  async getVariantStock(variantId) {
+    try {
+      // Tính tổng số lượng nhập
+      const totalImported =
+        (await ImportReceiptDetail.sum("SoLuong", {
+          where: { id_ChiTietSanPham: variantId },
+          include: [
+            {
+              model: ImportReceipt,
+              as: "importReceipt",
+              where: { TrangThai: 2 },
+            },
+          ],
+        })) || 0;
+
+      // Tính tổng số lượng đã bán
+      const totalSold =
+        (await OrderDetail.sum("SoLuong", {
+          where: { id_ChiTietSanPham: variantId },
+          include: [
+            {
+              model: Order,
+              as: "order",
+              where: { TrangThai: 4 },
+            },
+          ],
+        })) || 0;
+
+      // Tính số lượng đang chờ
+      const pendingOrders =
+        (await OrderDetail.sum("SoLuong", {
+          where: { id_ChiTietSanPham: variantId },
+          include: [
+            {
+              model: Order,
+              as: "order",
+              where: { TrangThai: 1 },
+            },
+          ],
+        })) || 0;
+
+      const realStock = Math.max(0, totalImported - totalSold);
+      const availableStock = Math.max(0, realStock - pendingOrders);
+
+      return {
+        totalImported,
+        totalSold,
+        pendingOrders,
+        realStock,
+        availableStock,
+      };
+    } catch (error) {
+      console.error("Error getting variant stock:", error);
+      throw new Error("Không thể lấy tồn kho variant: " + error.message);
+    }
+  }
+
+  // ...existing code...
 }
 
 module.exports = new ProductService();

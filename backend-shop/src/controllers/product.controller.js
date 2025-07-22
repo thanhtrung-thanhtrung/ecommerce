@@ -50,12 +50,23 @@ class ProductController {
       }
 
       const { productId } = req.params;
-      const product = await productService.getProductDetail(
-        parseInt(productId)
-      );
+
+      // Đảm bảo productId là số hợp lệ
+      const id = parseInt(productId);
+      if (isNaN(id) || id <= 0) {
+        return res.status(400).json({
+          message: "ID sản phẩm không hợp lệ",
+        });
+      }
+
+      const product = await productService.getProductDetail(id);
       res.json(product);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error("Error in getProductDetail controller:", error);
+      if (error.message.includes("không tồn tại")) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message });
     }
   }
 
@@ -232,7 +243,7 @@ class ProductController {
         // Tạo đối tượng hình ảnh
         productData.hinhAnh = {};
 
-        // Khi sử dụng upload.any(), req.files là một mảng đối tượng file
+        // Xử lý file upload với cấu trúc mới
         const anhChinhFiles = req.files.filter(
           (file) =>
             file.fieldname === "hinhAnh.anhChinh" ||
@@ -276,7 +287,7 @@ class ProductController {
                 {
                   type: "field",
                   value: productData.bienThe,
-                  msg: "Biến thể sản phẩm phải ở định dạng JSON hợp lệ",
+                  msg: "Biến thể phải ở định dạng JSON hợp lệ",
                   path: "bienThe",
                   location: "body",
                 },
@@ -287,18 +298,6 @@ class ProductController {
           // Nếu không phải chuỗi và không phải mảng
           if (typeof productData.bienThe === "object") {
             productData.bienThe = [productData.bienThe];
-          } else {
-            return res.status(400).json({
-              errors: [
-                {
-                  type: "field",
-                  value: productData.bienThe,
-                  msg: "Biến thể sản phẩm phải là mảng hợp lệ",
-                  path: "bienThe",
-                  location: "body",
-                },
-              ],
-            });
           }
         }
       }
@@ -330,7 +329,7 @@ class ProductController {
       }
 
       const result = await productService.updateProduct(
-        id,
+        parseInt(id), // Đảm bảo chuyển đổi thành số nguyên
         productData,
         userId
       );
@@ -355,20 +354,21 @@ class ProductController {
       res.json(result);
     } catch (error) {
       console.error("Error in deleteProduct controller:", error);
-      
+
       // Kiểm tra loại lỗi để trả về status code phù hợp
       if (error.message.includes("không tồn tại")) {
         return res.status(404).json({ message: error.message });
       }
-      
+
       if (error.message.includes("đã có khách hàng mua")) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: error.message,
           cannotDelete: true,
-          suggestion: "Bạn có thể ẩn sản phẩm bằng cách đổi trạng thái thành 'Ngừng bán'"
+          suggestion:
+            "Bạn có thể ẩn sản phẩm bằng cách đổi trạng thái thành 'Ngừng bán'",
         });
       }
-      
+
       res.status(500).json({ message: error.message });
     }
   }
@@ -393,9 +393,6 @@ class ProductController {
       res.status(400).json({ message: error.message });
     }
   }
-
-
-  
 
   // Cập nhật trạng thái sản phẩm (admin)
   async updateProductStatus(req, res) {
@@ -501,10 +498,10 @@ class ProductController {
   async createColor(req, res) {
     try {
       const { Ten, MaMau } = req.body;
-      
+
       if (!Ten || !MaMau) {
-        return res.status(400).json({ 
-          message: "Tên màu và mã màu là bắt buộc" 
+        return res.status(400).json({
+          message: "Tên màu và mã màu là bắt buộc",
         });
       }
 
@@ -520,10 +517,10 @@ class ProductController {
   async createSize(req, res) {
     try {
       const { Ten } = req.body;
-      
+
       if (!Ten) {
-        return res.status(400).json({ 
-          message: "Tên kích cỡ là bắt buộc" 
+        return res.status(400).json({
+          message: "Tên kích cỡ là bắt buộc",
         });
       }
 
@@ -540,10 +537,10 @@ class ProductController {
     try {
       const { id } = req.params;
       const { Ten, MaMau } = req.body;
-      
+
       if (!Ten || !MaMau) {
-        return res.status(400).json({ 
-          message: "Tên màu và mã màu là bắt buộc" 
+        return res.status(400).json({
+          message: "Tên màu và mã màu là bắt buộc",
         });
       }
 
@@ -555,16 +552,15 @@ class ProductController {
     }
   }
 
-
   async getColorById(req, res) {
-    try { 
+    try {
       const { id } = req.params;
-      const color = await productService.getColorById(id);  
+      const color = await productService.getColorById(id);
       if (!color) {
         return res.status(404).json({ message: "Màu sắc không tồn tại" });
       }
       res.json(color);
-    } catch (error) { 
+    } catch (error) {
       console.error("Error getting color by ID:", error);
       res.status(500).json({ message: error.message });
     }
@@ -575,10 +571,10 @@ class ProductController {
     try {
       const { id } = req.params;
       const { Ten } = req.body;
-      
+
       if (!Ten) {
-        return res.status(400).json({ 
-          message: "Tên kích cỡ là bắt buộc" 
+        return res.status(400).json({
+          message: "Tên kích cỡ là bắt buộc",
         });
       }
 

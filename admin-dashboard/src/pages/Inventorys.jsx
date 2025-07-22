@@ -229,7 +229,21 @@ const Inventorys = () => {
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap">
                                         <div className="text-xs font-medium text-gray-900">{item.TenSanPham}</div>
-                                        <div className="text-xs text-gray-500">{item.MaSanPham}</div>
+                                        <div className="text-xs text-gray-500">
+                                            Mã  : {item.id}</div>
+                                    </td>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        <div className="text-xs font-medium text-gray-900">{item.TenSanPham}</div>
+                                        <div className="text-xs text-gray-500">
+
+                                            <img
+                                                src={JSON.parse(item.HinhAnh).anhChinh}
+                                                alt={item.TenSanPham}
+                                                className="w-8 h-8 rounded"
+                                            />
+
+                                        </div>
+
                                     </td>
                                     <td className="px-3 py-2 whitespace-nowrap">
                                         <div className="text-xs text-gray-900">{item.TenThuongHieu}</div>

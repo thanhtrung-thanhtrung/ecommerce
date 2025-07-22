@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 19, 2025 at 11:19 AM
+-- Generation Time: Jul 22, 2025 at 08:23 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -132,12 +132,8 @@ CREATE TABLE `chitietdonhang` (
 --
 
 INSERT INTO `chitietdonhang` (`id`, `id_DonHang`, `id_ChiTietSanPham`, `SoLuong`, `GiaBan`, `ThanhTien`) VALUES
-(81, 74, 410, 5, 2200000.00, 11000000.00),
-(82, 75, 423, 10, 2200000.00, 22000000.00),
-(83, 75, 410, 1, 2200000.00, 2200000.00),
-(84, 76, 411, 1, 750000.00, 750000.00),
-(85, 77, 411, 1, 750000.00, 750000.00),
-(86, 78, 421, 1, 2200000.00, 2200000.00);
+(137, 129, 425, 2, 2200000.00, 4400000.00),
+(138, 129, 421, 1, 2200000.00, 2200000.00);
 
 -- --------------------------------------------------------
 
@@ -199,12 +195,12 @@ INSERT INTO `chitietsanpham` (`id`, `id_SanPham`, `id_KichCo`, `id_MauSac`, `MaS
 (417, 149, 3, 2, 'PUMA-TRANG-38'),
 (418, 152, 6, 2, 'NIKE-ZOOM-TRANG-41'),
 (419, 151, 6, 7, 'TIMBERLAND-VANG-41'),
-(420, 150, 5, 12, 'NIKE-NAVY-40'),
 (421, 153, 5, 1, 'NIKE-DEN-40'),
 (422, 153, 4, 10, 'NIKEE-NÂU-39-4942'),
 (423, 153, 5, 6, 'NIKEE-XÁM-40-1733'),
 (424, 153, 7, 6, 'NIKEE-XÁM-42-2062'),
-(425, 153, 8, 8, 'NIKEE-CAM-43-6933');
+(425, 153, 8, 8, 'NIKEE-CAM-43-6933'),
+(434, 164, 11, 1, 'MD23');
 
 -- --------------------------------------------------------
 
@@ -248,9 +244,9 @@ INSERT INTO `danhmuc` (`id`, `Ten`, `id_DanhMucCha`, `MoTa`, `TrangThai`) VALUES
 (3, 'Giày Thể Thao', NULL, 'Giày thể thao đsdasda năng', 1),
 (4, 'Giày Chạy Bộ', 3, 'Giày chuyên dụng cho chạy bộ', 1),
 (6, 'Giày Bóng Rổa', 3, 'Giày chuyên dụng cho bóng rổ', 1),
-(7, 'Giày Lifestyle', NULL, 'Giày thời trang hàng ngày', 1),
-(41, 'Giày cổ cao', NULL, NULL, 1),
-(43, 'Giày Leo Núi', NULL, NULL, 1);
+(7, 'Giày Lifestyle', NULL, 'Giày thời trang hàng ngày', 0),
+(41, 'Giày cổ cao', NULL, NULL, 0),
+(43, 'Giày Leo Núi', NULL, NULL, 0);
 
 -- --------------------------------------------------------
 
@@ -288,11 +284,7 @@ CREATE TABLE `donhang` (
 --
 
 INSERT INTO `donhang` (`id`, `MaDonHang`, `id_NguoiMua`, `session_id`, `TenNguoiNhan`, `SDTNguoiNhan`, `DiaChiNhan`, `TongTienHang`, `PhiVanChuyen`, `GiamGia`, `TongThanhToan`, `MaGiamGia`, `GhiChu`, `id_ThanhToan`, `id_VanChuyen`, `TrangThai`, `TrangThaiThanhToan`, `ThoiGianThanhToan`, `NgayDatHang`, `NgayCapNhat`, `EmailNguoiNhan`, `LyDoHuy`) VALUES
-(74, 'DH250718-74', 50, NULL, 'chun chunadđghjkg', '0798355784', 'Nguyễn Văn Tạo, Xã Tiên Sơn, Huyện Tiên Phước, Quảng Nam', 11000000.00, 123000.00, 100000.00, 11123000.00, 'VOUCHER1752823319410', 'hai ba bon nam sau bay', 1, 16, 4, 0, NULL, '2025-07-18 20:45:03', '2025-07-18 20:51:55', 'thanhtrung3010xsw@gmail.com', NULL),
-(75, 'DH250718-75', NULL, 'si8N3kZHC4NDoinhQAjRW1CnKi0p_VwF', 'thanh trung', '0798355780', 'nha be than yeu , Xã Tiến Thắng, Huyện Lý Nhân, Hà Nam', 24200000.00, 0.00, 100000.00, 24100000.00, 'VOUCHER1752823319410', NULL, 1, 4, 4, 0, NULL, '2025-07-18 20:50:55', '2025-07-18 20:51:47', 'thanhtrung3010xsw@gmail.com', NULL),
-(76, 'DH250718-76', NULL, 'si8N3kZHC4NDoinhQAjRW1CnKi0p_VwF', 'thanh trung', '0798355780', 'nha be than yeu , Xã Ia RSươm, Huyện Krông Pa, Gia Lai', 750000.00, 0.00, 0.00, 750000.00, NULL, NULL, 1, 4, 1, 0, NULL, '2025-07-18 20:55:56', '2025-07-18 20:55:56', 'thanhtrung3010xsw@gmail.com', NULL),
-(77, 'DH250718-77', NULL, 'si8N3kZHC4NDoinhQAjRW1CnKi0p_VwF', 'thanh trung', '0798355785', 'dsssssssssssssssssssssssssssss, Xã Khánh Thuận, Huyện U Minh, Cà Mau', 750000.00, 50000.00, 0.00, 800000.00, NULL, 'ssd', 7, 16, 1, 0, NULL, '2025-07-18 20:59:02', '2025-07-19 14:37:39', 'thanhtrung3010xsw@gmail.com', NULL),
-(78, 'DH250719-78', NULL, '5duOIl1NVfR0L42D02vBul6aQFLQ74iR', 'thanh trung', '0798355780', 'nha be than yeu , Thị trấn Long Điền, Huyện Long Điền, Bà Rịa - Vũng Tàu', 2200000.00, 100000.00, 0.00, 2300000.00, NULL, '12345678', 1, 16, 1, 0, NULL, '2025-07-19 14:56:12', '2025-07-19 14:56:12', 'thanhtrung3010xsw@gmail.com', NULL);
+(129, 'DH250721-129', 50, NULL, 'chun chunadđghjkg', '0798355784', 'nha be á nha, Xã Hàm Rồng, Huyện Năm Căn, Cà Mau', 6600000.00, 100000.00, 0.00, 6700000.00, NULL, 'hai ba bon nam sau', 7, 16, 4, 1, '2025-07-21 17:48:10', '2025-07-21 17:47:36', '2025-07-21 17:48:53', 'thanhtrung3010xsw@gmail.com', NULL);
 
 --
 -- Triggers `donhang`
@@ -413,7 +405,19 @@ INSERT INTO `giohang` (`id`, `id_NguoiDung`, `session_id`, `id_ChiTietSanPham`, 
 (188, NULL, 'si8N3kZHC4NDoinhQAjRW1CnKi0p_VwF', 411, 1, '2025-07-18 20:59:37'),
 (190, NULL, 'uGIZJa3zB05n46aP1zNzD-eCsrIhQ44Z', 421, 1, '2025-07-19 15:02:13'),
 (191, NULL, 'MBjXHXza17Fypz5AlOWRSG6DODMP3fk8', 410, 1, '2025-07-19 15:08:45'),
-(192, NULL, 'GCF-K2tY0prhMjdcl9JySzlg0GUP0f96', 410, 1, '2025-07-19 15:12:54');
+(192, NULL, 'GCF-K2tY0prhMjdcl9JySzlg0GUP0f96', 410, 1, '2025-07-19 15:12:54'),
+(201, NULL, 'USYr44nAQCa_I3ag8iVjV8jMDi5sLPvD', 421, 1, '2025-07-20 09:00:45'),
+(202, NULL, 'wZ7ZD6dPEc6hFy0cfr_UVUr0wVIOgSvv', 421, 1, '2025-07-20 09:07:21'),
+(204, NULL, '9YUedP8V8KBWk5kYShpVx-lcNIVBaD5g', 421, 1, '2025-07-20 09:30:01'),
+(206, NULL, '8Xjs4vRXBvqrW1h1haK_VutKC1Wk7Zux', 421, 1, '2025-07-20 09:35:46'),
+(207, NULL, '8Xjs4vRXBvqrW1h1haK_VutKC1Wk7Zux', 422, 1, '2025-07-20 09:35:51'),
+(208, NULL, '8Xjs4vRXBvqrW1h1haK_VutKC1Wk7Zux', 425, 1, '2025-07-20 09:35:57'),
+(210, NULL, 'H1MkkRlMv9gxAR1Ae4MGHzUAz-F-SX_l', 421, 6, '2025-07-20 09:45:09'),
+(211, NULL, 'HMAa705pU-l_nlCtywY0aJIs9-9H0gzO', 421, 6, '2025-07-20 09:47:30'),
+(254, NULL, 'WeIOYYo4LQTTkyp7L-zT_UeOKspwKz96', 412, 3, '2025-07-21 13:11:06'),
+(255, NULL, 'GcpSZxw1ubtOemfuNB7yQjyDphITVaBk', 410, 4, '2025-07-21 13:14:08'),
+(257, NULL, 'wjvi0Nzr1E4yDKF-N2Rkr8q2ieFL8WdR', 410, 1, '2025-07-22 09:39:45'),
+(258, NULL, 'cWns6f2tP8OoVCI6-KFp_qja5hLmPqml', 412, 1, '2025-07-22 12:11:52');
 
 -- --------------------------------------------------------
 
@@ -758,16 +762,17 @@ CREATE TABLE `sanpham` (
 --
 
 INSERT INTO `sanpham` (`id`, `Ten`, `MoTa`, `MoTaChiTiet`, `ThongSoKyThuat`, `Gia`, `GiaKhuyenMai`, `SoLuongDaBan`, `id_DanhMuc`, `id_ThuongHieu`, `id_NhaCungCap`, `HinhAnh`, `TrangThai`, `NgayTao`, `NgayCapNhat`) VALUES
-(144, 'Giày Thể Thao Nike Air Max 2023', 'Giày thể thao cao cấp với công nghệ đệm khí', 'Giày thể thao Nike Air Max 2023 được thiết kế với công nghệ đệm khí tiên tiến, mang lại cảm giác thoải mái và hỗ trợ tốt cho chân khi vận động. Phần upper làm từ vải mesh thoáng khí giúp giảm thiểu mồ hôi và mùi hôi.', '{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}', 2500000.00, 2200000.00, 17, 1, 53, 1, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841505/shoes_shop/products/x78zqg44xygy3lgsp155.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/x78zqg44xygy3lgsp155\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841509/shoes_shop/products/kxefeaqnggcgdgtvvgz7.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841512/shoes_shop/products/ecqjeyufickblb06rbzx.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/kxefeaqnggcgdgtvvgz7\",\"shoes_shop/products/ecqjeyufickblb06rbzx\"]}', 1, '2025-06-16 19:50:31', '2025-07-18 20:51:55'),
-(145, 'Giày Bitis Hunter X', 'Giày thể thao quốc dân Việt Nam', '\"Bitis Hunter X với giá hợp lý, thiết kế trẻ trung, phù hợp học sinh, sinh viên...\"', '{\"ChatLieu\":\"Vải lưới, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Việt Nam\"}', 800000.00, 750000.00, 131, 4, 7, 36, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750080727/shoes_shop/products/gdepwxbpyqa2mqv5pqrp.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/gdepwxbpyqa2mqv5pqrp\"}', 1, '2025-06-16 20:32:09', '2025-07-18 19:27:58'),
+(144, 'Giày Thể Thao Nike Air Max 2023', 'Giày thể thao cao cấp với công nghệ đệm khí', 'Giày thể thao Nike Air Max 2023 được thiết kế với công nghệ đệm khí tiên tiến, mang lại cảm giác thoải mái và hỗ trợ tốt cho chân khi vận động. Phần upper làm từ vải mesh thoáng khí giúp giảm thiểu mồ hôi và mùi hôi.', '{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}', 2500000.00, 2200000.00, 21, 1, 53, 1, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841505/shoes_shop/products/x78zqg44xygy3lgsp155.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/x78zqg44xygy3lgsp155\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841509/shoes_shop/products/kxefeaqnggcgdgtvvgz7.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841512/shoes_shop/products/ecqjeyufickblb06rbzx.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/kxefeaqnggcgdgtvvgz7\",\"shoes_shop/products/ecqjeyufickblb06rbzx\"]}', 1, '2025-06-16 19:50:31', '2025-07-21 11:18:15'),
+(145, 'Giày Bitis Hunter X', 'Giày thể thao quốc dân Việt Nam', '\"Bitis Hunter X với giá hợp lý, thiết kế trẻ trung, phù hợp học sinh, sinh viên...\"', '{\"ChatLieu\":\"Vải lưới, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Việt Nam\"}', 800000.00, 750000.00, 135, 4, 7, 36, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844683/shoes_shop/products/mltithr1fq2vj37du3na.jpg\"}', 1, '2025-06-16 20:32:09', '2025-07-21 11:18:19'),
 (146, 'Giày Nike Jordan 1 Retro', 'Nike Jordan 1 Retro kết hợp thiết kế cổ điển và chất liệu cao cấp, tạo nên dấu ấn riêng...', '\"ChatLieu\": \"Da thật, cao su\",\r\n      \"KieuGiay\": \"Bóng rổ\",\r\n      \"XuatXu\": \"Chính hãng\"', '{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}', 3899999.00, 3699999.00, 71, 6, 53, 1, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841915/shoes_shop/products/j5oy1hk1fov8cxgt5euy.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/j5oy1hk1fov8cxgt5euy\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841918/shoes_shop/products/sx5vx6p2fry2kjfejghf.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752841921/shoes_shop/products/gktypkvlkvjlpd7yebkt.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/sx5vx6p2fry2kjfejghf\",\"shoes_shop/products/gktypkvlkvjlpd7yebkt\"]}', 1, '2025-06-16 20:44:41', '2025-07-18 19:32:02'),
 (147, 'Giày New Balance 574', 'Thương hiệu chạy bộ biểu tượng', 'New Balance 574 nổi bật với thiết kế retro và phần đệm EVA êm ái...', '{\"ChatLieu\":\"Vải mesh, da lộn\",\"KieuGiay\":\"Chạy bộ\",\"XuatXu\":\"Chính hãng\"}', 2300000.00, 2100000.00, 10, 4, 3, 4, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750081624/shoes_shop/products/r5octfh1ltmhn71p9xya.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/r5octfh1ltmhn71p9xya\"}', 1, '2025-06-16 20:47:05', '2025-07-18 19:33:46'),
 (148, 'Giày Leo Núi MERRELL Moab 2 Ventilator', 'Bền bỉ, thoáng khí, phù hợp mọi địa hình', 'MERRELL Moab 2 Ventilator là dòng giày trekking kinh điển, nổi bật với lớp lưới thoáng khí, chất liệu da lộn cao cấp và đế Vibram chống trượt vượt trội. Thiết kế phù hợp cho người leo núi, dã ngoại hoặc di chuyển nhiều ngày dài.', '{\"ChatLieu\":\"Lưới tổng hợp, da lộn\",\"KieuGiay\":\"Leo núi / Dã ngoại\",\"XuatXu\":\"Chính hãng - Mỹ\"}', 3200000.00, 2850000.00, 4, 43, 7, 36, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752842385/shoes_shop/products/cfr9kfmo5ws728dr2wuc.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/cfr9kfmo5ws728dr2wuc\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752842388/shoes_shop/products/toumgokuba1lgcqpxffi.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752842391/shoes_shop/products/hi9woes08wfq1unqxuqg.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752842393/shoes_shop/products/pusgk4dxlgiqoouuvgpz.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/toumgokuba1lgcqpxffi\",\"shoes_shop/products/hi9woes08wfq1unqxuqg\",\"shoes_shop/products/pusgk4dxlgiqoouuvgpz\"]}', 1, '2025-06-16 20:52:48', '2025-07-18 19:39:54'),
 (149, 'Giày Puma Casual', 'Giày thể thao phong cách đường phố', 'Thiết kế hiện đại, nhẹ nhàng, phù hợp cho lối sống năng động và phối đồ hàng ngày, đi đâu cũng được.', '{\"ChatLieu\":\"Chất liệu da tổng hợp, cao su\",\"KieuGiay\":\"Kiểu giày thể thao\",\"XuatXu\":\"Chính hãng\"}', 1700000.00, 1500000.00, 0, 2, 3, 3, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750381315/shoes_shop/products/upoj3ohzdhchtpu95twm.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/upoj3ohzdhchtpu95twm\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750381317/shoes_shop/products/rjlczmz5qwsuokuaglx7.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750381322/shoes_shop/products/czkbmnjxukja3gkjqwtd.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/rjlczmz5qwsuokuaglx7\",\"shoes_shop/products/czkbmnjxukja3gkjqwtd\"]}', 1, '2025-06-19 12:18:18', '2025-07-18 20:03:59'),
-(150, 'Giày Nike Air Jordan 1', 'Giày thể thao phong cách bóng rổ', 'Thiết kế huyền thoại, phù hợp cho phong cách đường phố.', '{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}', 4000000.00, 3800000.00, 0, 6, 53, 1, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844412/shoes_shop/products/gngtjolqqrzttkjmsshk.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/gngtjolqqrzttkjmsshk\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844416/shoes_shop/products/g9dg2lknzzwzf8pq9fnl.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844421/shoes_shop/products/jakujpwidmgixoafiff3.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/g9dg2lknzzwzf8pq9fnl\",\"shoes_shop/products/jakujpwidmgixoafiff3\"]}', 1, '2025-06-19 12:19:35', '2025-07-18 20:13:43'),
+(150, 'Giày Nike Air Jordan 1', 'Giày thể thao phong cách bóng rổ', 'Thiết kế huyền thoại, phù hợp cho phong cách đường phố.', '{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}', 4000000.00, 3800000.00, 0, 6, 53, 1, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844412/shoes_shop/products/gngtjolqqrzttkjmsshk.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/gngtjolqqrzttkjmsshk\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844416/shoes_shop/products/g9dg2lknzzwzf8pq9fnl.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844421/shoes_shop/products/jakujpwidmgixoafiff3.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/g9dg2lknzzwzf8pq9fnl\",\"shoes_shop/products/jakujpwidmgixoafiff3\"]}', 1, '2025-06-19 12:19:35', '2025-07-21 15:08:24'),
 (151, 'Giày Timberland 6-Inch Classic', 'Chất liệu bền bỉ, giữ ấm tốt', 'Chất liệu bền bỉ, giữ ấm tốt', '{\"ChatLieu\":\"Canvas, cao su\",\"KieuGiay\":\"Leo núi\",\"XuatXu\":\"Chính hãng\"}', 1700000.00, 1500000.00, 0, 43, 7, 36, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750487109/shoes_shop/products/yk9i6hzqfqodnfan44dk.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/yk9i6hzqfqodnfan44dk\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750487112/shoes_shop/products/gmhk935nt6lsykm0a8kh.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750487115/shoes_shop/products/v1wj7e3sfxkpgcb0el5a.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1750487115/shoes_shop/products/vgnz770gp587yzbxsiwu.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/gmhk935nt6lsykm0a8kh\",\"shoes_shop/products/v1wj7e3sfxkpgcb0el5a\",\"shoes_shop/products/vgnz770gp587yzbxsiwu\"]}', 1, '2025-06-21 11:37:39', '2025-07-18 20:10:59'),
 (152, 'Giày Nike Air Zoom', 'Giày thể thao công nghệ đệm khí', 'Giày thể thaoGiày Nike Air Zoom được thiết kế với công nghệ đệm khí tiên tiến, mang lại cảm giác thoải mái và hỗ trợ tốt cho chân khi vận động. Phần upper làm từ vải mesh thoáng khí giúp giảm thiểu mồ hôi và mùi hôi.', '{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}', 2500000.00, 2200000.00, 0, 4, 53, 1, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844072/shoes_shop/products/gfdv3z3nubkhmofzih1j.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/gfdv3z3nubkhmofzih1j\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844077/shoes_shop/products/tn03ben5mbxeuorbikkz.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844080/shoes_shop/products/bdqieficwsncj2wc7r3z.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/tn03ben5mbxeuorbikkz\",\"shoes_shop/products/bdqieficwsncj2wc7r3z\"]}', 1, '2025-06-21 11:39:44', '2025-07-18 20:08:02'),
-(153, 'Giày Nike Dunk Low', 'Giày thời trang cổ thấp', 'Giày Nike Dunk Low mang phong cách cổ điển, được thiết kế với đường nét tinh tế và đơn giản, phù hợp để phối đồ với nhiều phong cách thời trang khác nhau từ casual đến streetwear. Đôi giày nổi bật với lớp da cao cấp, đế cao su bền bỉ, mang lại cảm giác thoải mái khi di chuyển hàng ngày.', '{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}', 2500000.00, 2200000.00, 20, 1, 53, 1, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844683/shoes_shop/products/mltithr1fq2vj37du3na.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/mltithr1fq2vj37du3na\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844687/shoes_shop/products/uehxlyi2h7n1a6rfp3tp.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844691/shoes_shop/products/ajhmapkmx0lkt56uzixi.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844690/shoes_shop/products/pd3qzmvfckmrimoofsux.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844690/shoes_shop/products/yszu3tk0bsaipasgzjme.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844690/shoes_shop/products/bpfm52njjbls9f4ylluj.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/uehxlyi2h7n1a6rfp3tp\",\"shoes_shop/products/ajhmapkmx0lkt56uzixi\",\"shoes_shop/products/pd3qzmvfckmrimoofsux\",\"shoes_shop/products/yszu3tk0bsaipasgzjme\",\"shoes_shop/products/bpfm52njjbls9f4ylluj\"]}', 1, '2025-06-21 12:18:46', '2025-07-18 20:51:47');
+(153, 'Giày Nike Dunk Low', 'Giày thời trang cổ thấp', 'Giày Nike Dunk Low mang phong cách cổ điển, được thiết kế với đường nét tinh tế và đơn giản, phù hợp để phối đồ với nhiều phong cách thời trang khác nhau từ casual đến streetwear. Đôi giày nổi bật với lớp da cao cấp, đế cao su bền bỉ, mang lại cảm giác thoải mái khi di chuyển hàng ngày.', '{\"ChatLieu\":\"Vải mesh, cao su\",\"KieuGiay\":\"Thể thao\",\"XuatXu\":\"Chính hãng\"}', 2500000.00, 2200000.00, 26, 1, 53, 1, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844683/shoes_shop/products/mltithr1fq2vj37du3na.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/mltithr1fq2vj37du3na\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844687/shoes_shop/products/uehxlyi2h7n1a6rfp3tp.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844691/shoes_shop/products/ajhmapkmx0lkt56uzixi.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844690/shoes_shop/products/pd3qzmvfckmrimoofsux.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844690/shoes_shop/products/yszu3tk0bsaipasgzjme.jpg\",\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1752844690/shoes_shop/products/bpfm52njjbls9f4ylluj.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/uehxlyi2h7n1a6rfp3tp\",\"shoes_shop/products/ajhmapkmx0lkt56uzixi\",\"shoes_shop/products/pd3qzmvfckmrimoofsux\",\"shoes_shop/products/yszu3tk0bsaipasgzjme\",\"shoes_shop/products/bpfm52njjbls9f4ylluj\"]}', 1, '2025-06-21 12:18:46', '2025-07-21 17:48:53'),
+(164, 'nike', 'nikeddddddddddddd', 'nikenbnnnnnnnnnnnnnnnnnddđ', '{\"ChatLieu\":\"11\",\"KieuGiay\":\"1\",\"XuatXu\":\"1\"}', 12000.00, 0.00, 0, 43, 15, 3, '{\"anhChinh\":\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1753086247/shoes_shop/products/aumfbpvkzxkpjewcf5ts.jpg\",\"anhChinh_public_id\":\"shoes_shop/products/aumfbpvkzxkpjewcf5ts\",\"anhPhu\":[\"https://res.cloudinary.com/db7jn3ooa/image/upload/v1753086251/shoes_shop/products/grfugh1sn1xksgw9uyyr.jpg\"],\"anhPhu_public_ids\":[\"shoes_shop/products/grfugh1sn1xksgw9uyyr\"]}', 1, '2025-07-21 15:24:13', '2025-07-21 15:24:13');
 
 -- --------------------------------------------------------
 
@@ -1004,7 +1009,34 @@ INSERT INTO `token_lammoi` (`id`, `id_NguoiDung`, `ma_hash`, `ngay_tao`, `ngay_h
 (193, 50, '', '2025-07-18 23:10:48', '2025-07-25 23:10:48', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI4NTUwNDgsImV4cCI6MTc1MzQ1OTg0OH0.axZB0uDeXorBzKIQClaX5jZAwcTU8ioJTu3janJ8QfY'),
 (194, 50, '', '2025-07-19 11:17:49', '2025-07-26 11:17:49', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI4OTg2NjksImV4cCI6MTc1MzUwMzQ2OX0.vesdMLqOMkU5TvXEiohfVjcWIdGKhu5A64jkGEeYg2U'),
 (195, 50, '', '2025-07-19 12:20:52', '2025-07-26 12:20:52', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5MDI0NTIsImV4cCI6MTc1MzUwNzI1Mn0.fBjkRqetM26KVi30hbmgGGHams3MwN7FBPOj8IZ5LsY'),
-(196, 50, '', '2025-07-19 14:34:24', '2025-07-26 14:34:24', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5MTA0NjQsImV4cCI6MTc1MzUxNTI2NH0.n8C_VFg43wZ6hA5xNeiJC7MPwLUPxVHb_tKsD_0-zX8');
+(196, 50, '', '2025-07-19 14:34:24', '2025-07-26 14:34:24', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5MTA0NjQsImV4cCI6MTc1MzUxNTI2NH0.n8C_VFg43wZ6hA5xNeiJC7MPwLUPxVHb_tKsD_0-zX8'),
+(197, 50, '', '2025-07-19 17:42:52', '2025-07-26 17:42:52', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5MjE3NzIsImV4cCI6MTc1MzUyNjU3Mn0.qR37r2kSjcJHgGy1T5U5FPLGclsTKLkkArRfL13Yvyc'),
+(198, 50, '', '2025-07-19 19:50:35', '2025-07-26 19:50:35', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5Mjk0MzUsImV4cCI6MTc1MzUzNDIzNX0.tRRniZjfjm4BLWG3JLmFVBKJUrk4bN3Z23zR4dPbxUY'),
+(199, 50, '', '2025-07-20 07:51:12', '2025-07-27 07:51:12', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5NzI2NzIsImV4cCI6MTc1MzU3NzQ3Mn0.rIJETtXoNN6mutu7BZ3Lsy7vE_1MmkBtiW3x7lwZ9PU'),
+(200, 50, '', '2025-07-20 09:49:57', '2025-07-27 09:49:57', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5Nzk3OTcsImV4cCI6MTc1MzU4NDU5N30.7nUfapNAWxJ2k3QUxTxNIdUPcgAzKCON05adKBEo2Ak'),
+(201, 50, '', '2025-07-20 11:37:33', '2025-07-27 11:37:33', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5ODYyNTMsImV4cCI6MTc1MzU5MTA1M30.234fftooLyTAyOv0wpJOaBv0sD18oTUFTzgKUl2OiKg'),
+(202, 50, '', '2025-07-20 12:09:24', '2025-07-27 12:09:24', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5ODgxNjQsImV4cCI6MTc1MzU5Mjk2NH0.iAiB_WZbYgYL6WhGX9fiePMMHbF1Qac82-hXRxnBGR4'),
+(203, 50, '', '2025-07-20 12:11:25', '2025-07-27 12:11:25', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5ODgyODUsImV4cCI6MTc1MzU5MzA4NX0.ntiTecsA86PaOUnE4uKES07z1Uz96ueBtYn3fVPtIkU'),
+(204, 50, '', '2025-07-20 12:27:34', '2025-07-27 12:27:34', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5ODkyNTQsImV4cCI6MTc1MzU5NDA1NH0.sUlVPvPFNjXKpOcg7IIs66JbKzap649A0pUybCU0TJk'),
+(205, 50, '', '2025-07-20 12:35:05', '2025-07-27 12:35:05', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5ODk3MDUsImV4cCI6MTc1MzU5NDUwNX0.3p4eN5m2r5-5N8RIRsrjw5SwLOdoUWm-iHs6T-bGMlE'),
+(206, 50, '', '2025-07-20 12:59:56', '2025-07-27 12:59:56', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5OTExOTYsImV4cCI6MTc1MzU5NTk5Nn0.uAVHHJqSEA0oUvkTucPakmP0WOTbh9NSkDmdg2AWJ2Q'),
+(207, 50, '', '2025-07-20 13:41:36', '2025-07-27 13:41:36', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5OTM2OTYsImV4cCI6MTc1MzU5ODQ5Nn0.USYQreYyjVV9B7CK1AjG0T5Rzum6EWqnL0gaG1q1pcs'),
+(208, 50, '', '2025-07-20 13:59:30', '2025-07-27 13:59:30', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5OTQ3NzAsImV4cCI6MTc1MzU5OTU3MH0.g5iph25qTIpiLuDcARYgCqFbw8IasvlrRy6p3bvGNhc'),
+(209, 50, '', '2025-07-20 14:07:00', '2025-07-27 14:07:00', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5OTUyMjAsImV4cCI6MTc1MzYwMDAyMH0.40zo7i-DgkqzTQroRx5GbGIbmwUgI0hPPxpZHFgpRwk'),
+(210, 50, '', '2025-07-20 14:48:41', '2025-07-27 14:48:41', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTI5OTc3MjEsImV4cCI6MTc1MzYwMjUyMX0.99456AJB_RAI32H6oPvQ0wnihA34beA2sq4-tC45oJc'),
+(211, 50, '', '2025-07-21 09:46:42', '2025-07-28 09:46:42', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwNjYwMDIsImV4cCI6MTc1MzY3MDgwMn0.sa19GGjEK51hSyzXKjYMqMvZkUtSrND69jTTKRCTAsM'),
+(212, 50, '', '2025-07-21 10:11:46', '2025-07-28 10:11:46', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwNjc1MDYsImV4cCI6MTc1MzY3MjMwNn0.sB7nQtcBMN_MDlw5lhT-qCr5_VBQNlKNPzuje7jcXOQ'),
+(213, 50, '', '2025-07-21 11:02:33', '2025-07-28 11:02:33', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwNzA1NTMsImV4cCI6MTc1MzY3NTM1M30.urvrTFHPFT3a_6LFTaRFs0Cex0dZMy_5NZhrpAM09hc'),
+(214, 50, '', '2025-07-21 11:52:02', '2025-07-28 11:52:02', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwNzM1MjIsImV4cCI6MTc1MzY3ODMyMn0.ipk4Tp7KcQ2JfdhOV8xbesc1YDeLAhOIoaZTl-DJsyE'),
+(215, 50, '', '2025-07-21 12:11:55', '2025-07-28 12:11:55', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwNzQ3MTUsImV4cCI6MTc1MzY3OTUxNX0.e5wAdSYQ98rLYmuowvQP_MSLVPuTE9UODLjUmNsSE7o'),
+(216, 50, '', '2025-07-21 13:15:36', '2025-07-28 13:15:36', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwNzg1MzYsImV4cCI6MTc1MzY4MzMzNn0.wg0Gs0xKxtkxwnuBLXUvz5HX0U01_YF1OnoxKgmGGSM'),
+(217, 50, '', '2025-07-21 14:26:52', '2025-07-28 14:26:52', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwODI4MTIsImV4cCI6MTc1MzY4NzYxMn0.r5W1gQ5TRdyBHHtBvrsQCObN5MJdyP3WvZqTOhTYyOc'),
+(218, 50, '', '2025-07-21 17:41:13', '2025-07-28 17:41:13', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwOTQ0NzMsImV4cCI6MTc1MzY5OTI3M30.NGhbfbQxcE2zIEj7XNmQqZOVHm3VEBtVp5mTm6abHHE'),
+(219, 50, '', '2025-07-21 17:41:24', '2025-07-28 17:41:24', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMwOTQ0ODQsImV4cCI6MTc1MzY5OTI4NH0.Jkyp0SxfvF1mdxYk9Gxl1Hbj1bJFeBGgN67LT8YktZg'),
+(220, 50, '', '2025-07-21 20:29:11', '2025-07-28 20:29:11', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMxMDQ1NTEsImV4cCI6MTc1MzcwOTM1MX0.SbyvuXhYsu9sv0tFeZmzk25z9Uj4nOY7sTTSG_RpGlI'),
+(221, 50, '', '2025-07-21 20:45:21', '2025-07-28 20:45:21', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMxMDU1MjEsImV4cCI6MTc1MzcxMDMyMX0.OhMg4Y4yaebd7wICaGxeEigYWSxV3KInDjcTyXaX9C8'),
+(222, 50, '', '2025-07-22 10:01:02', '2025-07-29 10:01:02', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMxNTMyNjIsImV4cCI6MTc1Mzc1ODA2Mn0.vxI7_iPNkoTFIA_36rBp7XISxNZu1yvLt6vT3vJssgA'),
+(223, 50, '', '2025-07-22 11:43:17', '2025-07-29 11:43:17', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUwLCJpYXQiOjE3NTMxNTkzOTcsImV4cCI6MTc1Mzc2NDE5N30.LEjbOGWwKTNPhWyR9Nd-Sc8sEg86n4M_Spou5OMCHjw');
 
 -- --------------------------------------------------------
 
@@ -1280,7 +1312,7 @@ ALTER TABLE `wishlist`
 -- AUTO_INCREMENT for table `chitietdonhang`
 --
 ALTER TABLE `chitietdonhang`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=87;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=139;
 
 --
 -- AUTO_INCREMENT for table `chitietphieunhap`
@@ -1292,7 +1324,7 @@ ALTER TABLE `chitietphieunhap`
 -- AUTO_INCREMENT for table `chitietsanpham`
 --
 ALTER TABLE `chitietsanpham`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=426;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=435;
 
 --
 -- AUTO_INCREMENT for table `danhgia`
@@ -1310,13 +1342,13 @@ ALTER TABLE `danhmuc`
 -- AUTO_INCREMENT for table `donhang`
 --
 ALTER TABLE `donhang`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=130;
 
 --
 -- AUTO_INCREMENT for table `giohang`
 --
 ALTER TABLE `giohang`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=193;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=259;
 
 --
 -- AUTO_INCREMENT for table `hinhthucthanhtoan`
@@ -1376,7 +1408,7 @@ ALTER TABLE `quyenguoidung`
 -- AUTO_INCREMENT for table `sanpham`
 --
 ALTER TABLE `sanpham`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=163;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=165;
 
 --
 -- AUTO_INCREMENT for table `test`
@@ -1394,7 +1426,7 @@ ALTER TABLE `thuonghieu`
 -- AUTO_INCREMENT for table `token_lammoi`
 --
 ALTER TABLE `token_lammoi`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=197;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=224;
 
 --
 -- AUTO_INCREMENT for table `wishlist`
